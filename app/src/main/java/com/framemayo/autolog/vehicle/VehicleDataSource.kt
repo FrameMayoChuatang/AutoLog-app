@@ -1,4 +1,4 @@
-package com.b1nd.autolog.vehicle
+package com.framemayo.autolog.vehicle
 
 import ai.pleos.playground.vehicle.Vehicle
 import ai.pleos.playground.vehicle.constant.control.VehicleGear

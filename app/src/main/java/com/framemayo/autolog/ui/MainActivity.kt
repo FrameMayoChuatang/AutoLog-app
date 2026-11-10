@@ -1,4 +1,4 @@
-package com.b1nd.autolog.ui
+package com.framemayo.autolog.ui
 
 import android.Manifest
 import android.os.Build
@@ -28,12 +28,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.b1nd.autolog.data.local.TripEntity
-import com.b1nd.autolog.data.local.TripPurpose
-import com.b1nd.autolog.data.local.distanceKm
-import com.b1nd.autolog.data.local.durationMs
-import com.b1nd.autolog.service.TripRecorderService
-import com.b1nd.autolog.ui.theme.AutoLogTheme
+import com.framemayo.autolog.data.local.TripEntity
+import com.framemayo.autolog.data.local.TripPurpose
+import com.framemayo.autolog.data.local.distanceKm
+import com.framemayo.autolog.data.local.durationMs
+import com.framemayo.autolog.service.TripRecorderService
+import com.framemayo.autolog.ui.theme.AutoLogTheme
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

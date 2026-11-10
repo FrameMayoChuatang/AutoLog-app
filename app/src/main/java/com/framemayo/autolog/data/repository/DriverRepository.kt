@@ -1,7 +1,7 @@
-package com.b1nd.autolog.data.repository
+package com.framemayo.autolog.data.repository
 
-import com.b1nd.autolog.data.local.DriverDao
-import com.b1nd.autolog.data.local.DriverEntity
+import com.framemayo.autolog.data.local.DriverDao
+import com.framemayo.autolog.data.local.DriverEntity
 import kotlinx.coroutines.flow.Flow
 
 class DriverRepository(private val dao: DriverDao) {

@@ -1,4 +1,4 @@
-package com.b1nd.autolog.service
+package com.framemayo.autolog.service
 
 import android.content.BroadcastReceiver
 import android.content.Context

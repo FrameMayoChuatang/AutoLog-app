@@ -1,4 +1,4 @@
-package com.b1nd.autolog.vehicle
+package com.framemayo.autolog.vehicle
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

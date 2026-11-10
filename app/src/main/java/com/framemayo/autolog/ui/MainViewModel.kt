@@ -1,14 +1,14 @@
-package com.b1nd.autolog.ui
+package com.framemayo.autolog.ui
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.b1nd.autolog.container
-import com.b1nd.autolog.data.local.DriverEntity
-import com.b1nd.autolog.data.local.TripEntity
-import com.b1nd.autolog.data.local.TripPurpose
-import com.b1nd.autolog.service.RecorderState
-import com.b1nd.autolog.service.VehicleSnapshot
+import com.framemayo.autolog.container
+import com.framemayo.autolog.data.local.DriverEntity
+import com.framemayo.autolog.data.local.TripEntity
+import com.framemayo.autolog.data.local.TripPurpose
+import com.framemayo.autolog.service.RecorderState
+import com.framemayo.autolog.service.VehicleSnapshot
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine

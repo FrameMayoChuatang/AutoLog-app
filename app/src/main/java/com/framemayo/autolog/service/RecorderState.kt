@@ -1,4 +1,4 @@
-package com.b1nd.autolog.service
+package com.framemayo.autolog.service
 
 import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import kotlinx.coroutines.flow.MutableStateFlow

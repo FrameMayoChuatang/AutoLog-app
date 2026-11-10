@@ -1,4 +1,4 @@
-package com.b1nd.autolog.ui.theme
+package com.framemayo.autolog.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme

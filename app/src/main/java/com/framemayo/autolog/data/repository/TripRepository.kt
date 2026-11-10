@@ -1,9 +1,9 @@
-package com.b1nd.autolog.data.repository
+package com.framemayo.autolog.data.repository
 
-import com.b1nd.autolog.data.local.TripDao
-import com.b1nd.autolog.data.local.TripEntity
-import com.b1nd.autolog.data.local.TripPurpose
-import com.b1nd.autolog.data.local.TripStatus
+import com.framemayo.autolog.data.local.TripDao
+import com.framemayo.autolog.data.local.TripEntity
+import com.framemayo.autolog.data.local.TripPurpose
+import com.framemayo.autolog.data.local.TripStatus
 import kotlinx.coroutines.flow.Flow
 
 class TripRepository(

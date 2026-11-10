@@ -1,4 +1,4 @@
-package com.b1nd.autolog.vehicle
+package com.framemayo.autolog.vehicle
 
 class StopDetector(private val thresholdMs: Long = 45_000L) {
     private var lastKm: Float? = null

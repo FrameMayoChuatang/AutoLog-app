@@ -25,7 +25,7 @@
 ## 구조
 
 ```
-app/src/main/java/com/b1nd/autolog
+app/src/main/java/com/framemayo/autolog
 ├─ AutoLogApp.kt            # Application + 수동 DI(AppContainer)
 ├─ vehicle/                 # Pleos SDK는 여기서만 호출
 │  ├─ VehicleDataSource.kt  # 누적거리·기어 Flow

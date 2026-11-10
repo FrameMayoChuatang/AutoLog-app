@@ -1,4 +1,4 @@
-package com.b1nd.autolog.vehicle
+package com.framemayo.autolog.vehicle
 
 object OdometerValidator {
     fun isValid(newKm: Float?, lastValidKm: Float?): Boolean {

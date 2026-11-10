@@ -1,4 +1,4 @@
-package com.b1nd.autolog.service
+package com.framemayo.autolog.service
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -10,10 +10,10 @@ import android.os.Build
 import android.util.Log
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
-import com.b1nd.autolog.R
-import com.b1nd.autolog.container
-import com.b1nd.autolog.vehicle.OdometerValidator
-import com.b1nd.autolog.vehicle.StopDetector
+import com.framemayo.autolog.R
+import com.framemayo.autolog.container
+import com.framemayo.autolog.vehicle.OdometerValidator
+import com.framemayo.autolog.vehicle.StopDetector
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch

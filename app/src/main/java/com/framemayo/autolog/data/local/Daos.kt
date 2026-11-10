@@ -1,4 +1,4 @@
-package com.b1nd.autolog.data.local
+package com.framemayo.autolog.data.local
 
 import androidx.room.Dao
 import androidx.room.Insert

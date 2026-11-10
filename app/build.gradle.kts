@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.b1nd.autolog"
+    namespace = "com.framemayo.autolog"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.b1nd.autolog"
+        applicationId = "com.framemayo.autolog"
         minSdk = 28 // Pleos Playground 배포 요구사항
         targetSdk = 34
         versionCode = 1

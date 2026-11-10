@@ -1,10 +1,10 @@
-package com.b1nd.autolog
+package com.framemayo.autolog
 
 import android.app.Application
-import com.b1nd.autolog.data.local.AutoLogDatabase
-import com.b1nd.autolog.data.repository.DriverRepository
-import com.b1nd.autolog.data.repository.TripRepository
-import com.b1nd.autolog.vehicle.VehicleDataSource
+import com.framemayo.autolog.data.local.AutoLogDatabase
+import com.framemayo.autolog.data.repository.DriverRepository
+import com.framemayo.autolog.data.repository.TripRepository
+import com.framemayo.autolog.vehicle.VehicleDataSource
 
 class AutoLogApp : Application() {
     lateinit var container: AppContainer
