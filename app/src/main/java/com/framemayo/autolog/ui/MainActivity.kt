@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPermission: () -> Unit) {
     val v = state.vehicle
+    val linked = vm.linkState.collectAsStateWithLifecycle().value.link != null
     state.consentPrompt?.let { ConsentDialog(it.name, vm, requestLocationPermission) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -107,7 +108,8 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
                 Card {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("누가 운전하나요?", style = MaterialTheme.typography.titleMedium)
-                        val canStart = v.isParked && v.odometerKm != null
+                        val canStart = linked && v.isParked && v.odometerKm != null
+                        if (!linked) Text("차량을 먼저 연결해 주세요.", color = MaterialTheme.colorScheme.error)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             state.drivers.forEach { d ->
                                 Button(onClick = { vm.startTrip(d.id) }, enabled = canStart) { Text(d.name) }

@@ -110,6 +110,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun beginTrip(driverId: Long?) {
+        if (vehicleLink.link.value == null) return
         val km = RecorderState.snapshot.value.odometerKm ?: return
         viewModelScope.launch { trips.start(driverId, km) }
     }
