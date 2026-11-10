@@ -30,6 +30,14 @@ interface DriverDao {
 
     @Update
     suspend fun update(driver: DriverEntity)
+
+    @Transaction
+    suspend fun upsertRemote(drivers: List<DriverEntity>) {
+        drivers.forEach { d ->
+            val cur = d.remoteId?.let { byRemoteId(it) }
+            if (cur == null) insert(d) else update(cur.copy(name = d.name, department = d.department))
+        }
+    }
 }
 
 @Dao
