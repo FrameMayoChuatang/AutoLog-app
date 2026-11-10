@@ -3,6 +3,7 @@ package com.framemayo.autolog.data.local
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +19,9 @@ interface DriverDao {
     @Query("UPDATE drivers SET locationConsent = :consent, consentUpdatedAt = :at WHERE id = :id")
     suspend fun setConsent(id: Long, consent: Boolean, at: Long)
 
+    @Query("SELECT locationConsent FROM drivers WHERE id = :id")
+    suspend fun consentOf(id: Long): Boolean?
+
     @Query("SELECT remoteId FROM drivers WHERE id = :id")
     suspend fun remoteIdOf(id: Long): Long?
 
@@ -29,12 +33,21 @@ interface DriverDao {
 }
 
 @Dao
-interface PurposeDao {
+abstract class PurposeDao {
     @Upsert
-    suspend fun upsertAll(purposes: List<PurposeEntity>)
+    protected abstract suspend fun upsertAll(purposes: List<PurposeEntity>)
+
+    @Query("UPDATE purposes SET active = 0")
+    protected abstract suspend fun deactivateAll()
 
     @Query("SELECT * FROM purposes WHERE active = 1 ORDER BY name")
-    fun observeActive(): Flow<List<PurposeEntity>>
+    abstract fun observeActive(): Flow<List<PurposeEntity>>
+
+    @Transaction
+    open suspend fun replaceAll(purposes: List<PurposeEntity>) {
+        deactivateAll()
+        upsertAll(purposes)
+    }
 }
 
 @Dao
@@ -77,11 +90,14 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE status = 'INTERRUPTED' OR (status = 'COMPLETED' AND purpose = 'UNCONFIRMED') ORDER BY startedAt DESC")
     fun observeNeedsReview(): Flow<List<TripEntity>>
 
-    @Query("SELECT * FROM trips WHERE syncState != 'SYNCED' AND status != 'ACTIVE' ORDER BY startedAt")
+    @Query("SELECT * FROM trips WHERE syncState = 'PENDING' AND status != 'ACTIVE' ORDER BY startedAt")
     suspend fun pendingSync(): List<TripEntity>
 
-    @Query("DELETE FROM trips WHERE syncState = 'SYNCED' AND status != 'ACTIVE' AND updatedAt < :cutoff")
+    @Query("DELETE FROM trips WHERE syncState = 'SYNCED' AND status != 'ACTIVE' AND syncedAt < :cutoff")
     suspend fun deleteSyncedBefore(cutoff: Long): Int
+
+    @Query("UPDATE trips SET syncState = 'SYNCED', syncedAt = :at WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markSynced(id: Long, updatedAt: Long, at: Long)
 
     @Query("UPDATE trips SET syncState = :state WHERE id = :id AND updatedAt = :updatedAt")
     suspend fun setSyncState(id: Long, updatedAt: Long, state: SyncState)

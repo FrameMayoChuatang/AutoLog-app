@@ -17,11 +17,16 @@ internal fun fakeTripDao(): TripDao {
             "update" -> { val t = a[0] as TripEntity; rows[rows.indexOfFirst { it.id == t.id }] = t; Unit }
             "get" -> rows.firstOrNull { it.id == a[0] }
             "active" -> rows.lastOrNull { it.status == TripStatus.ACTIVE }
-            "pendingSync" -> rows.filter { it.syncState != SyncState.SYNCED && it.status != TripStatus.ACTIVE }
+            "pendingSync" -> rows.filter { it.syncState == SyncState.PENDING && it.status != TripStatus.ACTIVE }
             "deleteSyncedBefore" -> {
                 val n = rows.size
-                rows.removeAll { it.syncState == SyncState.SYNCED && it.status != TripStatus.ACTIVE && it.updatedAt < (a[0] as Long) }
+                rows.removeAll { it.syncState == SyncState.SYNCED && it.status != TripStatus.ACTIVE && (it.syncedAt ?: Long.MAX_VALUE) < (a[0] as Long) }
                 n - rows.size
+            }
+            "markSynced" -> {
+                val i = rows.indexOfFirst { it.id == a[0] && it.updatedAt == a[1] }
+                if (i >= 0) rows[i] = rows[i].copy(syncState = SyncState.SYNCED, syncedAt = a[2] as Long)
+                Unit
             }
             "setSyncState" -> {
                 val i = rows.indexOfFirst { it.id == a[0] && it.updatedAt == a[1] }

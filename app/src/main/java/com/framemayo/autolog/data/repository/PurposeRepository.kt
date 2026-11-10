@@ -6,10 +6,11 @@ import kotlinx.coroutines.flow.Flow
 
 interface PurposeRepository {
     val active: Flow<List<PurposeEntity>>
-    suspend fun upsertAll(purposes: List<PurposeEntity>)
+
+    suspend fun replaceAll(purposes: List<PurposeEntity>)
 }
 
 class PurposeRepositoryImpl(private val dao: PurposeDao) : PurposeRepository {
     override val active: Flow<List<PurposeEntity>> = dao.observeActive()
-    override suspend fun upsertAll(purposes: List<PurposeEntity>) = dao.upsertAll(purposes)
+    override suspend fun replaceAll(purposes: List<PurposeEntity>) = dao.replaceAll(purposes)
 }

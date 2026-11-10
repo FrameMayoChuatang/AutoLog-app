@@ -44,4 +44,14 @@ class RetentionTest {
         now = 31 * day
         assertEquals(0, repo.purgeSynced(30))
     }
+
+    @Test fun retentionCountsFromSyncTimeNotLastEdit() = runBlocking {
+        val t = finishedAt(0, 100f)
+        now = 40 * day
+        repo.markSynced(t)
+        now = 41 * day
+        assertEquals(0, repo.purgeSynced(30))
+        now = 71 * day
+        assertEquals(1, repo.purgeSynced(30))
+    }
 }

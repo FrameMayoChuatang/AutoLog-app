@@ -15,6 +15,10 @@ class TripRepositoryImpl(
     override val active: Flow<TripEntity?> = dao.observeActive()
     override val recent: Flow<List<TripEntity>> = dao.observeRecent(50)
     override val needsReview: Flow<List<TripEntity>> = dao.observeNeedsReview()
+    override suspend fun get(id: Long): TripEntity? = dao.get(id)
+
+    private fun nextUpdatedAt(trip: TripEntity): Long = maxOf(clock(), trip.updatedAt + 1)
+
     override suspend fun start(driverId: Long?, odometerKm: Float): TripEntity {
         dao.active()?.let { return it }
         val now = clock()
@@ -35,13 +39,14 @@ class TripRepositoryImpl(
 
     override suspend fun end(odometerKm: Float): TripEntity? {
         val trip = dao.active() ?: return null
+        val now = nextUpdatedAt(trip)
         val ended = trip.copy(
-            endedAt = clock(),
+            endedAt = now,
             endOdometerKm = odometerKm,
             lastOdometerKm = odometerKm,
             status = TripStatus.COMPLETED,
             syncState = SyncState.PENDING,
-            updatedAt = clock(),
+            updatedAt = now,
         )
         dao.update(ended)
         onPending()
@@ -50,7 +55,7 @@ class TripRepositoryImpl(
 
     override suspend fun setPurpose(tripId: Long, purpose: TripPurpose, memo: String?) {
         val trip = dao.get(tripId) ?: return
-        dao.update(trip.copy(purpose = purpose, memo = memo ?: trip.memo, syncState = SyncState.PENDING, updatedAt = clock()))
+        dao.update(trip.copy(purpose = purpose, memo = memo ?: trip.memo, syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(trip)))
         onPending()
     }
     override suspend fun recoverInterrupted(): TripEntity? {
@@ -60,7 +65,7 @@ class TripRepositoryImpl(
             endOdometerKm = trip.lastOdometerKm,
             status = TripStatus.INTERRUPTED,
             syncState = SyncState.PENDING,
-            updatedAt = clock(),
+            updatedAt = nextUpdatedAt(trip),
         )
         dao.update(recovered)
         onPending()
@@ -69,7 +74,7 @@ class TripRepositoryImpl(
 
     override suspend fun pendingSync(): List<TripEntity> = dao.pendingSync()
 
-    override suspend fun markSynced(trip: TripEntity) = dao.setSyncState(trip.id, trip.updatedAt, SyncState.SYNCED)
+    override suspend fun markSynced(trip: TripEntity) = dao.markSynced(trip.id, trip.updatedAt, clock())
 
     override suspend fun markSyncFailed(trip: TripEntity) = dao.setSyncState(trip.id, trip.updatedAt, SyncState.FAILED)
 

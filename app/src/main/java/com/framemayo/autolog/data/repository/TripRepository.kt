@@ -9,6 +9,8 @@ interface TripRepository {
     val recent: Flow<List<TripEntity>>
     val needsReview: Flow<List<TripEntity>>
 
+    suspend fun get(id: Long): TripEntity?
+
     suspend fun start(driverId: Long?, odometerKm: Float): TripEntity
     suspend fun heartbeat(odometerKm: Float)
     suspend fun end(odometerKm: Float): TripEntity?
