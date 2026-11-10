@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -13,6 +14,21 @@ interface DriverDao {
 
     @Query("SELECT * FROM drivers ORDER BY name")
     fun observeAll(): Flow<List<DriverEntity>>
+
+    @Query("SELECT * FROM drivers WHERE remoteId = :remoteId")
+    suspend fun byRemoteId(remoteId: Long): DriverEntity?
+
+    @Update
+    suspend fun update(driver: DriverEntity)
+}
+
+@Dao
+interface PurposeDao {
+    @Upsert
+    suspend fun upsertAll(purposes: List<PurposeEntity>)
+
+    @Query("SELECT * FROM purposes WHERE active = 1 ORDER BY name")
+    fun observeActive(): Flow<List<PurposeEntity>>
 }
 
 @Dao
@@ -40,6 +56,9 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE status = 'INTERRUPTED' OR (status = 'COMPLETED' AND purpose = 'UNCONFIRMED') ORDER BY startedAt DESC")
     fun observeNeedsReview(): Flow<List<TripEntity>>
 
-    @Query("SELECT * FROM trips WHERE synced = 0 AND status != 'ACTIVE'")
-    suspend fun unsynced(): List<TripEntity>
+    @Query("SELECT * FROM trips WHERE syncState != 'SYNCED' AND status != 'ACTIVE' ORDER BY startedAt")
+    suspend fun pendingSync(): List<TripEntity>
+
+    @Query("UPDATE trips SET syncState = :state WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun setSyncState(id: Long, updatedAt: Long, state: SyncState)
 }
