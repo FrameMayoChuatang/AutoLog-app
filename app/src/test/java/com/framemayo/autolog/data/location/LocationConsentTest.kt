@@ -44,4 +44,12 @@ class LocationConsentTest {
         repo.setLocationConsent(1, false) // 철회
         assertEquals(false to 20L, saved[1L])
     }
+
+    @Test fun purgeRuleKeepsUnconfirmedOnlyForConsentedDriver() {
+        assertFalse(LocationPolicy.shouldPurge(true, TripPurpose.UNCONFIRMED))
+        assertFalse(LocationPolicy.shouldPurge(true, TripPurpose.BUSINESS_COMMUTE))
+        assertTrue(LocationPolicy.shouldPurge(true, TripPurpose.PERSONAL))
+        assertTrue(LocationPolicy.shouldPurge(false, TripPurpose.BUSINESS_GENERAL))
+        assertTrue(LocationPolicy.shouldPurge(null, TripPurpose.UNCONFIRMED))
+    }
 }

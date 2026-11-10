@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,8 @@ import java.time.format.DateTimeFormatter
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private val locationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* 거부돼도 위치만 수집 안 함 */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,7 +56,7 @@ class MainActivity : ComponentActivity() {
             AutoLogTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val state by viewModel.state.collectAsStateWithLifecycle()
-                    MainScreen(state, viewModel)
+                    MainScreen(state, viewModel) { locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
                 }
             }
         }
@@ -61,9 +64,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun MainScreen(state: MainUiState, vm: MainViewModel) {
+private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPermission: () -> Unit) {
     val v = state.vehicle
-    state.consentPrompt?.let { ConsentDialog(it.name, vm) }
+    state.consentPrompt?.let { ConsentDialog(it.name, vm, requestLocationPermission) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -111,7 +114,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel) {
             }
         }
 
-        item { LocationConsentCard(state, vm) }
+        item { LocationConsentCard(state, vm, requestLocationPermission) }
 
         item { Text("최근 운행", style = MaterialTheme.typography.titleMedium) }
         items(state.recentTrips, key = { it.id }) { trip -> TripRow(trip, vm) }
@@ -119,7 +122,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel) {
 }
 
 @Composable
-private fun ConsentDialog(name: String, vm: MainViewModel) {
+private fun ConsentDialog(name: String, vm: MainViewModel, requestLocationPermission: () -> Unit) {
     AlertDialog(
         onDismissRequest = vm::dismissConsent,
         title = { Text("위치정보 수집 동의") },
@@ -129,13 +132,13 @@ private fun ConsentDialog(name: String, vm: MainViewModel) {
                     "동의하지 않아도 운행 기록은 정상 작성됩니다. 동의는 언제든 철회할 수 있습니다.",
             )
         },
-        confirmButton = { Button(onClick = { vm.answerConsent(true) }) { Text("동의") } },
+        confirmButton = { Button(onClick = { vm.answerConsent(true); requestLocationPermission() }) { Text("동의") } },
         dismissButton = { OutlinedButton(onClick = { vm.answerConsent(false) }) { Text("동의 안 함") } },
     )
 }
 
 @Composable
-private fun LocationConsentCard(state: MainUiState, vm: MainViewModel) {
+private fun LocationConsentCard(state: MainUiState, vm: MainViewModel, requestLocationPermission: () -> Unit) {
     if (state.drivers.isEmpty()) return
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -144,7 +147,7 @@ private fun LocationConsentCard(state: MainUiState, vm: MainViewModel) {
                 val agreed = d.locationConsent == true
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${d.name}: ${when (d.locationConsent) { true -> "동의"; false -> "동의 안 함"; null -> "미확인" }}")
-                    OutlinedButton(onClick = { vm.setLocationConsent(d.id, !agreed) }) { Text(if (agreed) "철회" else "동의") }
+                    OutlinedButton(onClick = { vm.setLocationConsent(d.id, !agreed); if (!agreed) requestLocationPermission() }) { Text(if (agreed) "철회" else "동의") }
                 }
             }
         }

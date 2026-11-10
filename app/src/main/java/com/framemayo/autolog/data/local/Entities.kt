@@ -1,6 +1,7 @@
 package com.framemayo.autolog.data.local
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.util.UUID
@@ -14,6 +15,18 @@ data class DriverEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val locationConsent: Boolean? = null,
     val consentUpdatedAt: Long? = null,
+)
+
+@Entity(
+    tableName = "trip_locations",
+    foreignKeys = [ForeignKey(TripEntity::class, ["id"], ["tripId"], onDelete = ForeignKey.CASCADE)],
+)
+data class TripLocationEntity(
+    @PrimaryKey val tripId: Long,
+    val latitude: Double,
+    val longitude: Double,
+    val accuracyM: Float?,
+    val capturedAt: Long,
 )
 
 enum class TripStatus {
