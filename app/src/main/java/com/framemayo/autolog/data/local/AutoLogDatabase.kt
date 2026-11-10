@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class, TripLocationEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class AutoLogDatabase : RoomDatabase() {
@@ -21,8 +21,26 @@ abstract class AutoLogDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): AutoLogDatabase =
             Room.databaseBuilder(context, AutoLogDatabase::class.java, "autolog.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE drivers_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, remoteId TEXT, name TEXT NOT NULL, " +
+                        "department TEXT NOT NULL, createdAt INTEGER NOT NULL, locationConsent INTEGER, consentUpdatedAt INTEGER)",
+                )
+                db.execSQL(
+                    "INSERT INTO drivers_new (id, name, department, createdAt, locationConsent, consentUpdatedAt) " +
+                        "SELECT id, name, department, createdAt, locationConsent, consentUpdatedAt FROM drivers",
+                )
+                db.execSQL("DROP TABLE drivers")
+                db.execSQL("ALTER TABLE drivers_new RENAME TO drivers")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_drivers_remoteId ON drivers (remoteId)")
+                db.execSQL("DROP TABLE purposes")
+                db.execSQL("CREATE TABLE purposes (remoteId TEXT NOT NULL, name TEXT NOT NULL, active INTEGER NOT NULL, PRIMARY KEY(remoteId))")
+            }
+        }
 
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {

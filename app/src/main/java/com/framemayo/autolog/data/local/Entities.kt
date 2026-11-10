@@ -9,7 +9,7 @@ import java.util.UUID
 @Entity(tableName = "drivers", indices = [Index("remoteId", unique = true)])
 data class DriverEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val remoteId: Long? = null,
+    val remoteId: String? = null, // 서버 운전자 UUID
     val name: String,
     val department: String,
     val createdAt: Long = System.currentTimeMillis(),
@@ -38,7 +38,7 @@ enum class SyncState { PENDING, SYNCED, FAILED }
 
 @Entity(tableName = "purposes")
 data class PurposeEntity(
-    @PrimaryKey val remoteId: Long,
+    @PrimaryKey val remoteId: String,
     val name: String,
     val active: Boolean = true,
 )

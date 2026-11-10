@@ -8,7 +8,7 @@ interface DriverRepository {
     val all: Flow<List<DriverEntity>>
     suspend fun add(name: String, department: String): Long
 
-    suspend fun remoteIdOf(localId: Long): Long?
+    suspend fun remoteIdOf(localId: Long): String?
 
     suspend fun consentOf(driverId: Long): Boolean?
 
@@ -17,7 +17,7 @@ interface DriverRepository {
     suspend fun upsertRemote(drivers: List<RemoteDriver>)
 }
 
-data class RemoteDriver(val remoteId: Long, val name: String, val department: String)
+data class RemoteDriver(val remoteId: String, val name: String, val department: String)
 
 class DriverRepositoryImpl(
     private val dao: DriverDao,
@@ -28,7 +28,7 @@ class DriverRepositoryImpl(
     override suspend fun add(name: String, department: String): Long =
         dao.insert(DriverEntity(name = name.trim(), department = department.trim()))
 
-    override suspend fun remoteIdOf(localId: Long): Long? = dao.remoteIdOf(localId)
+    override suspend fun remoteIdOf(localId: Long): String? = dao.remoteIdOf(localId)
 
     override suspend fun consentOf(driverId: Long): Boolean? = dao.consentOf(driverId)
 

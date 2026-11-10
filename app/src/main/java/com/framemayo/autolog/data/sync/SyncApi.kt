@@ -4,7 +4,7 @@ import com.framemayo.autolog.data.local.TripEntity
 
 data class TripPayload(
     val uuid: String,
-    val driverRemoteId: Long?,
+    val driverRemoteId: String?,
     val startedAt: Long,
     val endedAt: Long?,
     val startOdometerKm: Float,
@@ -27,7 +27,7 @@ interface SyncApi {
     suspend fun upload(trip: TripPayload): SyncResult
 }
 
-fun TripEntity.toPayload(driverRemoteId: Long?) = TripPayload(
+fun TripEntity.toPayload(driverRemoteId: String?) = TripPayload(
     uuid = uuid,
     driverRemoteId = driverRemoteId,
     startedAt = startedAt,
