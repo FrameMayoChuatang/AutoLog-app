@@ -1,42 +1,16 @@
 package com.framemayo.autolog.data
 
 import com.framemayo.autolog.data.local.SyncState
-import com.framemayo.autolog.data.local.TripDao
-import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
-import com.framemayo.autolog.data.local.TripStatus
 import com.framemayo.autolog.data.repository.TripRepositoryImpl
-import java.lang.reflect.Proxy
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
-private fun fakeDao(): TripDao {
-    val rows = mutableListOf<TripEntity>()
-    var nextId = 1L
-    return Proxy.newProxyInstance(TripDao::class.java.classLoader, arrayOf(TripDao::class.java)) { _, m, a ->
-        when (m.name) {
-            "insert" -> { val t = (a[0] as TripEntity).copy(id = nextId++); rows += t; t.id }
-            "update" -> { val t = a[0] as TripEntity; rows[rows.indexOfFirst { it.id == t.id }] = t; Unit }
-            "get" -> rows.firstOrNull { it.id == a[0] }
-            "active" -> rows.lastOrNull { it.status == TripStatus.ACTIVE }
-            "pendingSync" -> rows.filter { it.syncState != SyncState.SYNCED && it.status != TripStatus.ACTIVE }
-            "setSyncState" -> {
-                val i = rows.indexOfFirst { it.id == a[0] && it.updatedAt == a[1] }
-                if (i >= 0) rows[i] = rows[i].copy(syncState = a[2] as SyncState)
-                Unit
-            }
-            "observeActive", "observeRecent", "observeNeedsReview" -> flowOf<Any?>(null)
-            else -> error("unexpected ${m.name}")
-        }
-    } as TripDao
-}
-
 class TripRepositorySyncTest {
     private var now = 1_000L
-    private val repo = TripRepositoryImpl(fakeDao()) { now++ }
+    private val repo = TripRepositoryImpl(fakeTripDao(), clock = { now++ })
 
     @Test fun activeTripIsNotPending() = runBlocking {
         repo.start(1, 100f)

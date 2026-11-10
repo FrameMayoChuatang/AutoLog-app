@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 class TripRepositoryImpl(
     private val dao: TripDao,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val onPending: () -> Unit = {},
 ) : TripRepository {
     override val active: Flow<TripEntity?> = dao.observeActive()
     override val recent: Flow<List<TripEntity>> = dao.observeRecent(50)
@@ -43,12 +44,14 @@ class TripRepositoryImpl(
             updatedAt = clock(),
         )
         dao.update(ended)
+        onPending()
         return ended
     }
 
     override suspend fun setPurpose(tripId: Long, purpose: TripPurpose, memo: String?) {
         val trip = dao.get(tripId) ?: return
         dao.update(trip.copy(purpose = purpose, memo = memo ?: trip.memo, syncState = SyncState.PENDING, updatedAt = clock()))
+        onPending()
     }
     override suspend fun recoverInterrupted(): TripEntity? {
         val trip = dao.active() ?: return null
@@ -60,6 +63,7 @@ class TripRepositoryImpl(
             updatedAt = clock(),
         )
         dao.update(recovered)
+        onPending()
         return recovered
     }
 
