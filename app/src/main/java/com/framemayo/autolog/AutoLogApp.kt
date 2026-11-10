@@ -1,7 +1,7 @@
 package com.framemayo.autolog
 
 import android.app.Application
-import com.framemayo.autolog.data.link.FakeVehicleLinkApi
+import com.framemayo.autolog.data.link.HttpVehicleLinkApi
 import com.framemayo.autolog.data.link.VehicleLinkRepository
 import com.framemayo.autolog.data.local.AutoLogDatabase
 import com.framemayo.autolog.data.repository.DriverRepository
@@ -13,6 +13,7 @@ import com.framemayo.autolog.data.repository.TripRepositoryImpl
 import com.framemayo.autolog.data.location.AndroidLocationSource
 import com.framemayo.autolog.data.location.FusedLocationSource
 import com.framemayo.autolog.data.location.ArrivalLocationRecorder
+import com.framemayo.autolog.data.remote.ServerApi
 import com.framemayo.autolog.data.retention.RetentionScheduler
 import com.framemayo.autolog.data.sync.FakeSyncApi
 import com.framemayo.autolog.data.sync.SyncManager
@@ -40,7 +41,8 @@ class AppContainer(app: Application) {
 
     val arrival = ArrivalLocationRecorder(db.tripLocationDao(), FusedLocationSource(app, AndroidLocationSource(app)))
 
-    val vehicleLink = VehicleLinkRepository(app.getSharedPreferences("vehicle_link", android.content.Context.MODE_PRIVATE), FakeVehicleLinkApi())
+    val server: ServerApi = ServerApi(app.getString(R.string.server_url), token = { vehicleLink.link.value?.accessToken }, onUnauthorized = { vehicleLink.disconnect() })
+    val vehicleLink: VehicleLinkRepository = VehicleLinkRepository(app.getSharedPreferences("vehicle_link", android.content.Context.MODE_PRIVATE), HttpVehicleLinkApi(server))
 
     val sync = SyncManager(trips, drivers, FakeSyncApi())
 }
