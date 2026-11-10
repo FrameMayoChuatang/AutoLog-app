@@ -10,6 +10,8 @@ interface DriverRepository {
 
     suspend fun remoteIdOf(localId: Long): Long?
 
+    suspend fun consentOf(driverId: Long): Boolean?
+
     suspend fun setLocationConsent(driverId: Long, consent: Boolean)
 
     suspend fun upsertRemote(drivers: List<RemoteDriver>)
@@ -27,6 +29,8 @@ class DriverRepositoryImpl(
         dao.insert(DriverEntity(name = name.trim(), department = department.trim()))
 
     override suspend fun remoteIdOf(localId: Long): Long? = dao.remoteIdOf(localId)
+
+    override suspend fun consentOf(driverId: Long): Boolean? = dao.consentOf(driverId)
 
     override suspend fun setLocationConsent(driverId: Long, consent: Boolean) =
         dao.setConsent(driverId, consent, clock())

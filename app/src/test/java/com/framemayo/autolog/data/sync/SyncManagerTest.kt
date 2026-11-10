@@ -20,6 +20,7 @@ private object FakeDrivers : DriverRepository {
     override suspend fun add(name: String, department: String) = 1L
     override suspend fun remoteIdOf(localId: Long): Long? = if (localId == 1L) 100L else null
     override suspend fun setLocationConsent(driverId: Long, consent: Boolean) = Unit
+    override suspend fun consentOf(driverId: Long): Boolean? = null
     override suspend fun upsertRemote(drivers: List<RemoteDriver>) = Unit
 }
 
@@ -68,7 +69,10 @@ class SyncManagerTest {
         finishedTrip()
         api.reject = true
         assertTrue(sync.syncPending())
-        assertEquals(SyncState.FAILED, repo.pendingSync().single().syncState)
+        assertEquals(SyncState.FAILED, repo.get(1L)!!.syncState)
+        api.reject = false
+        sync.syncPending()
+        assertEquals(0, api.received.size)
     }
 
     @Test fun stopsAtFirstNetworkErrorKeepingOrder() = runBlocking {

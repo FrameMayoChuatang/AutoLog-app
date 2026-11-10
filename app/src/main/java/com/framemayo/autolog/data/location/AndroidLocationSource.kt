@@ -8,6 +8,7 @@ import android.location.Location
 import android.location.LocationManager
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
+import androidx.core.os.CancellationSignal
 import androidx.core.util.Consumer
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -33,7 +34,9 @@ class AndroidLocationSource(private val context: Context) : LocationSource {
         val p = provider() ?: return null
         return withTimeoutOrNull(FIX_TIMEOUT_MS) {
             suspendCancellableCoroutine<LocationFix?> { cont ->
-                LocationManagerCompat.getCurrentLocation(m, p, null as androidx.core.os.CancellationSignal?, ContextCompat.getMainExecutor(context), Consumer<Location?> { loc ->
+                val signal = CancellationSignal()
+                cont.invokeOnCancellation { signal.cancel() } // 타임아웃 시 GPS 요청도 중단
+                LocationManagerCompat.getCurrentLocation(m, p, signal, ContextCompat.getMainExecutor(context), Consumer<Location?> { loc ->
                     if (cont.isActive) {
                         cont.resume(
                             loc?.let {

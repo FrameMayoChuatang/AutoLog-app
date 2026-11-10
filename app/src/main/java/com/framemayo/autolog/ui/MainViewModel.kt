@@ -29,7 +29,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val drivers = app.container.drivers
     private val arrival = app.container.arrival
 
-    private fun consentOf(driverId: Long?): Boolean? = state.value.drivers.find { it.id == driverId }?.locationConsent
+    private suspend fun consentOf(driverId: Long?): Boolean? = driverId?.let { drivers.consentOf(it) }
 
     private val consentPrompt = MutableStateFlow<DriverEntity?>(null)
 
@@ -89,8 +89,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setPurpose(tripId: Long, purpose: TripPurpose) {
         viewModelScope.launch {
             trips.setPurpose(tripId, purpose)
-            val driverId = state.value.recentTrips.find { it.id == tripId }?.driverId
-            arrival.settle(tripId, consentOf(driverId), purpose)
+            val trip = trips.get(tripId) ?: return@launch
+            arrival.settle(tripId, consentOf(trip.driverId), purpose)
         }
     }
 }
