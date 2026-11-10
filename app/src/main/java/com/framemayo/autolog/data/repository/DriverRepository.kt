@@ -35,11 +35,6 @@ class DriverRepositoryImpl(
     override suspend fun setLocationConsent(driverId: Long, consent: Boolean) =
         dao.setConsent(driverId, consent, clock())
 
-    override suspend fun upsertRemote(drivers: List<RemoteDriver>) {
-        drivers.forEach { d ->
-            val cur = dao.byRemoteId(d.remoteId)
-            if (cur == null) dao.insert(DriverEntity(remoteId = d.remoteId, name = d.name, department = d.department))
-            else dao.update(cur.copy(name = d.name, department = d.department))
-        }
-    }
+    override suspend fun upsertRemote(drivers: List<RemoteDriver>) =
+        dao.upsertRemote(drivers.map { DriverEntity(remoteId = it.remoteId, name = it.name, department = it.department) })
 }
