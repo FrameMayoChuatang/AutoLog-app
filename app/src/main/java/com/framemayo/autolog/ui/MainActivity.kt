@@ -35,6 +35,7 @@ import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.local.distanceKm
 import com.framemayo.autolog.data.local.durationMs
+import com.framemayo.autolog.data.location.FusedLocationSource
 import com.framemayo.autolog.service.TripRecorderService
 import com.framemayo.autolog.ui.theme.AutoLogTheme
 import java.time.Instant
@@ -45,7 +46,7 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private val locationPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* 거부돼도 위치만 수집 안 함 */ }
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { /* 거부돼도 위치만 수집 안 함 */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,7 +57,9 @@ class MainActivity : ComponentActivity() {
             AutoLogTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val state by viewModel.state.collectAsStateWithLifecycle()
-                    MainScreen(state, viewModel) { locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
+                    MainScreen(state, viewModel) {
+                        locationPermission.launch(arrayOf(FusedLocationSource.PERMISSION, Manifest.permission.ACCESS_FINE_LOCATION))
+                    }
                 }
             }
         }
