@@ -15,6 +15,9 @@ interface DriverDao {
     @Query("SELECT * FROM drivers ORDER BY name")
     fun observeAll(): Flow<List<DriverEntity>>
 
+    @Query("SELECT remoteId FROM drivers WHERE id = :id")
+    suspend fun remoteIdOf(id: Long): Long?
+
     @Query("SELECT * FROM drivers WHERE remoteId = :remoteId")
     suspend fun byRemoteId(remoteId: Long): DriverEntity?
 

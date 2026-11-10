@@ -8,6 +8,8 @@ interface DriverRepository {
     val all: Flow<List<DriverEntity>>
     suspend fun add(name: String, department: String): Long
 
+    suspend fun remoteIdOf(localId: Long): Long?
+
     suspend fun upsertRemote(drivers: List<RemoteDriver>)
 }
 
@@ -18,6 +20,8 @@ class DriverRepositoryImpl(private val dao: DriverDao) : DriverRepository {
 
     override suspend fun add(name: String, department: String): Long =
         dao.insert(DriverEntity(name = name.trim(), department = department.trim()))
+
+    override suspend fun remoteIdOf(localId: Long): Long? = dao.remoteIdOf(localId)
 
     override suspend fun upsertRemote(drivers: List<RemoteDriver>) {
         drivers.forEach { d ->

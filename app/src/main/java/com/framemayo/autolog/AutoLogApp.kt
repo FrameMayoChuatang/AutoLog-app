@@ -8,6 +8,9 @@ import com.framemayo.autolog.data.repository.PurposeRepository
 import com.framemayo.autolog.data.repository.PurposeRepositoryImpl
 import com.framemayo.autolog.data.repository.TripRepository
 import com.framemayo.autolog.data.repository.TripRepositoryImpl
+import com.framemayo.autolog.data.sync.FakeSyncApi
+import com.framemayo.autolog.data.sync.SyncManager
+import com.framemayo.autolog.data.sync.SyncScheduler
 import com.framemayo.autolog.vehicle.VehicleDataSource
 
 class AutoLogApp : Application() {
@@ -17,15 +20,18 @@ class AutoLogApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        SyncScheduler.enqueue(this)
     }
 }
 
 class AppContainer(app: Application) {
     private val db = AutoLogDatabase.create(app)
     val vehicle = VehicleDataSource(app)
-    val trips: TripRepository = TripRepositoryImpl(db.tripDao())
+    val trips: TripRepository = TripRepositoryImpl(db.tripDao(), onPending = { SyncScheduler.enqueue(app) })
     val drivers: DriverRepository = DriverRepositoryImpl(db.driverDao())
     val purposes: PurposeRepository = PurposeRepositoryImpl(db.purposeDao())
+
+    val sync = SyncManager(trips, drivers, FakeSyncApi())
 }
 
 val android.content.Context.container: AppContainer
