@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,6 +63,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MainScreen(state: MainUiState, vm: MainViewModel) {
     val v = state.vehicle
+    state.consentPrompt?.let { ConsentDialog(it.name, vm) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -108,8 +111,43 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel) {
             }
         }
 
+        item { LocationConsentCard(state, vm) }
+
         item { Text("최근 운행", style = MaterialTheme.typography.titleMedium) }
         items(state.recentTrips, key = { it.id }) { trip -> TripRow(trip, vm) }
+    }
+}
+
+@Composable
+private fun ConsentDialog(name: String, vm: MainViewModel) {
+    AlertDialog(
+        onDismissRequest = vm::dismissConsent,
+        title = { Text("위치정보 수집 동의") },
+        text = {
+            Text(
+                "${name}님의 업무 운행에 한해 도착 위치를 저장합니다. 개인 운행은 저장하지 않으며, " +
+                    "동의하지 않아도 운행 기록은 정상 작성됩니다. 동의는 언제든 철회할 수 있습니다.",
+            )
+        },
+        confirmButton = { Button(onClick = { vm.answerConsent(true) }) { Text("동의") } },
+        dismissButton = { OutlinedButton(onClick = { vm.answerConsent(false) }) { Text("동의 안 함") } },
+    )
+}
+
+@Composable
+private fun LocationConsentCard(state: MainUiState, vm: MainViewModel) {
+    if (state.drivers.isEmpty()) return
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("위치정보 수집 설정", style = MaterialTheme.typography.titleMedium)
+            state.drivers.forEach { d ->
+                val agreed = d.locationConsent == true
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${d.name}: ${when (d.locationConsent) { true -> "동의"; false -> "동의 안 함"; null -> "미확인" }}")
+                    OutlinedButton(onClick = { vm.setLocationConsent(d.id, !agreed) }) { Text(if (agreed) "철회" else "동의") }
+                }
+            }
+        }
     }
 }
 

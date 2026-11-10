@@ -15,6 +15,9 @@ interface DriverDao {
     @Query("SELECT * FROM drivers ORDER BY name")
     fun observeAll(): Flow<List<DriverEntity>>
 
+    @Query("UPDATE drivers SET locationConsent = :consent, consentUpdatedAt = :at WHERE id = :id")
+    suspend fun setConsent(id: Long, consent: Boolean, at: Long)
+
     @Query("SELECT remoteId FROM drivers WHERE id = :id")
     suspend fun remoteIdOf(id: Long): Long?
 
