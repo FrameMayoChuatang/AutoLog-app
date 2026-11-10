@@ -9,6 +9,7 @@ import com.framemayo.autolog.data.repository.PurposeRepositoryImpl
 import com.framemayo.autolog.data.repository.TripRepository
 import com.framemayo.autolog.data.repository.TripRepositoryImpl
 import com.framemayo.autolog.data.location.AndroidLocationSource
+import com.framemayo.autolog.data.location.FusedLocationSource
 import com.framemayo.autolog.data.location.ArrivalLocationRecorder
 import com.framemayo.autolog.data.retention.RetentionScheduler
 import com.framemayo.autolog.data.sync.FakeSyncApi
@@ -35,7 +36,7 @@ class AppContainer(app: Application) {
     val drivers: DriverRepository = DriverRepositoryImpl(db.driverDao())
     val purposes: PurposeRepository = PurposeRepositoryImpl(db.purposeDao())
 
-    val arrival = ArrivalLocationRecorder(db.tripLocationDao(), AndroidLocationSource(app))
+    val arrival = ArrivalLocationRecorder(db.tripLocationDao(), FusedLocationSource(app, AndroidLocationSource(app)))
 
     val sync = SyncManager(trips, drivers, FakeSyncApi())
 }
