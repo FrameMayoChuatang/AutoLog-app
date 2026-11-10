@@ -19,6 +19,7 @@ private object FakeDrivers : DriverRepository {
     override val all: Flow<List<DriverEntity>> = flowOf(emptyList())
     override suspend fun add(name: String, department: String) = 1L
     override suspend fun remoteIdOf(localId: Long): Long? = if (localId == 1L) 100L else null
+    override suspend fun setLocationConsent(driverId: Long, consent: Boolean) = Unit
     override suspend fun upsertRemote(drivers: List<RemoteDriver>) = Unit
 }
 

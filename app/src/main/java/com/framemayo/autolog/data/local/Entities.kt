@@ -12,6 +12,8 @@ data class DriverEntity(
     val name: String,
     val department: String,
     val createdAt: Long = System.currentTimeMillis(),
+    val locationConsent: Boolean? = null,
+    val consentUpdatedAt: Long? = null,
 )
 
 enum class TripStatus {
