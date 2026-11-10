@@ -23,10 +23,10 @@ interface DriverDao {
     suspend fun consentOf(id: Long): Boolean?
 
     @Query("SELECT remoteId FROM drivers WHERE id = :id")
-    suspend fun remoteIdOf(id: Long): Long?
+    suspend fun remoteIdOf(id: Long): String?
 
     @Query("SELECT * FROM drivers WHERE remoteId = :remoteId")
-    suspend fun byRemoteId(remoteId: Long): DriverEntity?
+    suspend fun byRemoteId(remoteId: String): DriverEntity?
 
     @Update
     suspend fun update(driver: DriverEntity)

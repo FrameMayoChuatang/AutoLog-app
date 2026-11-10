@@ -15,10 +15,12 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+private const val DRIVER_UUID = "0a94e986-dfcf-4e4a-b490-f96876c62aed"
+
 private object FakeDrivers : DriverRepository {
     override val all: Flow<List<DriverEntity>> = flowOf(emptyList())
     override suspend fun add(name: String, department: String) = 1L
-    override suspend fun remoteIdOf(localId: Long): Long? = if (localId == 1L) 100L else null
+    override suspend fun remoteIdOf(localId: Long): String? = if (localId == 1L) DRIVER_UUID else null
     override suspend fun setLocationConsent(driverId: Long, consent: Boolean) = Unit
     override suspend fun consentOf(driverId: Long): Boolean? = null
     override suspend fun upsertRemote(drivers: List<RemoteDriver>) = Unit
@@ -46,7 +48,7 @@ class SyncManagerTest {
         assertTrue(sync.syncPending())
         assertEquals(0, repo.pendingSync().size)
         assertEquals(1, api.received.size)
-        assertEquals(100L, api.received.single().driverRemoteId)
+        assertEquals(DRIVER_UUID, api.received.single().driverRemoteId)
     }
 
     @Test fun alreadySyncedIsNotResent() = runBlocking {
@@ -60,8 +62,8 @@ class SyncManagerTest {
     @Test fun duplicateUploadOfSameUuidStaysOneRecord() = runBlocking {
         finishedTrip()
         val trip = repo.pendingSync().single()
-        api.upload(trip.toPayload(100L))
-        api.upload(trip.toPayload(100L)) // 응답 유실로 재전송된 상황
+        api.upload(trip.toPayload(DRIVER_UUID))
+        api.upload(trip.toPayload(DRIVER_UUID)) // 응답 유실로 재전송된 상황
         assertEquals(1, api.received.size)
     }
 
