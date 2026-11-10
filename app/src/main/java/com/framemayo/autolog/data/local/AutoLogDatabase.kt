@@ -8,20 +8,31 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class],
-    version = 3,
+    entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class, TripLocationEntity::class],
+    version = 4,
     exportSchema = false,
 )
 abstract class AutoLogDatabase : RoomDatabase() {
     abstract fun driverDao(): DriverDao
     abstract fun tripDao(): TripDao
     abstract fun purposeDao(): PurposeDao
+    abstract fun tripLocationDao(): TripLocationDao
 
     companion object {
         fun create(context: Context): AutoLogDatabase =
             Room.databaseBuilder(context, AutoLogDatabase::class.java, "autolog.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS trip_locations (tripId INTEGER NOT NULL, latitude REAL NOT NULL, " +
+                        "longitude REAL NOT NULL, accuracyM REAL, capturedAt INTEGER NOT NULL, PRIMARY KEY(tripId), " +
+                        "FOREIGN KEY(tripId) REFERENCES trips(id) ON UPDATE NO ACTION ON DELETE CASCADE)",
+                )
+            }
+        }
 
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {

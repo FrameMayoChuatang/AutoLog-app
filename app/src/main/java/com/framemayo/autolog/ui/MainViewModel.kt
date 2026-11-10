@@ -27,6 +27,9 @@ data class MainUiState(
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val trips = app.container.trips
     private val drivers = app.container.drivers
+    private val arrival = app.container.arrival
+
+    private fun consentOf(driverId: Long?): Boolean? = state.value.drivers.find { it.id == driverId }?.locationConsent
 
     private val consentPrompt = MutableStateFlow<DriverEntity?>(null)
 
@@ -64,7 +67,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setLocationConsent(driverId: Long, consent: Boolean) {
-        viewModelScope.launch { drivers.setLocationConsent(driverId, consent) }
+        viewModelScope.launch {
+            drivers.setLocationConsent(driverId, consent)
+            if (!consent) arrival.purgeDriver(driverId)
+        }
     }
 
     private fun beginTrip(driverId: Long?) {
@@ -74,10 +80,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun endTrip() {
         val km = RecorderState.snapshot.value.odometerKm ?: return
-        viewModelScope.launch { trips.end(km) }
+        viewModelScope.launch {
+            val ended = trips.end(km) ?: return@launch
+            arrival.recordArrival(ended, consentOf(ended.driverId))
+        }
     }
 
     fun setPurpose(tripId: Long, purpose: TripPurpose) {
-        viewModelScope.launch { trips.setPurpose(tripId, purpose) }
+        viewModelScope.launch {
+            trips.setPurpose(tripId, purpose)
+            val driverId = state.value.recentTrips.find { it.id == tripId }?.driverId
+            arrival.settle(tripId, consentOf(driverId), purpose)
+        }
     }
 }

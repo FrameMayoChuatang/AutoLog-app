@@ -38,6 +38,21 @@ interface PurposeDao {
 }
 
 @Dao
+interface TripLocationDao {
+    @Upsert
+    suspend fun upsert(location: TripLocationEntity)
+
+    @Query("SELECT * FROM trip_locations WHERE tripId = :tripId")
+    suspend fun get(tripId: Long): TripLocationEntity?
+
+    @Query("DELETE FROM trip_locations WHERE tripId = :tripId")
+    suspend fun delete(tripId: Long)
+
+    @Query("DELETE FROM trip_locations WHERE tripId IN (SELECT id FROM trips WHERE driverId = :driverId)")
+    suspend fun deleteByDriver(driverId: Long)
+}
+
+@Dao
 interface TripDao {
     @Insert
     suspend fun insert(trip: TripEntity): Long
