@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,6 +85,8 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
                 }
             }
         }
+
+        item { VehicleLinkCard(vm) }
 
         val active = state.activeTrip
         if (active != null) {
@@ -153,6 +156,33 @@ private fun LocationConsentCard(state: MainUiState, vm: MainViewModel, requestLo
                     OutlinedButton(onClick = { vm.setLocationConsent(d.id, !agreed); if (!agreed) requestLocationPermission() }) { Text(if (agreed) "철회" else "동의") }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun VehicleLinkCard(vm: MainViewModel) {
+    val s by vm.linkState.collectAsStateWithLifecycle()
+    Card {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val link = s.link
+            if (link != null) {
+                Text("차량 연결됨 · ${link.companyName}", style = MaterialTheme.typography.titleMedium)
+                Text("${link.vehicleNumber} · VIN ${link.vin ?: "미확인"}")
+                OutlinedButton(onClick = vm::disconnectVehicle) { Text("연결 해제") }
+                return@Column
+            }
+            LaunchedEffect(Unit) { vm.detectVin() }
+            var number by remember { mutableStateOf("") }
+            var code by remember { mutableStateOf("") }
+            Text("차량 연결", style = MaterialTheme.typography.titleMedium)
+            Text("VIN: ${s.detectedVin ?: "자동 확인 불가"}")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(number, { number = it }, label = { Text("차량번호") }, singleLine = true)
+                OutlinedTextField(code, { code = it }, label = { Text("인증 코드") }, singleLine = true)
+                Button(onClick = { vm.connectVehicle(code, number) }, enabled = !s.busy) { Text("연결") }
+            }
+            s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }
 }

@@ -41,6 +41,21 @@ class VehicleDataSource(context: Context) {
         )
     }
 
+    suspend fun vin(): String? = suspendCancellableCoroutine { cont ->
+        runCatching {
+            vehicle.getCarInfo().getVINInfo(
+                onComplete = { if (cont.isActive) cont.resume(it?.trim()?.uppercase()?.takeIf(VIN::matches)) },
+                onFailed = { e ->
+                    Log.w(TAG, "getVINInfo failed", e)
+                    if (cont.isActive) cont.resume(null)
+                },
+            )
+        }.onFailure {
+            Log.w(TAG, "getVINInfo threw", it)
+            if (cont.isActive) cont.resume(null)
+        }
+    }
+
     fun odometerKm(): Flow<Float?> = callbackFlow {
         val odometer = vehicle.getOdometer()
         val listener = object : DistanceDrivenListener {
@@ -74,5 +89,8 @@ class VehicleDataSource(context: Context) {
 
     companion object {
         private const val TAG = "VehicleDataSource"
+
+        // 17자리, I·O·Q 제외 (에뮬레이터는 "\"invalid\""를 돌려줌)
+        private val VIN = Regex("^[A-HJ-NPR-Z0-9]{17}$")
     }
 }
