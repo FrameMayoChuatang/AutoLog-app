@@ -54,4 +54,18 @@ class RetentionTest {
         now = 71 * day
         assertEquals(1, repo.purgeSynced(30))
     }
+
+    @Test fun lowStoragePurgesRecentSyncedButKeepsUnsynced() = runBlocking {
+        val synced = finishedAt(0, 100f); repo.markSynced(synced)
+        val pending = finishedAt(1, 200f)
+        now = 2
+        val days = RetentionScheduler.retentionDaysFor(RetentionScheduler.LOW_STORAGE_BYTES - 1)
+        assertEquals(1, repo.purgeSynced(days))
+        assertEquals(null, dao.get(synced.id))
+        assertEquals(SyncState.PENDING, dao.get(pending.id)!!.syncState)
+    }
+
+    @Test fun enoughStorageKeepsNormalRetention() {
+        assertEquals(RetentionScheduler.RETENTION_DAYS, RetentionScheduler.retentionDaysFor(RetentionScheduler.LOW_STORAGE_BYTES))
+    }
 }
