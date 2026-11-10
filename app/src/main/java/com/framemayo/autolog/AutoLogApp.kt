@@ -41,8 +41,8 @@ class AppContainer(app: Application) {
 
     val arrival = ArrivalLocationRecorder(db.tripLocationDao(), FusedLocationSource(app, AndroidLocationSource(app)))
 
-    val server = ServerApi(BuildConfig.SERVER_URL, token = { vehicleLink.link.value?.accessToken }, onUnauthorized = { vehicleLink.disconnect() })
-    val vehicleLink = VehicleLinkRepository(app.getSharedPreferences("vehicle_link", android.content.Context.MODE_PRIVATE), HttpVehicleLinkApi(server))
+    val server: ServerApi = ServerApi(app.getString(R.string.server_url), token = { vehicleLink.link.value?.accessToken }, onUnauthorized = { vehicleLink.disconnect() })
+    val vehicleLink: VehicleLinkRepository = VehicleLinkRepository(app.getSharedPreferences("vehicle_link", android.content.Context.MODE_PRIVATE), HttpVehicleLinkApi(server))
 
     val sync = SyncManager(trips, drivers, FakeSyncApi())
 }

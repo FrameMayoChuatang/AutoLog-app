@@ -8,7 +8,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 sealed interface ApiResult {
-    data class Http(val code: Int, val json: JSONObject?) : ApiResult {
+    data class Http(val code: Int, val json: JSONObject?, val retryAfterSeconds: Int? = null) : ApiResult {
         val ok: Boolean get() = code in 200..299
     }
 
@@ -43,7 +43,11 @@ class ServerApi(
                 val code = conn.responseCode
                 val text = (if (code >= 400) conn.errorStream else conn.inputStream)?.bufferedReader()?.use { it.readText() }
                 if (code == 401 && bearer != null) onUnauthorized()
-                ApiResult.Http(code, text?.takeIf { it.startsWith("{") }?.let { runCatching { JSONObject(it) }.getOrNull() })
+                ApiResult.Http(
+                    code,
+                    text?.takeIf { it.startsWith("{") }?.let { runCatching { JSONObject(it) }.getOrNull() },
+                    conn.getHeaderField("Retry-After")?.trim()?.toIntOrNull(),
+                )
             } catch (_: IOException) {
                 ApiResult.Offline
             } finally {

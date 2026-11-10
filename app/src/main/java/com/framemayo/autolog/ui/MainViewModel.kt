@@ -53,13 +53,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val linkState: StateFlow<LinkUiState> = combine(vehicleLink.link, linkForm) { link, form -> form.copy(link = link) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LinkUiState(link = vehicleLink.link.value))
 
-    fun connectVehicle(pairingToken: String) {
+    fun connectVehicle(pairingCode: String) {
         if (linkForm.value.busy) return
         linkForm.value = linkForm.value.copy(busy = true, error = null)
         viewModelScope.launch {
-            val error = when (vehicleLink.connect(pairingToken)) {
+            val result = vehicleLink.connect(pairingCode)
+            val error = when (result) {
                 is LinkResult.Ok -> null
-                LinkResult.InvalidCode -> "페어링 코드가 올바르지 않거나 만료되었습니다. 관리자에게 새 코드를 받아 주세요."
+                LinkResult.InvalidCode -> "페어링 코드가 올바르지 않거나 만료되었습니다. 8자리 숫자를 확인하고, 안 되면 관리자에게 새 코드를 받아 주세요."
+                is LinkResult.RateLimited -> "시도 횟수가 너무 많습니다. ${result.seconds?.let { s -> "${s}초" } ?: "잠시"} 뒤에 다시 시도해 주세요."
                 LinkResult.Retry -> "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
             }
             linkForm.value = linkForm.value.copy(busy = false, error = error)

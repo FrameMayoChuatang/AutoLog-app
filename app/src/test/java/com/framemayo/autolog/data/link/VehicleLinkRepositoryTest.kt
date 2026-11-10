@@ -37,9 +37,9 @@ class VehicleLinkRepositoryTest {
 
     @Test
     fun pairSavesLinkAndSurvivesRestart() = runBlocking {
-        val r = repo().connect("  PAIR-TOKEN ")
+        val r = repo().connect("  00123456 ")
         assertTrue(r is LinkResult.Ok)
-        assertEquals("""{"pairingToken":"PAIR-TOKEN"}""", sentBody)
+        assertEquals("""{"pairingToken":"00123456"}""", sentBody)
         val link = repo().link.value!!
         assertEquals("DEVICE_TOKEN", link.accessToken)
         assertEquals("12가3456", link.registrationNumber)
@@ -51,28 +51,53 @@ class VehicleLinkRepositoryTest {
     fun rejectedTokenIsInvalidCodeAndSavesNothing() = runBlocking {
         status = 401
         body = """{"code":"UNAUTHORIZED","message":"x"}"""
-        assertEquals(LinkResult.InvalidCode, repo().connect("bad"))
-        assertEquals(LinkResult.InvalidCode, repo().connect("   "))
+        assertEquals(LinkResult.InvalidCode, repo().connect("12345678"))
         assertNull(repo().link.value)
     }
 
     @Test
     fun serverErrorOrBrokenBodyOrOfflineIsRetry() = runBlocking {
         status = 500; body = "{}"
-        assertEquals(LinkResult.Retry, repo().connect("t"))
+        assertEquals(LinkResult.Retry, repo().connect("12345678"))
         status = 200; body = """{"accessToken":"x"}""" // vehicle 없음
-        assertEquals(LinkResult.Retry, repo().connect("t"))
+        assertEquals(LinkResult.Retry, repo().connect("12345678"))
         val dead = TestServer { _, _, _, _ -> 200 to "{}" }
         val url = dead.url
         dead.stop()
-        assertEquals(LinkResult.Retry, repo(url).connect("t"))
+        assertEquals(LinkResult.Retry, repo(url).connect("12345678"))
+        assertNull(repo().link.value)
+    }
+
+    @Test
+    fun malformedCodeIsRejectedWithoutCallingServer() = runBlocking {
+        val repo = repo()
+        for (bad in listOf("", "   ", "1234567", "123456789", "1234567a", "12 345678", "٠١٢٣٤٥٦٧", "AbCdEfGh")) {
+            assertEquals(bad, LinkResult.InvalidCode, repo.connect(bad))
+        }
+        assertEquals("", sentBody)
+    }
+
+    @Test
+    fun leadingZerosAreSentAsString() = runBlocking {
+        repo().connect("00000001")
+        assertEquals("""{"pairingToken":"00000001"}""", sentBody)
+    }
+
+    @Test
+    fun tooManyAttemptsShowsWaitTime() = runBlocking {
+        status = 429
+        body = """{"code":"RATE_LIMITED","message":"x"}"""
+        server.responseHeaders["Retry-After"] = "45"
+        assertEquals(LinkResult.RateLimited(45), repo().connect("12345678"))
+        server.responseHeaders.clear()
+        assertEquals(LinkResult.RateLimited(null), repo().connect("12345678"))
         assertNull(repo().link.value)
     }
 
     @Test
     fun disconnectClears() = runBlocking {
         val repo = repo()
-        repo.connect("t")
+        repo.connect("12345678")
         repo.disconnect()
         assertNull(repo.link.value)
         assertNull(repo().link.value)

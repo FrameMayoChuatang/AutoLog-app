@@ -61,6 +61,15 @@ class ServerApiTest {
     }
 
     @Test
+    fun parsesRetryAfterSeconds() = runBlocking {
+        status = 429
+        server.responseHeaders["Retry-After"] = "30"
+        assertEquals(30, (api().call("POST", "/x", auth = false) as ApiResult.Http).retryAfterSeconds)
+        server.responseHeaders.clear()
+        assertNull((api().call("POST", "/x", auth = false) as ApiResult.Http).retryAfterSeconds)
+    }
+
+    @Test
     fun emptyBodyIsOk() = runBlocking {
         status = 204
         val r = api().call("POST", "/api/auth/logout") as ApiResult.Http

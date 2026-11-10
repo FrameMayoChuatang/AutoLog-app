@@ -6,6 +6,7 @@ import kotlin.concurrent.thread
 
 class TestServer(private val handler: (method: String, path: String, auth: String?, body: String) -> Pair<Int, String>) {
     private val socket = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+    val responseHeaders = mutableMapOf<String, String>()
     val url: String get() = "http://127.0.0.1:${socket.localPort}"
 
     init {
@@ -38,7 +39,7 @@ class TestServer(private val handler: (method: String, path: String, auth: Strin
                         val (code, text) = handler(method, path, auth, body)
                         val bytes = text.toByteArray()
                         c.getOutputStream().apply {
-                            write("HTTP/1.1 $code X\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                            write("HTTP/1.1 $code X\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n${responseHeaders.entries.joinToString("") { "${it.key}: ${it.value}\r\n" }}\r\n".toByteArray())
                             write(bytes)
                             flush()
                         }
