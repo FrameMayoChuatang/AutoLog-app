@@ -28,7 +28,6 @@ data class MainUiState(
 
 data class LinkUiState(
     val link: VehicleLink? = null,
-    val detectedVin: String? = null,
     val busy: Boolean = false,
     val error: String? = null,
 )
@@ -49,24 +48,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
     private val vehicleLink = app.container.vehicleLink
-    private val vehicle = app.container.vehicle
     private val linkForm = MutableStateFlow(LinkUiState())
 
     val linkState: StateFlow<LinkUiState> = combine(vehicleLink.link, linkForm) { link, form -> form.copy(link = link) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LinkUiState(link = vehicleLink.link.value))
 
-    fun detectVin() {
-        viewModelScope.launch { linkForm.value = linkForm.value.copy(detectedVin = vehicle.vin()) }
-    }
-
-    fun connectVehicle(code: String, vehicleNumber: String) {
+    fun connectVehicle(pairingToken: String) {
         if (linkForm.value.busy) return
         linkForm.value = linkForm.value.copy(busy = true, error = null)
         viewModelScope.launch {
-            val error = when (vehicleLink.connect(code, vehicleNumber, linkForm.value.detectedVin)) {
+            val error = when (vehicleLink.connect(pairingToken)) {
                 is LinkResult.Ok -> null
-                LinkResult.InvalidCode -> "인증 코드가 올바르지 않습니다."
-                LinkResult.InvalidNumber -> "차량번호 형식을 확인해 주세요. (예: 12가3456)"
+                LinkResult.InvalidCode -> "페어링 코드가 올바르지 않거나 만료되었습니다. 관리자에게 새 코드를 받아 주세요."
                 LinkResult.Retry -> "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
             }
             linkForm.value = linkForm.value.copy(busy = false, error = error)

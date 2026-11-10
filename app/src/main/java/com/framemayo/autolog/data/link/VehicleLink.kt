@@ -1,30 +1,40 @@
 package com.framemayo.autolog.data.link
 
 import android.content.SharedPreferences
+import com.framemayo.autolog.data.remote.ApiResult
+import com.framemayo.autolog.data.remote.ServerApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONObject
 
 data class VehicleLink(
-    val vehicleRemoteId: Long,
-    val companyName: String,
-    val vehicleNumber: String,
-    val vin: String?,
+    val vehicleId: String,
+    val registrationNumber: String,
+    val model: String,
+    val accessToken: String,
+    val expiresAt: String,
     val connectedAt: Long,
 )
 
 sealed interface LinkResult {
     data class Ok(val link: VehicleLink) : LinkResult
 
+    /** 토큰이 틀렸거나 만료·사용됨 */
     data object InvalidCode : LinkResult
 
-    data object InvalidNumber : LinkResult
-
+    /** 서버에 닿지 못했거나 서버 오류 */
     data object Retry : LinkResult
 }
 
 sealed interface LinkResponse {
-    data class Ok(val vehicleRemoteId: Long, val companyName: String) : LinkResponse
+    data class Ok(
+        val vehicleId: String,
+        val registrationNumber: String,
+        val model: String,
+        val accessToken: String,
+        val expiresAt: String,
+    ) : LinkResponse
 
     data object InvalidCode : LinkResponse
 
@@ -32,16 +42,27 @@ sealed interface LinkResponse {
 }
 
 interface VehicleLinkApi {
-    suspend fun connect(code: String, vehicleNumber: String, vin: String?): LinkResponse
+    suspend fun pair(pairingToken: String): LinkResponse
 }
 
-class FakeVehicleLinkApi : VehicleLinkApi {
-    @Volatile var online = true
-
-    override suspend fun connect(code: String, vehicleNumber: String, vin: String?): LinkResponse = when {
-        !online -> LinkResponse.Retry
-        code.length == 6 && code.all(Char::isDigit) -> LinkResponse.Ok(vehicleRemoteId = 1, companyName = "테스트 회사")
-        else -> LinkResponse.InvalidCode
+class HttpVehicleLinkApi(private val server: ServerApi) : VehicleLinkApi {
+    override suspend fun pair(pairingToken: String): LinkResponse {
+        val r = server.call("POST", "/api/device/pair", JSONObject().put("pairingToken", pairingToken), auth = false)
+        if (r !is ApiResult.Http) return LinkResponse.Retry
+        if (r.ok) {
+            val json = r.json ?: return LinkResponse.Retry
+            return runCatching {
+                val vehicle = json.getJSONObject("vehicle")
+                LinkResponse.Ok(
+                    vehicleId = vehicle.getString("id"),
+                    registrationNumber = vehicle.getString("registrationNumber"),
+                    model = vehicle.optString("model"),
+                    accessToken = json.getString("accessToken"),
+                    expiresAt = json.optString("expiresAt"),
+                )
+            }.getOrDefault(LinkResponse.Retry)
+        }
+        return if (r.code in 400..499) LinkResponse.InvalidCode else LinkResponse.Retry
     }
 }
 
@@ -53,16 +74,14 @@ class VehicleLinkRepository(
     private val _link = MutableStateFlow(load())
     val link: StateFlow<VehicleLink?> = _link.asStateFlow()
 
-    suspend fun connect(code: String, vehicleNumber: String, vin: String?): LinkResult {
-        val number = vehicleNumber.filterNot(Char::isWhitespace)
-        if (!PLATE.matches(number)) return LinkResult.InvalidNumber
-        val trimmedCode = code.trim()
-        if (trimmedCode.isEmpty()) return LinkResult.InvalidCode
-        return when (val r = api.connect(trimmedCode, number, vin)) {
+    suspend fun connect(pairingToken: String): LinkResult {
+        val token = pairingToken.trim()
+        if (token.isEmpty()) return LinkResult.InvalidCode
+        return when (val r = api.pair(token)) {
             LinkResponse.InvalidCode -> LinkResult.InvalidCode
             LinkResponse.Retry -> LinkResult.Retry
             is LinkResponse.Ok -> {
-                val link = VehicleLink(r.vehicleRemoteId, r.companyName, number, vin, clock())
+                val link = VehicleLink(r.vehicleId, r.registrationNumber, r.model, r.accessToken, r.expiresAt, clock())
                 save(link)
                 LinkResult.Ok(link)
             }
@@ -75,33 +94,32 @@ class VehicleLinkRepository(
     }
 
     private fun save(link: VehicleLink) {
-        prefs.edit()
-            .putLong(K_ID, link.vehicleRemoteId)
-            .putString(K_COMPANY, link.companyName)
-            .putString(K_NUMBER, link.vehicleNumber)
-            .putString(K_VIN, link.vin)
+        prefs.edit().clear()
+            .putString(K_ID, link.vehicleId)
+            .putString(K_NUMBER, link.registrationNumber)
+            .putString(K_MODEL, link.model)
+            .putString(K_TOKEN, link.accessToken)
+            .putString(K_EXPIRES, link.expiresAt)
             .putLong(K_AT, link.connectedAt)
             .commit() // 연결 직후 종료돼도 남도록 동기 저장
         _link.value = link
     }
 
-    private fun load(): VehicleLink? {
-        if (!prefs.contains(K_ID)) return null
-        return VehicleLink(
-            vehicleRemoteId = prefs.getLong(K_ID, 0),
-            companyName = prefs.getString(K_COMPANY, null) ?: return null,
-            vehicleNumber = prefs.getString(K_NUMBER, null) ?: return null,
-            vin = prefs.getString(K_VIN, null),
-            connectedAt = prefs.getLong(K_AT, 0),
-        )
-    }
+    private fun load(): VehicleLink? = VehicleLink(
+        vehicleId = prefs.getString(K_ID, null) ?: return null,
+        registrationNumber = prefs.getString(K_NUMBER, null) ?: return null,
+        model = prefs.getString(K_MODEL, "") ?: "",
+        accessToken = prefs.getString(K_TOKEN, null) ?: return null,
+        expiresAt = prefs.getString(K_EXPIRES, "") ?: "",
+        connectedAt = prefs.getLong(K_AT, 0),
+    )
 
     private companion object {
-        val PLATE = Regex("^([가-힣]{2})?\\d{2,3}[가-힣]\\d{4}$")
-        const val K_ID = "vehicleRemoteId"
-        const val K_COMPANY = "companyName"
-        const val K_NUMBER = "vehicleNumber"
-        const val K_VIN = "vin"
+        const val K_ID = "vehicleId"
+        const val K_NUMBER = "registrationNumber"
+        const val K_MODEL = "model"
+        const val K_TOKEN = "accessToken"
+        const val K_EXPIRES = "expiresAt"
         const val K_AT = "connectedAt"
     }
 }
