@@ -1,6 +1,8 @@
 package com.framemayo.autolog
 
 import android.app.Application
+import com.framemayo.autolog.data.link.FakeVehicleLinkApi
+import com.framemayo.autolog.data.link.VehicleLinkRepository
 import com.framemayo.autolog.data.local.AutoLogDatabase
 import com.framemayo.autolog.data.repository.DriverRepository
 import com.framemayo.autolog.data.repository.DriverRepositoryImpl
@@ -37,6 +39,8 @@ class AppContainer(app: Application) {
     val purposes: PurposeRepository = PurposeRepositoryImpl(db.purposeDao())
 
     val arrival = ArrivalLocationRecorder(db.tripLocationDao(), FusedLocationSource(app, AndroidLocationSource(app)))
+
+    val vehicleLink = VehicleLinkRepository(app.getSharedPreferences("vehicle_link", android.content.Context.MODE_PRIVATE), FakeVehicleLinkApi())
 
     val sync = SyncManager(trips, drivers, FakeSyncApi())
 }
