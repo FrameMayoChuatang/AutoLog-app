@@ -18,6 +18,11 @@ internal fun fakeTripDao(): TripDao {
             "get" -> rows.firstOrNull { it.id == a[0] }
             "active" -> rows.lastOrNull { it.status == TripStatus.ACTIVE }
             "pendingSync" -> rows.filter { it.syncState != SyncState.SYNCED && it.status != TripStatus.ACTIVE }
+            "deleteSyncedBefore" -> {
+                val n = rows.size
+                rows.removeAll { it.syncState == SyncState.SYNCED && it.status != TripStatus.ACTIVE && it.updatedAt < (a[0] as Long) }
+                n - rows.size
+            }
             "setSyncState" -> {
                 val i = rows.indexOfFirst { it.id == a[0] && it.updatedAt == a[1] }
                 if (i >= 0) rows[i] = rows[i].copy(syncState = a[2] as SyncState)

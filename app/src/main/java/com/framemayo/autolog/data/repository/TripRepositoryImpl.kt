@@ -72,4 +72,11 @@ class TripRepositoryImpl(
     override suspend fun markSynced(trip: TripEntity) = dao.setSyncState(trip.id, trip.updatedAt, SyncState.SYNCED)
 
     override suspend fun markSyncFailed(trip: TripEntity) = dao.setSyncState(trip.id, trip.updatedAt, SyncState.FAILED)
+
+    override suspend fun purgeSynced(retentionDays: Int): Int =
+        dao.deleteSyncedBefore(clock() - retentionDays * DAY_MS)
+
+    private companion object {
+        const val DAY_MS = 24L * 60 * 60 * 1000
+    }
 }

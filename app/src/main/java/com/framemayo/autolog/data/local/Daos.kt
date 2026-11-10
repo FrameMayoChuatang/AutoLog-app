@@ -62,6 +62,9 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE syncState != 'SYNCED' AND status != 'ACTIVE' ORDER BY startedAt")
     suspend fun pendingSync(): List<TripEntity>
 
+    @Query("DELETE FROM trips WHERE syncState = 'SYNCED' AND status != 'ACTIVE' AND updatedAt < :cutoff")
+    suspend fun deleteSyncedBefore(cutoff: Long): Int
+
     @Query("UPDATE trips SET syncState = :state WHERE id = :id AND updatedAt = :updatedAt")
     suspend fun setSyncState(id: Long, updatedAt: Long, state: SyncState)
 }
