@@ -19,4 +19,6 @@ interface TripRepository {
 
     suspend fun markSynced(trip: TripEntity)
     suspend fun markSyncFailed(trip: TripEntity)
+
+    suspend fun purgeSynced(retentionDays: Int): Int
 }

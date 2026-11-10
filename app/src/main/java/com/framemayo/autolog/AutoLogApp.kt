@@ -8,6 +8,7 @@ import com.framemayo.autolog.data.repository.PurposeRepository
 import com.framemayo.autolog.data.repository.PurposeRepositoryImpl
 import com.framemayo.autolog.data.repository.TripRepository
 import com.framemayo.autolog.data.repository.TripRepositoryImpl
+import com.framemayo.autolog.data.retention.RetentionScheduler
 import com.framemayo.autolog.data.sync.FakeSyncApi
 import com.framemayo.autolog.data.sync.SyncManager
 import com.framemayo.autolog.data.sync.SyncScheduler
@@ -21,6 +22,7 @@ class AutoLogApp : Application() {
         super.onCreate()
         container = AppContainer(this)
         SyncScheduler.enqueue(this)
+        RetentionScheduler.schedule(this)
     }
 }
 
