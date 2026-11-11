@@ -85,13 +85,13 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
     }
     if (state.activeTrip == null && (!showVehicle || !parked)) {
         DriverSelectionScreen(
-            drivers = state.drivers,
-            recentDriverId = state.recentTrips.firstOrNull { it.driverId != null }?.driverId,
+            profiles = state.profiles,
             parked = parked,
             linked = linked,
             odometerReady = v.odometerKm?.let { it.isFinite() && it > 0f } == true,
             onStart = vm::startTrip,
-            onAdd = vm::addDriver,
+            onSave = vm::saveProfile,
+            onDelete = vm::deleteProfile,
             onOpenVehicle = { showVehicle = true },
         )
         return

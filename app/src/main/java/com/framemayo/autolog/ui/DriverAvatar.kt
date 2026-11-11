@@ -60,14 +60,16 @@ internal fun DriverAvatar(color: Int, modifier: Modifier = Modifier, blinking: B
         }
     }
     Canvas(modifier) {
-        if (Build.VERSION.SDK_INT >= 33 && shader != null) {
+        var hardwareCanvas = false
+        drawIntoCanvas { hardwareCanvas = it.nativeCanvas.isHardwareAccelerated }
+        if (Build.VERSION.SDK_INT >= 33 && shader != null && hardwareCanvas) {
             shader.setFloatUniform("viewport", size.width, size.height)
             shader.setFloatUniform("hue", ProfileHues.getOrElse(color) { 0f } / 360f)
             shader.setFloatUniform("blink", if (blinking) blink.value else 0f)
             paint.shader = shader
             drawIntoCanvas { it.nativeCanvas.drawRect(0f, 0f, size.width, size.height, paint) }
         } else {
-            // API 28–32는 원본 정적 캐릭터를 사용한다. Pleos API 34에서는 색상과 깜박임을 지원한다.
+            // API 28–32 또는 소프트웨어 캔버스는 원본 정적 캐릭터로 표시한다. Pleos의 하드웨어 렌더링에서는 색상과 깜박임을 지원한다.
             drawImage(image, IntOffset(200, 310), IntSize(860, 645), dstSize = IntSize(size.width.toInt(), size.height.toInt()))
         }
     }
