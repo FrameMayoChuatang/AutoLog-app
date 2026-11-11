@@ -43,6 +43,19 @@ internal fun fakeTripDao(): TripDao {
                 if (i >= 0) rows[i] = rows[i].copy(serverVersion = a[1] as Long, sourceRevision = maxOf(rows[i].sourceRevision + 1, (a[2] as Long) + 1))
                 Unit
             }
+            "recordConfirm" -> {
+                val i = rows.indexOfFirst { it.id == a[0] }
+                if (i >= 0) rows[i] = rows[i].copy(
+                    serverVersion = a[1] as Long,
+                    confirmSentAt = if (rows[i].updatedAt == a[2]) a[2] as Long else rows[i].confirmSentAt,
+                )
+                Unit
+            }
+            "setServerVersion" -> {
+                val i = rows.indexOfFirst { it.id == a[0] }
+                if (i >= 0) rows[i] = rows[i].copy(serverVersion = a[1] as Long)
+                Unit
+            }
             "setSyncState" -> {
                 val i = rows.indexOfFirst { it.id == a[0] && it.updatedAt == a[1] }
                 if (i >= 0) rows[i] = rows[i].copy(syncState = a[2] as SyncState)

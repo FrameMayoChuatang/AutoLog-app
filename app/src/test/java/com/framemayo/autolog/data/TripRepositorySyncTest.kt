@@ -91,4 +91,26 @@ class TripRepositorySyncTest {
         val b = repo.start(1, 110f)
         assertNotEquals(a.uuid, b.uuid)
     }
+
+    @Test fun confirmIsRecordedOnlyWhenPurposeIsUnchangedSinceSending() = runBlocking {
+        val t = repo.start(1, 100f).let { repo.end(110f)!! }
+        repo.setPurpose(t.id, TripPurpose.PERSONAL)
+        val sentCopy = repo.get(t.id)!!
+        repo.setPurpose(t.id, TripPurpose.BUSINESS_GENERAL)
+        repo.recordConfirm(sentCopy, serverVersion = 5)
+        val changed = repo.get(t.id)!!
+        assertEquals(5, changed.serverVersion)
+        assertEquals(null, changed.confirmSentAt)
+
+        repo.recordConfirm(changed, serverVersion = 6)
+        assertEquals(changed.updatedAt, repo.get(t.id)!!.confirmSentAt)
+    }
+
+    @Test fun updateServerVersionKeepsRevisions() = runBlocking {
+        val t = repo.start(1, 100f).let { repo.end(110f)!! }
+        repo.updateServerVersion(t, 9)
+        val r = repo.get(t.id)!!
+        assertEquals(9, r.serverVersion)
+        assertEquals(t.sourceRevision, r.sourceRevision)
+    }
 }

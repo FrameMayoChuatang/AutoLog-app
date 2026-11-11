@@ -1,7 +1,9 @@
 package com.framemayo.autolog.data.sync
 
+import com.framemayo.autolog.data.local.DriverStatus
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
+import com.framemayo.autolog.data.local.TripStatus
 import com.framemayo.autolog.data.repository.DriverRepository
 import com.framemayo.autolog.data.repository.TripRepository
 
@@ -53,9 +55,46 @@ class SyncManager(
         return fail(trip)
     }
 
-    private suspend fun settle(trip: TripEntity): Outcome {
-        if (trip.purpose == TripPurpose.UNCONFIRMED) trips.markSynced(trip)
-        return Outcome.DONE
+    private suspend fun settle(measured: TripEntity): Outcome {
+        val trip = trips.get(measured.id) ?: return Outcome.DONE
+        if (trip.purpose == TripPurpose.UNCONFIRMED || trip.confirmSentAt == trip.updatedAt) {
+            trips.markSynced(trip)
+            return Outcome.DONE
+        }
+        return confirm(trip)
+    }
+
+    private suspend fun confirm(first: TripEntity): Outcome {
+        if (first.status != TripStatus.COMPLETED) return Outcome.DONE
+        val driver = first.driverId?.let { drivers.find(it) } ?: return Outcome.DONE
+        val remoteId = driver.remoteId ?: return Outcome.DONE
+        if (driver.status != DriverStatus.ACTIVE) return Outcome.DONE
+
+        var trip = first
+        repeat(MAX_ATTEMPTS) {
+            val payload = trip.toConfirmPayload(remoteId, firstTime = trip.confirmSentAt == null) ?: return Outcome.DONE
+            when (val r = api.confirm(payload)) {
+                is SyncResult.Ok -> {
+                    trips.recordConfirm(trip, r.serverVersion)
+                    trips.markSynced(trip)
+                    return Outcome.DONE
+                }
+                SyncResult.Retry -> return Outcome.RETRY
+                SyncResult.Unauthorized -> return Outcome.STOP
+                SyncResult.Rejected -> return fail(trip)
+                SyncResult.Conflict -> when (val s = api.fetch(trip.uuid)) {
+                    FetchResult.Retry -> return Outcome.RETRY
+                    FetchResult.Unauthorized -> return Outcome.STOP
+                    FetchResult.NotFound -> return fail(trip)
+                    is FetchResult.Found -> {
+                        if (s.approved) return fail(trip)
+                        trips.updateServerVersion(trip, s.serverVersion)
+                    }
+                }
+            }
+            trip = trips.get(trip.id) ?: return Outcome.DONE
+        }
+        return fail(trip)
     }
 
     private suspend fun fail(trip: TripEntity): Outcome {

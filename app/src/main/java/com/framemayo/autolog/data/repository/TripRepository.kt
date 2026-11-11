@@ -23,6 +23,10 @@ interface TripRepository {
 
     suspend fun rebase(trip: TripEntity, serverVersion: Long, serverRevision: Long)
 
+    suspend fun recordConfirm(trip: TripEntity, serverVersion: Long)
+
+    suspend fun updateServerVersion(trip: TripEntity, serverVersion: Long)
+
     suspend fun markSynced(trip: TripEntity)
     suspend fun markSyncFailed(trip: TripEntity)
 

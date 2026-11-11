@@ -21,6 +21,18 @@ class HttpSyncApi(private val server: ServerApi) : SyncApi {
         }
     }
 
+    override suspend fun confirm(confirm: ConfirmPayload): SyncResult {
+        val r = server.call("POST", "/api/device/trips/${confirm.uuid}/confirm", confirm.toJson())
+        if (r !is ApiResult.Http) return SyncResult.Retry
+        return when {
+            r.ok -> r.json?.optLong("serverVersion", -1)?.takeIf { it >= 0 }?.let { SyncResult.Ok(it) } ?: SyncResult.Retry
+            r.code == 409 -> SyncResult.Conflict
+            r.code == 401 -> SyncResult.Unauthorized
+            r.code == 400 || r.code == 404 -> SyncResult.Rejected
+            else -> SyncResult.Retry
+        }
+    }
+
     override suspend fun fetch(uuid: String): FetchResult {
         val r = server.call("GET", "/api/device/trips/$uuid")
         if (r !is ApiResult.Http) return FetchResult.Retry
@@ -32,6 +44,7 @@ class HttpSyncApi(private val server: ServerApi) : SyncApi {
                     serverVersion = json.getLong("serverVersion"),
                     sourceRevision = json.getLong("sourceRevision"),
                     locked = !json.isNull("measurementLockedAt"),
+                    approved = json.optString("approvalStatus") == "APPROVED",
                 )
             }
             r.code == 404 -> FetchResult.NotFound
@@ -59,3 +72,12 @@ internal fun TripPayload.toJson(): JSONObject = JSONObject().apply {
 private fun instant(epochMillis: Long): String = Instant.ofEpochMilli(epochMillis).toString()
 
 private fun km(value: Float): BigDecimal = BigDecimal(value.toString()).setScale(3, RoundingMode.HALF_UP)
+
+internal fun ConfirmPayload.toJson(): JSONObject = JSONObject().apply {
+    put("expectedVersion", expectedVersion)
+    put("driverId", driverId)
+    put("classification", classification)
+    purposeText?.let { put("purposeText", it) }
+    note?.let { put("note", it) }
+    put("reason", reason)
+}

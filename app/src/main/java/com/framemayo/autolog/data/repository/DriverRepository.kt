@@ -11,6 +11,8 @@ interface DriverRepository {
 
     suspend fun remoteIdOf(localId: Long): String?
 
+    suspend fun find(localId: Long): DriverEntity?
+
     suspend fun consentOf(driverId: Long): Boolean?
 
     suspend fun setLocationConsent(driverId: Long, consent: Boolean)
@@ -42,6 +44,8 @@ class DriverRepositoryImpl(
     }
 
     override suspend fun remoteIdOf(localId: Long): String? = dao.remoteIdOf(localId)
+
+    override suspend fun find(localId: Long): DriverEntity? = dao.byId(localId)
 
     override suspend fun consentOf(driverId: Long): Boolean? = dao.consentOf(driverId)
 
