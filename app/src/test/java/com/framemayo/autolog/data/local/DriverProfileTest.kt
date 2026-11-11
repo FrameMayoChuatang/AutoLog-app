@@ -28,10 +28,11 @@ class DriverProfileTest {
     @Test fun localAppearanceSurvivesRemoteRefreshAndHidingPreservesIdentity() = runBlocking {
         repo.upsertRemote(listOf(RemoteDriver("server-driver", "서버 이름", "영업")))
         val id = repo.all.first().single().id
-        repo.editProfile(id, "내 이름", 2)
+        repo.editProfile(id, "내 이름", 2, 1)
         repo.upsertRemote(listOf(RemoteDriver("server-driver", "변경된 서버 이름", "개발")))
         assertEquals("내 이름", repo.profiles.first().single().displayName)
         assertEquals(2, repo.profiles.first().single().color)
+        assertEquals(1, repo.profiles.first().single().expression)
         assertTrue(repo.hideProfile(id))
         repo.upsertRemote(listOf(RemoteDriver("server-driver", "다시 동기화", "개발")))
         assertTrue(repo.profiles.first().isEmpty())
@@ -58,7 +59,9 @@ class DriverProfileTest {
 
     @Test fun invalidNamesAndColorsDoNotCreateDrivers() = runBlocking {
         assertTrue(runCatching { repo.addProfile("  ", 0) }.isFailure)
-        assertTrue(runCatching { repo.addProfile("이름", 5) }.isFailure)
+        assertTrue(runCatching { repo.addProfile("이름", 7) }.isFailure)
+        assertTrue(runCatching { repo.addProfile("이름", 0, 7) }.isFailure)
+        assertTrue(runCatching { repo.addProfile("이름", 0, -1) }.isFailure)
         assertTrue(repo.all.first().isEmpty())
     }
 
@@ -82,21 +85,56 @@ class DriverProfileTest {
             it.version = 7
         }
         fun open() = Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
-            .addMigrations(AutoLogDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
+            .addMigrations(AutoLogDatabase.MIGRATION_7_8, AutoLogDatabase.MIGRATION_8_9).allowMainThreadQueries().build()
         val migrated = open()
         try {
             val repository = DriverRepositoryImpl(migrated.driverDao())
             assertEquals("기존 운전자", repository.profiles.first().single().displayName)
+            assertEquals(0, repository.profiles.first().single().expression)
             assertEquals(true, repository.consentOf(id))
             assertEquals("remote", repository.remoteIdOf(id))
             assertEquals(55f, migrated.tripDao().get(tripId)!!.lastOdometerKm)
-            repository.editProfile(id, "수정 이름", 4)
+            repository.editProfile(id, "수정 이름", 4, 6)
         } finally { migrated.close() }
         val reopened = open()
         try {
             val profile = DriverRepositoryImpl(reopened.driverDao()).profiles.first().single()
             assertEquals("수정 이름", profile.displayName)
             assertEquals(4, profile.color)
+            assertEquals(6, profile.expression)
         } finally { reopened.close() }
     }
+
+    @Test fun versionEightMigrationPreservesCustomProfilesAndDefaultsExpressions() = runBlocking {
+        val name = "profiles-migration.db"
+        val initial = Room.databaseBuilder(context, AutoLogDatabase::class.java, name).allowMainThreadQueries().build()
+        val repository = DriverRepositoryImpl(initial.driverDao())
+        val id = repository.addProfile("사용자", 2, 1)
+        repository.editProfile(id, "표시 이름", 4, 6)
+        val hidden = repository.addProfile("숨김", 1, 2)
+        repository.hideProfile(hidden)
+        val tripId = initial.tripDao().insert(TripEntity(driverId = id, startedAt = 1, startOdometerKm = 10f, lastOdometerKm = 12f, lastSavedAt = 2))
+        initial.close()
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+            it.execSQL("CREATE TABLE driver_profiles_v8 (driverId INTEGER NOT NULL, displayName TEXT, color INTEGER NOT NULL, hidden INTEGER NOT NULL, PRIMARY KEY(driverId), FOREIGN KEY(driverId) REFERENCES drivers(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+            it.execSQL("INSERT INTO driver_profiles_v8 SELECT driverId, displayName, color, hidden FROM driver_profiles")
+            it.execSQL("DROP TABLE driver_profiles")
+            it.execSQL("ALTER TABLE driver_profiles_v8 RENAME TO driver_profiles")
+            it.execSQL("DROP TABLE room_master_table")
+            it.version = 8
+        }
+        val migrated = Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
+            .addMigrations(AutoLogDatabase.MIGRATION_8_9).allowMainThreadQueries().build()
+        try {
+            val profile = migrated.driverDao().observeProfiles().first().single()
+            assertEquals(id, profile.driver.id)
+            assertEquals("표시 이름", profile.displayName)
+            assertEquals(4, profile.color)
+            assertEquals(0, profile.expression)
+            assertTrue(migrated.driverDao().profile(hidden)!!.hidden)
+            assertEquals(id, migrated.tripDao().get(tripId)!!.driverId)
+            assertEquals(12f, migrated.tripDao().get(tripId)!!.lastOdometerKm)
+        } finally { migrated.close() }
+    }
+
 }
