@@ -1,11 +1,13 @@
 package com.framemayo.autolog.data.sync
 
+import android.util.Log
 import com.framemayo.autolog.data.local.DriverStatus
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.local.TripStatus
 import com.framemayo.autolog.data.repository.DriverRepository
 import com.framemayo.autolog.data.repository.TripRepository
+import kotlinx.coroutines.CancellationException
 
 class SyncManager(
     private val trips: TripRepository,
@@ -17,14 +19,28 @@ class SyncManager(
 
     suspend fun syncPending(): Boolean {
         if (!isLinked()) return true
+        var retryStreak = 0
+        var allDone = true
         for (trip in trips.pendingSync()) {
-            when (syncOne(trip)) {
-                Outcome.DONE -> Unit
-                Outcome.RETRY -> return false
+            when (safely { syncOne(trip) }) {
+                Outcome.DONE -> retryStreak = 0
+                Outcome.RETRY -> {
+                    allDone = false
+                    if (++retryStreak >= MAX_RETRY_STREAK) return false
+                }
                 Outcome.STOP -> return true // 401: 다시 페어링해야 함
             }
         }
-        return true
+        return allDone
+    }
+
+    private suspend fun safely(block: suspend () -> Outcome): Outcome = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.e(TAG, "trip sync failed", e)
+        Outcome.RETRY
     }
 
     private suspend fun syncOne(first: TripEntity): Outcome {
@@ -52,7 +68,7 @@ class SyncManager(
             }
             trip = trips.get(trip.id) ?: return Outcome.DONE
         }
-        return fail(trip)
+        return Outcome.RETRY
     }
 
     private suspend fun settle(measured: TripEntity): Outcome {
@@ -68,6 +84,7 @@ class SyncManager(
         if (first.status != TripStatus.COMPLETED) return Outcome.DONE
         val driver = first.driverId?.let { drivers.find(it) } ?: return Outcome.DONE
         val remoteId = driver.remoteId ?: return Outcome.DONE
+        if (driver.status == DriverStatus.PENDING) return Outcome.RETRY // 관리자 승인을 기다리는 중이라 곧 다시 확인
         if (driver.status != DriverStatus.ACTIVE) return Outcome.DONE
 
         var trip = first
@@ -94,7 +111,7 @@ class SyncManager(
             }
             trip = trips.get(trip.id) ?: return Outcome.DONE
         }
-        return fail(trip)
+        return Outcome.RETRY
     }
 
     private suspend fun fail(trip: TripEntity): Outcome {
@@ -104,5 +121,7 @@ class SyncManager(
 
     private companion object {
         const val MAX_ATTEMPTS = 2
+        const val MAX_RETRY_STREAK = 3
+        const val TAG = "SyncManager"
     }
 }

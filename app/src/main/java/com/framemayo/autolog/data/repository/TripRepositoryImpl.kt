@@ -105,6 +105,8 @@ class TripRepositoryImpl(
     override suspend fun updateServerVersion(trip: TripEntity, serverVersion: Long) =
         dao.setServerVersion(trip.id, serverVersion)
 
+    override suspend fun clearServerState() = dao.clearServerState()
+
     override suspend fun markSynced(trip: TripEntity) = dao.markSynced(trip.id, trip.updatedAt, clock())
 
     override suspend fun markSyncFailed(trip: TripEntity) = dao.setSyncState(trip.id, trip.updatedAt, SyncState.FAILED)

@@ -48,12 +48,13 @@ class ServerApi(
             try {
                 val code = conn.responseCode
                 val text = (if (code >= 400) conn.errorStream else conn.inputStream)?.bufferedReader()?.use { it.readText() }
-                if (code == 401 && bearer != null) onUnauthorized()
+                val body = text?.trimStart('\uFEFF', ' ', '\n', '\r', '\t')
+                if (code == 401 && bearer != null && token() == bearer) onUnauthorized() // 그 사이 다시 페어링했다면 새 연결은 유지
                 ApiResult.Http(
                     code,
-                    text?.takeIf { it.startsWith("{") }?.let { runCatching { JSONObject(it) }.getOrNull() },
+                    body?.takeIf { it.startsWith("{") }?.let { runCatching { JSONObject(it) }.getOrNull() },
                     conn.getHeaderField("Retry-After")?.trim()?.toIntOrNull(),
-                    text?.takeIf { it.startsWith("[") }?.let { runCatching { JSONArray(it) }.getOrNull() },
+                    body?.takeIf { it.startsWith("[") }?.let { runCatching { JSONArray(it) }.getOrNull() },
                 )
             } catch (_: IOException) {
                 ApiResult.Offline

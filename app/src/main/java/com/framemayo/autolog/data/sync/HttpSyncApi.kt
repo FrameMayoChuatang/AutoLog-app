@@ -12,25 +12,21 @@ class HttpSyncApi(private val server: ServerApi) : SyncApi {
     override suspend fun upload(trip: TripPayload): SyncResult {
         val r = server.call("PUT", "/api/device/trips/${trip.uuid}", trip.toJson())
         if (r !is ApiResult.Http) return SyncResult.Retry
-        return when {
-            r.ok -> r.json?.optLong("serverVersion", -1)?.takeIf { it >= 0 }?.let { SyncResult.Ok(it) } ?: SyncResult.Retry
-            r.code == 409 -> SyncResult.Conflict
-            r.code == 401 -> SyncResult.Unauthorized
-            r.code == 400 || r.code == 404 -> SyncResult.Rejected
-            else -> SyncResult.Retry
-        }
+        return r.toSyncResult()
     }
 
     override suspend fun confirm(confirm: ConfirmPayload): SyncResult {
         val r = server.call("POST", "/api/device/trips/${confirm.uuid}/confirm", confirm.toJson())
         if (r !is ApiResult.Http) return SyncResult.Retry
-        return when {
-            r.ok -> r.json?.optLong("serverVersion", -1)?.takeIf { it >= 0 }?.let { SyncResult.Ok(it) } ?: SyncResult.Retry
-            r.code == 409 -> SyncResult.Conflict
-            r.code == 401 -> SyncResult.Unauthorized
-            r.code == 400 || r.code == 404 -> SyncResult.Rejected
-            else -> SyncResult.Retry
-        }
+        return r.toSyncResult()
+    }
+
+    private fun ApiResult.Http.toSyncResult(): SyncResult = when {
+        ok -> json?.optLong("serverVersion", -1)?.takeIf { it >= 0 }?.let { SyncResult.Ok(it) } ?: SyncResult.Retry
+        code == 409 -> SyncResult.Conflict
+        code == 401 -> SyncResult.Unauthorized
+        code == 400 || code == 404 -> SyncResult.Rejected
+        else -> SyncResult.Retry
     }
 
     override suspend fun fetch(uuid: String): FetchResult {

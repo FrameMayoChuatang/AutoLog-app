@@ -15,6 +15,9 @@ class FakeSyncApi : SyncApi {
     @Volatile var rejectConfirm = false
 
     @Volatile var loseNextResponse = false
+    @Volatile var alwaysConflict = false
+    val retryUuids = mutableSetOf<String>()
+    val throwUuids = mutableSetOf<String>()
 
     val store = LinkedHashMap<String, Stored>()
 
@@ -26,6 +29,9 @@ class FakeSyncApi : SyncApi {
         if (!online) return SyncResult.Retry
         if (unauthorized) return SyncResult.Unauthorized
         uploads += trip
+        if (trip.uuid in throwUuids) error("boom")
+        if (trip.uuid in retryUuids) return SyncResult.Retry
+        if (alwaysConflict) return SyncResult.Conflict
         if (reject) return SyncResult.Rejected
         val cur = store[trip.uuid]
         val result: SyncResult = when {

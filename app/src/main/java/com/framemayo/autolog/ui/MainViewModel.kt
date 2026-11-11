@@ -28,6 +28,7 @@ data class MainUiState(
     val recentTrips: List<TripEntity> = emptyList(),
     val consentPrompt: DriverEntity? = null,
     val syncStatus: Map<Long, TripSyncStatus> = emptyMap(),
+    val linked: Boolean = false,
 )
 
 data class LinkUiState(
@@ -53,7 +54,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         MainUiState(vehicle, driverList, active, recent, prompt)
     }.combine(vehicleLink.link) { ui, link ->
         val byId = ui.drivers.associateBy { it.id }
-        ui.copy(syncStatus = ui.recentTrips.associate { it.id to it.syncStatus(it.driverId?.let(byId::get), link != null) })
+        ui.copy(
+            syncStatus = ui.recentTrips.associate { it.id to it.syncStatus(it.driverId?.let(byId::get), link != null) },
+            linked = link != null,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
     private val linkForm = MutableStateFlow(LinkUiState())
@@ -79,7 +83,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun disconnectVehicle() = vehicleLink.disconnect()
+    fun disconnectVehicle() {
+        vehicleLink.disconnect()
+        viewModelScope.launch {
+            drivers.clearServerLinks()
+            trips.clearServerState()
+        }
+    }
 
     fun addDriver(name: String, department: String) {
         if (name.isBlank()) return

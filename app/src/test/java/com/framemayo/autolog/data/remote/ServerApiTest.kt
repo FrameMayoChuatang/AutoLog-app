@@ -53,6 +53,27 @@ class ServerApiTest {
     }
 
     @Test
+    fun staleTokenUnauthorizedDoesNotDisconnectNewLink() = runBlocking {
+        status = 401
+        var current = "OLD"
+        val api = ServerApi(server.url, { current }, { unauthorized++ })
+        server.beforeResponse = { current = "NEW" } // 요청이 나간 사이 다시 페어링
+        api.call("GET", "/x")
+        assertEquals(0, unauthorized)
+    }
+
+    @Test
+    fun bodyWithLeadingWhitespaceOrBomStillParses() = runBlocking {
+        val padded = TestServer { _, _, _, _ -> 200 to "\uFEFF \n{\"ok\":true}" }
+        try {
+            val r = ServerApi(padded.url).call("GET", "/x") as ApiResult.Http
+            assertEquals(true, r.json?.getBoolean("ok"))
+        } finally {
+            padded.stop()
+        }
+    }
+
+    @Test
     fun unauthorizedWithoutTokenDoesNotTriggerCallback() = runBlocking {
         status = 401
         api().call("POST", "/api/device/pair", auth = false)

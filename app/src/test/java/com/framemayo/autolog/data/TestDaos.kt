@@ -51,6 +51,12 @@ internal fun fakeTripDao(): TripDao {
                 )
                 Unit
             }
+            "clearServerState" -> {
+                for (i in rows.indices) if (rows[i].syncState != SyncState.SYNCED) {
+                    rows[i] = rows[i].copy(ackedRevision = 0, serverVersion = 0, confirmSentAt = null, syncState = SyncState.PENDING)
+                }
+                Unit
+            }
             "setServerVersion" -> {
                 val i = rows.indexOfFirst { it.id == a[0] }
                 if (i >= 0) rows[i] = rows[i].copy(serverVersion = a[1] as Long)
