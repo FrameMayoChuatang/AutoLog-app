@@ -15,7 +15,7 @@ import com.framemayo.autolog.data.location.FusedLocationSource
 import com.framemayo.autolog.data.location.ArrivalLocationRecorder
 import com.framemayo.autolog.data.remote.ServerApi
 import com.framemayo.autolog.data.retention.RetentionScheduler
-import com.framemayo.autolog.data.sync.FakeSyncApi
+import com.framemayo.autolog.data.sync.HttpSyncApi
 import com.framemayo.autolog.data.sync.SyncManager
 import com.framemayo.autolog.data.sync.SyncScheduler
 import com.framemayo.autolog.vehicle.VehicleDataSource
@@ -44,7 +44,7 @@ class AppContainer(app: Application) {
     val server: ServerApi = ServerApi(app.getString(R.string.server_url), token = { vehicleLink.link.value?.accessToken }, onUnauthorized = { vehicleLink.disconnect() })
     val vehicleLink: VehicleLinkRepository = VehicleLinkRepository(app.getSharedPreferences("vehicle_link", android.content.Context.MODE_PRIVATE), HttpVehicleLinkApi(server))
 
-    val sync = SyncManager(trips, drivers, FakeSyncApi())
+    val sync = SyncManager(trips, drivers, HttpSyncApi(server), isLinked = { vehicleLink.link.value != null })
 }
 
 val android.content.Context.container: AppContainer

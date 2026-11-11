@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,67 +30,151 @@ private object FakeDrivers : DriverRepository {
 class SyncManagerTest {
     private var now = 1_000L
     private var pendingCalls = 0
-    private val repo = TripRepositoryImpl(fakeTripDao(), { now++ }, { pendingCalls++ })
+    private var linked = true
+    private val dao = fakeTripDao()
+    private val repo = TripRepositoryImpl(dao, { now++ }, { pendingCalls++ })
     private val api = FakeSyncApi()
-    private val sync = SyncManager(repo, FakeDrivers, api)
+    private val sync = SyncManager(repo, FakeDrivers, api, isLinked = { linked })
 
-    private suspend fun finishedTrip(startKm: Float = 100f) {
-        repo.start(1, startKm); repo.end(startKm + 10)
-    }
+    private suspend fun finishedTrip(startKm: Float = 100f) = repo.start(1, startKm).let { repo.end(startKm + 10)!! }
 
     @Test fun offlineKeepsPendingThenOnlineUploadsOnce() = runBlocking {
-        finishedTrip()
+        val t = finishedTrip()
         api.online = false
         assertFalse(sync.syncPending())
-        assertEquals(1, repo.pendingSync().size)
-        assertEquals(0, api.received.size)
+        assertEquals(SyncState.PENDING, dao.get(t.id)!!.syncState)
+        assertEquals(0, api.uploads.size)
 
         api.online = true
         assertTrue(sync.syncPending())
-        assertEquals(0, repo.pendingSync().size)
-        assertEquals(1, api.received.size)
-        assertEquals(DRIVER_UUID, api.received.single().driverRemoteId)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+        val sent = api.uploads.single()
+        assertEquals(2, sent.sourceRevision)
+        assertEquals(0, sent.baseServerVersion)
+        assertEquals("COMPLETED", sent.state)
+        assertEquals(DRIVER_UUID, sent.driverId)
     }
 
-    @Test fun alreadySyncedIsNotResent() = runBlocking {
-        finishedTrip()
-        sync.syncPending()
-        api.received // 1건
-        sync.syncPending()
-        assertEquals(1, api.received.size)
+    @Test fun runningThenCompletedUsesServerVersionAsBase() = runBlocking {
+        val t = repo.start(1, 100f)
+        assertTrue(sync.syncPending())
+        val running = api.uploads.single()
+        assertEquals("RUNNING", running.state)
+        assertEquals(1, running.sourceRevision)
+        assertNull(running.endedAt)
+        assertEquals(100f, running.lastOdometerKm)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+
+        repo.end(110f)
+        assertTrue(sync.syncPending())
+        val done = api.uploads.last()
+        assertEquals(2, done.sourceRevision)
+        assertEquals(1, done.baseServerVersion)
+        assertEquals(2, api.store.getValue(t.uuid).serverVersion)
     }
 
-    @Test fun duplicateUploadOfSameUuidStaysOneRecord() = runBlocking {
-        finishedTrip()
-        val trip = repo.pendingSync().single()
-        api.upload(trip.toPayload(DRIVER_UUID))
-        api.upload(trip.toPayload(DRIVER_UUID)) // 응답 유실로 재전송된 상황
-        assertEquals(1, api.received.size)
+    @Test fun lostResponseResendsSamePayloadAndStaysOneRecord() = runBlocking {
+        val t = finishedTrip()
+        api.loseNextResponse = true
+        assertFalse(sync.syncPending())
+        assertEquals(SyncState.PENDING, dao.get(t.id)!!.syncState)
+
+        assertTrue(sync.syncPending())
+        assertEquals(2, api.uploads.size)
+        assertEquals(api.uploads[0], api.uploads[1])
+        assertEquals(1, api.store.size)
+        assertEquals(1, api.store.getValue(t.uuid).serverVersion)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun serverSideVersionDriftIsRebasedAndResent() = runBlocking {
+        val t = repo.start(1, 100f)
+        sync.syncPending()
+        api.serverSideEdit(t.uuid)
+        repo.end(110f)
+
+        assertTrue(sync.syncPending())
+        val saved = api.store.getValue(t.uuid)
+        assertEquals("COMPLETED", saved.payload.state)
+        assertEquals(2, saved.payload.baseServerVersion)
+        assertTrue(saved.payload.sourceRevision > 2)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+        assertEquals(3, api.uploads.size)
+    }
+
+    @Test fun lockedMeasurementBecomesFailedAndIsNotResent() = runBlocking {
+        val t = repo.start(1, 100f)
+        sync.syncPending()
+        api.store.getValue(t.uuid).locked = true
+        repo.end(110f)
+
+        assertTrue(sync.syncPending())
+        assertEquals(SyncState.FAILED, dao.get(t.id)!!.syncState)
+        val calls = api.uploads.size
+        assertTrue(sync.syncPending())
+        assertEquals(calls, api.uploads.size)
     }
 
     @Test fun rejectedBecomesFailedWithoutRetryLoop() = runBlocking {
-        finishedTrip()
+        val t = finishedTrip()
         api.reject = true
         assertTrue(sync.syncPending())
-        assertEquals(SyncState.FAILED, repo.get(1L)!!.syncState)
-        api.reject = false
-        sync.syncPending()
-        assertEquals(0, api.received.size)
+        assertEquals(SyncState.FAILED, dao.get(t.id)!!.syncState)
+        assertEquals(1, api.uploads.size)
+        assertTrue(sync.syncPending())
+        assertEquals(1, api.uploads.size)
     }
 
-    @Test fun stopsAtFirstNetworkErrorKeepingOrder() = runBlocking {
-        finishedTrip(100f); finishedTrip(200f)
-        api.online = false
-        assertFalse(sync.syncPending())
-        api.online = true
-        sync.syncPending()
-        assertEquals(listOf(100f, 200f), api.received.map { it.startOdometerKm })
+    @Test fun unauthorizedStopsWithoutRetryOrFailure() = runBlocking {
+        val t = finishedTrip()
+        api.unauthorized = true
+        assertTrue(sync.syncPending())
+        assertEquals(SyncState.PENDING, dao.get(t.id)!!.syncState)
     }
 
-    @Test fun repositoryNotifiesWhenPending() = runBlocking {
+    @Test fun notLinkedSendsNothing() = runBlocking {
         finishedTrip()
-        val t = repo.pendingSync().single()
-        repo.setPurpose(t.id, TripPurpose.PERSONAL)
-        assertEquals(2, pendingCalls) // end + setPurpose
+        linked = false
+        assertTrue(sync.syncPending())
+        assertEquals(0, api.uploads.size)
+        linked = true
+        assertTrue(sync.syncPending())
+        assertEquals(1, api.uploads.size)
+    }
+
+    @Test fun interruptedIsSentWithoutEstimatedEndValues() = runBlocking {
+        val t = repo.start(1, 100f)
+        repo.heartbeat(104.5f)
+        repo.recoverInterrupted()
+        assertTrue(sync.syncPending())
+        val sent = api.uploads.single()
+        assertEquals("INTERRUPTED", sent.state)
+        assertNull(sent.endedAt)
+        assertNull(sent.endOdometerKm)
+        assertEquals(104.5f, sent.lastOdometerKm)
+        assertEquals(listOf("SAMPLING_INTERRUPTED"), sent.collectionIssues)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun purposeEditAfterSyncIsNotResentButStaysPending() = runBlocking {
+        val t = finishedTrip()
+        sync.syncPending()
+        repo.setPurpose(t.id, TripPurpose.BUSINESS_GENERAL)
+        assertTrue(sync.syncPending())
+        assertEquals(1, api.uploads.size)
+        assertEquals(SyncState.PENDING, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun oldestTripIsSentFirstAndOneOfflineStopsTheRest() = runBlocking {
+        val a = finishedTrip(100f)
+        val b = finishedTrip(200f)
+        assertTrue(sync.syncPending())
+        assertEquals(listOf(a.uuid, b.uuid), api.uploads.map { it.uuid })
+    }
+
+    @Test fun startTriggersSyncSoRunningStateIsSent() = runBlocking {
+        pendingCalls = 0
+        repo.start(1, 100f)
+        assertEquals(1, pendingCalls)
     }
 }

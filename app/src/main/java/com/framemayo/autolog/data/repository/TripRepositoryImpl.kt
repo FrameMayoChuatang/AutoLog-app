@@ -30,7 +30,9 @@ class TripRepositoryImpl(
             lastSavedAt = now,
             updatedAt = now,
         )
-        return trip.copy(id = dao.insert(trip))
+        val saved = trip.copy(id = dao.insert(trip))
+        onPending()
+        return saved
     }
     override suspend fun heartbeat(odometerKm: Float) {
         val trip = dao.active() ?: return
@@ -46,6 +48,7 @@ class TripRepositoryImpl(
             lastOdometerKm = odometerKm,
             status = TripStatus.COMPLETED,
             syncState = SyncState.PENDING,
+            sourceRevision = trip.sourceRevision + 1,
             updatedAt = now,
         )
         dao.update(ended)
@@ -65,6 +68,7 @@ class TripRepositoryImpl(
             endOdometerKm = trip.lastOdometerKm,
             status = TripStatus.INTERRUPTED,
             syncState = SyncState.PENDING,
+            sourceRevision = trip.sourceRevision + 1,
             updatedAt = nextUpdatedAt(trip),
         )
         dao.update(recovered)
@@ -73,6 +77,12 @@ class TripRepositoryImpl(
     }
 
     override suspend fun pendingSync(): List<TripEntity> = dao.pendingSync()
+
+    override suspend fun recordAck(trip: TripEntity, serverVersion: Long) =
+        dao.recordAck(trip.id, trip.sourceRevision, serverVersion)
+
+    override suspend fun rebase(trip: TripEntity, serverVersion: Long, serverRevision: Long) =
+        dao.rebase(trip.id, serverVersion, serverRevision)
 
     override suspend fun markSynced(trip: TripEntity) = dao.markSynced(trip.id, trip.updatedAt, clock())
 

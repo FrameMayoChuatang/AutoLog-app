@@ -19,6 +19,10 @@ interface TripRepository {
 
     suspend fun pendingSync(): List<TripEntity>
 
+    suspend fun recordAck(trip: TripEntity, serverVersion: Long)
+
+    suspend fun rebase(trip: TripEntity, serverVersion: Long, serverRevision: Long)
+
     suspend fun markSynced(trip: TripEntity)
     suspend fun markSyncFailed(trip: TripEntity)
 

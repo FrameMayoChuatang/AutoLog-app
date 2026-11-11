@@ -9,6 +9,7 @@ import com.framemayo.autolog.data.link.VehicleLink
 import com.framemayo.autolog.data.local.DriverEntity
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
+import com.framemayo.autolog.data.sync.SyncScheduler
 import com.framemayo.autolog.service.RecorderState
 import com.framemayo.autolog.service.VehicleSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,7 +60,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val result = vehicleLink.connect(pairingCode)
             val error = when (result) {
-                is LinkResult.Ok -> null
+                is LinkResult.Ok -> {
+                    SyncScheduler.enqueue(getApplication())
+                    null
+                }
                 LinkResult.InvalidCode -> "페어링 코드가 올바르지 않거나 만료되었습니다. 8자리 숫자를 확인하고, 안 되면 관리자에게 새 코드를 받아 주세요."
                 is LinkResult.RateLimited -> "시도 횟수가 너무 많습니다. ${result.seconds?.let { s -> "${s}초" } ?: "잠시"} 뒤에 다시 시도해 주세요."
                 LinkResult.Retry -> "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."

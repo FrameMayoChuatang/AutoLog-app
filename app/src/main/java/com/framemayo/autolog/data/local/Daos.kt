@@ -98,8 +98,14 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE status = 'INTERRUPTED' OR (status = 'COMPLETED' AND purpose = 'UNCONFIRMED') ORDER BY startedAt DESC")
     fun observeNeedsReview(): Flow<List<TripEntity>>
 
-    @Query("SELECT * FROM trips WHERE syncState = 'PENDING' AND status != 'ACTIVE' ORDER BY startedAt")
+    @Query("SELECT * FROM trips WHERE syncState = 'PENDING' ORDER BY startedAt")
     suspend fun pendingSync(): List<TripEntity>
+
+    @Query("UPDATE trips SET ackedRevision = :revision, serverVersion = :serverVersion WHERE id = :id AND ackedRevision < :revision")
+    suspend fun recordAck(id: Long, revision: Long, serverVersion: Long)
+
+    @Query("UPDATE trips SET serverVersion = :serverVersion, sourceRevision = MAX(sourceRevision + 1, :serverRevision + 1) WHERE id = :id")
+    suspend fun rebase(id: Long, serverVersion: Long, serverRevision: Long)
 
     @Query("DELETE FROM trips WHERE syncState = 'SYNCED' AND status != 'ACTIVE' AND syncedAt < :cutoff")
     suspend fun deleteSyncedBefore(cutoff: Long): Int

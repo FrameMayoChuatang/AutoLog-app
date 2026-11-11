@@ -12,9 +12,32 @@ class TripRepositorySyncTest {
     private var now = 1_000L
     private val repo = TripRepositoryImpl(fakeTripDao(), clock = { now++ })
 
-    @Test fun activeTripIsNotPending() = runBlocking {
+    @Test fun activeTripIsPendingSoRunningStateReachesServer() = runBlocking {
+        val t = repo.start(1, 100f)
+        assertEquals(listOf(t.uuid), repo.pendingSync().map { it.uuid })
+        assertEquals(1, t.sourceRevision)
+    }
+
+    @Test fun revisionIncreasesOnlyWhenMeasurementsChange() = runBlocking {
         repo.start(1, 100f)
-        assertEquals(0, repo.pendingSync().size)
+        repo.heartbeat(105f)
+        val ended = repo.end(110f)!!
+        assertEquals(2, ended.sourceRevision)
+        repo.setPurpose(ended.id, TripPurpose.PERSONAL)
+        assertEquals(2, repo.get(ended.id)!!.sourceRevision)
+    }
+
+    @Test fun ackAndRebaseKeepVersions() = runBlocking {
+        val t = repo.start(1, 100f)
+        repo.recordAck(t, serverVersion = 7)
+        assertEquals(1, repo.get(t.id)!!.ackedRevision)
+        assertEquals(7, repo.get(t.id)!!.serverVersion)
+        repo.recordAck(t, serverVersion = 3)
+        assertEquals(7, repo.get(t.id)!!.serverVersion)
+        repo.rebase(t, serverVersion = 9, serverRevision = 5)
+        val r = repo.get(t.id)!!
+        assertEquals(9, r.serverVersion)
+        assertEquals(6, r.sourceRevision)
     }
 
     @Test fun endedTripIsPendingWithUuid() = runBlocking {
