@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -67,6 +68,7 @@ internal fun DriverSearchDialog(
     val progress = remember { Animatable(0f) }
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    var inputFocused by remember { mutableStateOf(false) }
     var targetBounds by remember { mutableStateOf(Rect.Zero) }
     val results = profiles.filter { it.displayName.contains(query.trim(), ignoreCase = true) }
     val dismiss = { keyboard?.hide(); onDismiss() }
@@ -83,13 +85,20 @@ internal fun DriverSearchDialog(
         BoxWithConstraints(
             Modifier.fillMaxSize()
                 .semantics { contentDescription = "검색 모달 배경" }
-                .pointerInput(Unit) { detectTapGestures { dismiss() } }
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        if (inputFocused) {
+                            focusManager.clearFocus()
+                            keyboard?.hide()
+                        } else dismiss()
+                    }
+                }
                 .safeDrawingPadding().imePadding().padding(24.dp),
             contentAlignment = Alignment.Center,
         ) {
-            // 전체 화면 Dialog의 바깥 터치를 직접 처리하고, 모달 내부 탭은 포커스만 해제한다.
+            // 바깥 탭은 입력 종료 후 다음 탭에 모달을 닫고, 내부 빈 영역은 포커스만 해제한다.
             // 입력창·결과 버튼이 소비한 터치는 부모의 닫기 동작으로 전달되지 않는다.
-            Box(Modifier.widthIn(max = 640.dp).fillMaxWidth().height(minOf(520.dp, maxHeight))
+            Box(Modifier.widthIn(max = 840.dp).fillMaxWidth().height(minOf(640.dp, maxHeight))
                 .pointerInput(Unit) {
                     detectTapGestures {
                         focusManager.clearFocus()
@@ -133,16 +142,16 @@ internal fun DriverSearchDialog(
                 // 이동 중에도 카드 경계에 잘리지 않도록 입력창을 모달 표면과 별도로 배치한다.
                 Box(
                     Modifier.align(Alignment.TopCenter).padding(top = 80.dp, start = 24.dp, end = 24.dp)
-                        .widthIn(max = 480.dp).fillMaxWidth().onGloballyPositioned { targetBounds = it.boundsInWindow() },
+                        .widthIn(max = 640.dp).fillMaxWidth().onGloballyPositioned { targetBounds = it.boundsInWindow() },
                 ) {
-                    DriverSearchBar(query, onQuery, { keyboard?.hide() }, Modifier.focusRequester(focus).graphicsLayer {
+                    DriverSearchBar(query, onQuery, { focusManager.clearFocus(); keyboard?.hide() }, Modifier.focusRequester(focus).onFocusChanged { inputFocused = it.hasFocus }.graphicsLayer {
                         if (sourceBounds != Rect.Zero && targetBounds != Rect.Zero) {
                             val remaining = 1f - progress.value
                             translationX = (sourceBounds.center.x - targetBounds.center.x) * remaining
                             translationY = (sourceBounds.center.y - targetBounds.center.y) * remaining
                             scaleX = 1f + (sourceBounds.width / targetBounds.width - 1f) * remaining
                         }
-                    })
+                    }, maxWidth = 640.dp)
                 }
             }
         }

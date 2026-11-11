@@ -261,8 +261,8 @@ private fun ProfileTool(label: String, icon: String, onClick: () -> Unit) {
 }
 
 @Composable
-internal fun DriverSearchBar(query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier, onOpen: (() -> Unit)? = null) {
-    Box(modifier.widthIn(max = 480.dp).fillMaxWidth()) {
+internal fun DriverSearchBar(query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier, onOpen: (() -> Unit)? = null, maxWidth: Dp = 480.dp) {
+    Box(modifier.widthIn(max = maxWidth).fillMaxWidth()) {
         if (onOpen != null) Surface(
             onClick = onOpen, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).semantics { contentDescription = "운전자 검색 열기" },
             shape = CircleShape, color = Color.White,
