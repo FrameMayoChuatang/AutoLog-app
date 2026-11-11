@@ -67,11 +67,14 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertDoesNotExist()
     }
 
-    @Test fun tappingSearchBackdropClosesDialogAndKeepsQuery() {
+    @Test fun backdropFirstEndsInputThenClosesDialogAndKeepsQuery() {
         val starts = mutableListOf<Long>()
         show(onStart = { starts.add(it) })
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
+        compose.onNodeWithContentDescription("검색 모달 배경").performTouchInput { click(androidx.compose.ui.geometry.Offset(4f, 4f)) }
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed().assertIsNotFocused().assertTextContains("7")
+        compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertIsDisplayed()
         compose.onNodeWithContentDescription("검색 모달 배경").performTouchInput { click(androidx.compose.ui.geometry.Offset(4f, 4f)) }
         compose.onNodeWithContentDescription("운전자 이름 검색").assertDoesNotExist()
         compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("7")
