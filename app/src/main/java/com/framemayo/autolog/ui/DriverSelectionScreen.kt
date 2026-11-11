@@ -131,12 +131,15 @@ internal fun DriverSelectionScreen(
                 ) {
                     item {
                         Box(Modifier.fillMaxWidth()) {
-                            Row(Modifier.fillMaxWidth().padding(top = 24.dp)) {
+                            Row(Modifier.fillMaxWidth().padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                                 OutlinedButton(
                                     onClick = { managing = !managing }, shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier.heightIn(min = 56.dp), border = BorderStroke(1.dp, SelectionColors.outline),
                                     colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
                                 ) { Text(if (managing) "완료" else "프로필 관리", fontSize = 18.sp) }
+                                Box(Modifier.weight(1f).padding(start = 24.dp), contentAlignment = Alignment.CenterEnd) {
+                                    DriverSearchBar(query, { query = it }, { keyboard?.hide() }, Modifier)
+                                }
                             }
                             Column(
                                 Modifier.fillMaxWidth().layout { measurable, constraints ->
@@ -162,8 +165,9 @@ internal fun DriverSelectionScreen(
                         }
                     }
                     item {
-                        DriverSearchBar(query, { query = it }, { keyboard?.hide() }, Modifier.padding(top = 72.dp, bottom = 32.dp))
-                        if (query.isNotBlank() && others.isEmpty()) Text("검색 결과가 없습니다.", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
+                        Box(Modifier.fillMaxWidth().padding(top = 72.dp), contentAlignment = Alignment.Center) {
+                            if (query.isNotBlank() && others.isEmpty()) Text("검색 결과가 없습니다.", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
+                        }
                     }
                     items(others.chunked(columns), key = { row -> "others-${row.first().driver.id}" }) { row ->
                         Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.Top) { row.forEach { card(it) } }
