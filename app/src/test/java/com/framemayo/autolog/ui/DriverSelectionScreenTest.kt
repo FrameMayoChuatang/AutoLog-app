@@ -86,7 +86,7 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
         compose.onNodeWithContentDescription("운전자 이름 검색").assertIsFocused()
-        compose.onNodeWithText("운전자 검색", substring = false).performTouchInput { click() }
+        compose.onNodeWithText("검색 결과 1명", substring = false).performTouchInput { click() }
         compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed().assertIsNotFocused().assertTextContains("7")
         compose.onNodeWithContentDescription("운전자 이름 검색").performTouchInput { click() }
         compose.onNodeWithContentDescription("운전자 이름 검색").assertIsFocused()
@@ -236,7 +236,12 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed().performTextInput("7")
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithContentDescription("검색 닫기").assertIsDisplayed().performClick()
+        compose.onNodeWithText("운전자 검색", substring = false).assertDoesNotExist()
+        compose.onNodeWithText("×", substring = false).assertDoesNotExist()
+        val result = compose.onNodeWithContentDescription("운전자7 검색 결과 선택").fetchSemanticsNode().boundsInRoot
+        val close = compose.onNodeWithContentDescription("검색 닫기").assertIsDisplayed().assertTextContains("닫기").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue(close.top > result.bottom)
+        compose.onNodeWithContentDescription("검색 닫기").performClick()
         compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("7")
     }
 
