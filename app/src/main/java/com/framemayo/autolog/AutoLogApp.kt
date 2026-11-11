@@ -19,6 +19,7 @@ import com.framemayo.autolog.data.remote.ServerApi
 import com.framemayo.autolog.data.retention.RetentionScheduler
 import com.framemayo.autolog.data.sync.HttpSyncApi
 import com.framemayo.autolog.data.sync.SyncManager
+import com.framemayo.autolog.data.sync.SyncRunner
 import com.framemayo.autolog.data.sync.SyncScheduler
 import com.framemayo.autolog.vehicle.VehicleDataSource
 
@@ -50,6 +51,8 @@ class AppContainer(app: Application) {
     val driverSync = DriverSyncManager(drivers, HttpDriverApi(server), isLinked = { vehicleLink.link.value != null })
 
     val sync = SyncManager(trips, drivers, HttpSyncApi(server), isLinked = { vehicleLink.link.value != null })
+
+    val syncRunner = SyncRunner(driverSync = { driverSync.sync() }, tripSync = { sync.syncPending() })
 }
 
 val android.content.Context.container: AppContainer
