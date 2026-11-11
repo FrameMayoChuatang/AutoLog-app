@@ -182,7 +182,7 @@ internal fun DriverSelectionScreen(
                         if (others.isNotEmpty()) item {
                             OutlinedButton(
                                 onClick = { showingMore = !showingMore },
-                                modifier = Modifier.padding(top = 40.dp, bottom = 24.dp).widthIn(min = 160.dp).heightIn(min = 56.dp),
+                                modifier = Modifier.padding(top = 80.dp, bottom = 24.dp).widthIn(min = 160.dp).heightIn(min = 56.dp),
                                 shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SelectionColors.outline),
                                 colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
                             ) { Text(if (showingMore) "접기" else "더보기", fontSize = 20.sp) }
