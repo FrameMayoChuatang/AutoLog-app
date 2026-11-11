@@ -333,6 +333,24 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("운전자 이름 검색...")
     }
 
+    @Test
+    @Config(qualifiers = "w500dp-h900dp-port-mdpi")
+    fun allAppearancePickersScrollHorizontallyWithoutWrapping() {
+        compose.setContent { DriverProfileEditor(null, false, null, {}, { _, _, _ -> }) }
+        val horizontal = SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.HorizontalScrollAxisRange)
+        compose.onAllNodes(horizontal).assertCountEquals(3)
+        listOf("실버", "느긋 표정", "느긋 구름 캐릭터").forEach { last ->
+            compose.onNode(horizontal and hasAnyDescendant(hasContentDescription(last))).performScrollTo()
+            compose.onNodeWithContentDescription(last).performScrollTo().assertIsDisplayed().performClick().assertIsSelected()
+        }
+        compose.onAllNodes(horizontal).fetchSemanticsNodes().forEach { node ->
+            val range = node.config[androidx.compose.ui.semantics.SemanticsProperties.HorizontalScrollAxisRange]
+            org.junit.Assert.assertTrue(range.maxValue() > 0f)
+            org.junit.Assert.assertTrue(range.value() > 0f)
+        }
+        screenshot("editor-horizontal-pickers")
+    }
+
     private fun screenshot(name: String) {
         compose.runOnIdle {
             val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog()?.takeIf { it.isShowing }
