@@ -109,7 +109,7 @@ internal fun DriverSearchDialog(
                     Modifier.fillMaxSize().graphicsLayer { alpha = progress.value },
                     shape = RoundedCornerShape(28.dp), color = Color(0xFF17181D),
                 ) {
-                    Column(Modifier.padding(24.dp)) {
+                    Column(Modifier.padding(horizontal = 40.dp, vertical = 32.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("운전자 검색", fontSize = 26.sp, fontWeight = FontWeight.Medium)
                             TextButton(onClick = dismiss, modifier = Modifier.size(56.dp).semantics { contentDescription = "검색 닫기" }) {
@@ -132,7 +132,7 @@ internal fun DriverSearchDialog(
                                             Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f)) }
                                         }
                                         Text(profile.displayName, Modifier.weight(1f), fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(if (managing) "수정" else "선택", fontSize = 18.sp, color = Color(0xFFB9BEC8))
+                                        if (managing) Text("수정", fontSize = 18.sp, color = Color(0xFFB9BEC8))
                                     }
                                 }
                             }
@@ -141,8 +141,8 @@ internal fun DriverSearchDialog(
                 }
                 // 이동 중에도 카드 경계에 잘리지 않도록 입력창을 모달 표면과 별도로 배치한다.
                 Box(
-                    Modifier.align(Alignment.TopCenter).padding(top = 80.dp, start = 24.dp, end = 24.dp)
-                        .widthIn(max = 640.dp).fillMaxWidth().onGloballyPositioned { targetBounds = it.boundsInWindow() },
+                    Modifier.align(Alignment.TopCenter).padding(top = 88.dp, start = 40.dp, end = 40.dp)
+                        .fillMaxWidth().onGloballyPositioned { targetBounds = it.boundsInWindow() },
                 ) {
                     DriverSearchBar(query, onQuery, { focusManager.clearFocus(); keyboard?.hide() }, Modifier.focusRequester(focus).onFocusChanged { inputFocused = it.hasFocus }.graphicsLayer {
                         if (sourceBounds != Rect.Zero && targetBounds != Rect.Zero) {
@@ -151,7 +151,7 @@ internal fun DriverSearchDialog(
                             translationY = (sourceBounds.center.y - targetBounds.center.y) * remaining
                             scaleX = 1f + (sourceBounds.width / targetBounds.width - 1f) * remaining
                         }
-                    }, maxWidth = 640.dp)
+                    }, maxWidth = 760.dp)
                 }
             }
         }
