@@ -26,6 +26,8 @@ interface DriverRepository {
     suspend fun consentPending(): List<DriverEntity>
 
     suspend fun markConsentSent(driver: DriverEntity)
+
+    suspend fun clearServerLinks()
 }
 
 data class RemoteDriver(val remoteId: String, val name: String, val department: String, val status: DriverStatus)
@@ -62,6 +64,8 @@ class DriverRepositoryImpl(
     override suspend fun link(localId: Long, remote: RemoteDriver) = dao.link(localId, remote.remoteId, remote.status)
 
     override suspend fun consentPending(): List<DriverEntity> = dao.consentPending()
+
+    override suspend fun clearServerLinks() = dao.clearServerLinks()
 
     override suspend fun markConsentSent(driver: DriverEntity) {
         driver.consentUpdatedAt?.let { dao.markConsentSent(driver.id, it) }

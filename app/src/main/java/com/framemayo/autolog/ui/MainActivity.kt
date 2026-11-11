@@ -69,7 +69,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPermission: () -> Unit) {
     val v = state.vehicle
-    val linked = vm.linkState.collectAsStateWithLifecycle().value.link != null
+    val linked = state.linked
     state.consentPrompt?.let { ConsentDialog(it.name, vm, requestLocationPermission) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(24.dp),

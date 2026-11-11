@@ -17,6 +17,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 private const val DRIVER_UUID = "0a94e986-dfcf-4e4a-b490-f96876c62aed"
 
@@ -35,8 +38,11 @@ private class FakeDrivers : DriverRepository {
     override suspend fun link(localId: Long, remote: RemoteDriver) = Unit
     override suspend fun consentPending(): List<DriverEntity> = emptyList()
     override suspend fun markConsentSent(driver: DriverEntity) = Unit
+    override suspend fun clearServerLinks() = Unit
 }
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = android.app.Application::class)
 class SyncManagerTest {
     private var now = 1_000L
     private var pendingCalls = 0
@@ -250,7 +256,7 @@ class SyncManagerTest {
     @Test fun confirmIsHeldUntilDriverIsLinkedAndApproved() = runBlocking {
         val t = finishedWithPurpose(TripPurpose.PERSONAL)
         driversFake.status = DriverStatus.PENDING
-        assertTrue(sync.syncPending())
+        assertFalse(sync.syncPending()) // 승인 대기는 곧 다시 확인한다
         assertEquals(1, api.uploads.size)
         assertEquals(0, api.confirms.size)
         assertEquals(SyncState.PENDING, dao.get(t.id)!!.syncState)
@@ -263,6 +269,72 @@ class SyncManagerTest {
         assertTrue(sync.syncPending())
         assertEquals(1, api.confirms.size)
         assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun tripAwaitingDriverApprovalIsSentOnNextRunAfterApproval() = runBlocking {
+        val t = finishedWithPurpose(TripPurpose.PERSONAL)
+        driversFake.status = DriverStatus.PENDING
+        assertFalse(sync.syncPending())
+        assertEquals(0, api.confirms.size)
+
+        driversFake.status = DriverStatus.ACTIVE
+        assertTrue(sync.syncPending())
+        assertEquals(1, api.confirms.size)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun oneBlockedTripDoesNotStopLaterTrips() = runBlocking {
+        val a = finishedTrip(100f)
+        val b = finishedTrip(200f)
+        api.retryUuids += a.uuid
+        assertFalse(sync.syncPending())
+        assertEquals(SyncState.PENDING, dao.get(a.id)!!.syncState)
+        assertEquals(SyncState.SYNCED, dao.get(b.id)!!.syncState)
+    }
+
+    @Test fun tripThatThrowsDoesNotStopLaterTrips() = runBlocking {
+        val a = finishedTrip(100f)
+        val b = finishedTrip(200f)
+        api.throwUuids += a.uuid
+        assertFalse(sync.syncPending())
+        assertEquals(SyncState.SYNCED, dao.get(b.id)!!.syncState)
+    }
+
+    @Test fun consecutiveRetriesStopTheRunSoOfflineDoesNotWaitForEveryTrip() = runBlocking {
+        repeat(5) { finishedTrip(100f + it * 100) }
+        api.online = false
+        assertFalse(sync.syncPending())
+        assertEquals(0, api.uploads.size)
+    }
+
+    @Test fun repeatedConflictsRetryLaterInsteadOfFailing() = runBlocking {
+        val t = finishedTrip()
+        api.alwaysConflict = true
+        assertFalse(sync.syncPending())
+        assertEquals(SyncState.PENDING, dao.get(t.id)!!.syncState)
+
+        api.alwaysConflict = false
+        assertTrue(sync.syncPending())
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun clearingServerStateResetsUnsyncedTripsOnly() = runBlocking {
+        val synced = finishedTrip(100f)
+        sync.syncPending()
+        val unsent = finishedWithPurpose(TripPurpose.PERSONAL, startKm = 200f)
+        api.online = false
+        sync.syncPending()
+        api.online = true
+        repo.markSyncFailed(dao.get(unsent.id)!!)
+
+        repo.clearServerState()
+
+        assertEquals(SyncState.SYNCED, dao.get(synced.id)!!.syncState)
+        val u = dao.get(unsent.id)!!
+        assertEquals(SyncState.PENDING, u.syncState)
+        assertEquals(0, u.ackedRevision)
+        assertEquals(0, u.serverVersion)
+        assertNull(u.confirmSentAt)
     }
 
     @Test fun tripsWithoutDriverAndInterruptedTripsAreHeld() = runBlocking {

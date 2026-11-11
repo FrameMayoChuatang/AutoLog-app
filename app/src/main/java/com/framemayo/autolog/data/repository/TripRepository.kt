@@ -29,6 +29,8 @@ interface TripRepository {
 
     suspend fun updateServerVersion(trip: TripEntity, serverVersion: Long)
 
+    suspend fun clearServerState()
+
     suspend fun markSynced(trip: TripEntity)
     suspend fun markSyncFailed(trip: TripEntity)
 

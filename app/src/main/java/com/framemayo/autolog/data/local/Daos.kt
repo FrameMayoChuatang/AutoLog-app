@@ -40,6 +40,9 @@ interface DriverDao {
     @Query("UPDATE drivers SET remoteId = :remoteId, status = :status WHERE id = :id AND remoteId IS NULL")
     suspend fun link(id: Long, remoteId: String, status: DriverStatus)
 
+    @Query("UPDATE drivers SET remoteId = NULL, status = NULL, consentSentAt = NULL")
+    suspend fun clearServerLinks()
+
     @Query("UPDATE drivers SET status = 'INACTIVE' WHERE remoteId IS NOT NULL AND remoteId NOT IN (:remoteIds)")
     suspend fun markMissingInactive(remoteIds: List<String>)
 
@@ -125,6 +128,9 @@ interface TripDao {
 
     @Query("UPDATE trips SET serverVersion = :serverVersion, confirmSentAt = CASE WHEN updatedAt = :updatedAt THEN :updatedAt ELSE confirmSentAt END WHERE id = :id")
     suspend fun recordConfirm(id: Long, serverVersion: Long, updatedAt: Long)
+
+    @Query("UPDATE trips SET ackedRevision = 0, serverVersion = 0, confirmSentAt = NULL, syncState = 'PENDING' WHERE syncState != 'SYNCED'")
+    suspend fun clearServerState()
 
     @Query("UPDATE trips SET serverVersion = :serverVersion WHERE id = :id")
     suspend fun setServerVersion(id: Long, serverVersion: Long)
