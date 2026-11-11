@@ -19,6 +19,10 @@ import org.junit.Test
 private const val DRIVER_UUID = "0a94e986-dfcf-4e4a-b490-f96876c62aed"
 
 private object FakeDrivers : DriverRepository {
+    override val profiles = flowOf(emptyList<com.framemayo.autolog.data.local.DriverProfile>())
+    override suspend fun addProfile(name: String, color: Int) = 1L
+    override suspend fun editProfile(id: Long, name: String, color: Int) = Unit
+    override suspend fun hideProfile(id: Long) = true
     override val all: Flow<List<DriverEntity>> = flowOf(emptyList())
     override suspend fun add(name: String, department: String) = 1L
     override suspend fun remoteIdOf(localId: Long): String? = if (localId == 1L) DRIVER_UUID else null
