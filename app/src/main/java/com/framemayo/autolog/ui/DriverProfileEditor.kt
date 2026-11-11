@@ -59,10 +59,11 @@ internal fun DriverProfileEditor(
     busy: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onSave: (String, Int) -> Unit,
+    onSave: (String, Int, Int) -> Unit,
 ) {
     var name by rememberSaveable(profile?.driver?.id) { mutableStateOf(profile?.displayName.orEmpty()) }
     var color by rememberSaveable(profile?.driver?.id) { mutableIntStateOf(profile?.color ?: 0) }
+    var expression by rememberSaveable(profile?.driver?.id) { mutableIntStateOf(profile?.expression ?: 0) }
     Dialog(
         onDismissRequest = { if (!busy) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !busy, dismissOnClickOutside = !busy),
@@ -70,12 +71,12 @@ internal fun DriverProfileEditor(
         MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF141416))) {
             BoxWithConstraints(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                 val stacked = maxWidth < 640.dp
-                val dialogHeight = minOf(maxHeight, if (stacked) 640.dp else 480.dp)
-                Surface(Modifier.widthIn(max = 920.dp).fillMaxWidth().height(dialogHeight), shape = RoundedCornerShape(24.dp), color = Color.White) {
+                val dialogHeight = minOf(maxHeight, if (stacked) 640.dp else 720.dp)
+                Surface(Modifier.widthIn(max = 1200.dp).fillMaxWidth().height(dialogHeight), shape = RoundedCornerShape(24.dp), color = Color.White) {
                     Box {
                         val editor: @Composable (Modifier) -> Unit = { modifier ->
                             Column(modifier.verticalScroll(rememberScrollState()).padding(28.dp)) {
-                                Text(if (profile == null) "운전자 프로필 만들기" else "운전자 프로필 수정", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+                                Text(if (profile == null) "프로필 생성" else "프로필 수정", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
                                 Spacer(Modifier.height(28.dp))
                                 Text("이름", color = Color(0xFF626269), fontSize = 16.sp)
                                 Spacer(Modifier.height(8.dp))
@@ -90,14 +91,16 @@ internal fun DriverProfileEditor(
                                 Spacer(Modifier.height(12.dp))
                                 ProfileColorPicker(color, enabled = !busy, onColor = { color = it })
                                 Spacer(Modifier.height(24.dp))
+                                Text("표정", color = Color(0xFF626269), fontSize = 16.sp)
+                                Spacer(Modifier.height(12.dp))
+                                ProfileExpressionPicker(expression, enabled = !busy, onExpression = { expression = it })
+                                Spacer(Modifier.height(24.dp))
                                 Text("캐릭터", color = Color(0xFF626269), fontSize = 16.sp)
                                 Spacer(Modifier.height(12.dp))
-                                Surface(
-                                    onClick = { color = 0 }, enabled = !busy,
-                                    modifier = Modifier.size(90.dp).semantics { contentDescription = "기본 구름 캐릭터"; selected = color == 0 },
-                                    shape = RoundedCornerShape(18.dp), color = Color.White,
-                                    border = BorderStroke(2.dp, if (color == 0) Color(0xFF252528) else Color.Transparent),
-                                ) { Box(contentAlignment = Alignment.Center) { DriverAvatar(0, Modifier.fillMaxWidth().aspectRatio(4f / 3f)) } }
+                                ProfilePresetPicker(color, expression, enabled = !busy) { preset ->
+                                    expression = preset
+                                    color = ProfileExpressions[preset].presetColor
+                                }
                                 error?.let { Text(it, color = Color(0xFFA52C2C), fontSize = 16.sp, modifier = Modifier.padding(top = 12.dp)) }
                             }
                         }
@@ -109,9 +112,9 @@ internal fun DriverProfileEditor(
                             ) {
                                 if (!stacked) Spacer(Modifier.height(24.dp))
                                 Text(name.trim().ifEmpty { "나의 프로필" }, fontSize = if (stacked) 26.sp else 34.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 2)
-                                DriverAvatar(color, Modifier.widthIn(max = if (stacked) 160.dp else 300.dp).fillMaxWidth().aspectRatio(4f / 3f), blinking = true)
+                                DriverAvatar(color, Modifier.widthIn(max = if (stacked) 160.dp else 400.dp).fillMaxWidth().aspectRatio(4f / 3f), blinking = true, expression = expression)
                                 Button(
-                                    onClick = { onSave(name.trim(), color) }, enabled = name.isNotBlank() && !busy,
+                                    onClick = { onSave(name.trim(), color, expression) }, enabled = name.isNotBlank() && !busy,
                                     modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = CircleShape,
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF141416), contentColor = Color.White),
                                 ) { Text(if (busy) "저장 중…" else "저장", fontSize = 18.sp) }
@@ -147,10 +150,46 @@ private fun ProfileColorPicker(color: Int, enabled: Boolean, onColor: (Int) -> U
                 shape = CircleShape, color = Color.White,
                 border = BorderStroke(2.dp, if (color == index) Color(0xFF242429) else Color.Transparent),
             ) {
-                Box(Modifier.padding(4.dp).background(swatch, CircleShape), contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(18.dp).background(Color.White, CircleShape))
+                Box(Modifier.padding(4.dp).background(swatch, CircleShape))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProfileExpressionPicker(expression: Int, enabled: Boolean, onExpression: (Int) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ProfileExpressions.forEachIndexed { index, face ->
+            Surface(
+                onClick = { onExpression(index) }, enabled = enabled,
+                modifier = Modifier.size(80.dp).semantics { contentDescription = "${face.name} 표정"; selected = expression == index },
+                shape = RoundedCornerShape(14.dp), color = Color.White,
+                border = BorderStroke(2.dp, if (expression == index) Color(0xFF252528) else Color(0xFFE8E8EC)),
+            ) {
+                Column(Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    DriverAvatar(face.presetColor, Modifier.fillMaxWidth().weight(1f), expression = index, faceOnly = true)
+                    Text(face.name, fontSize = 14.sp)
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProfilePresetPicker(color: Int, expression: Int, enabled: Boolean, onPreset: (Int) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ProfileExpressions.forEachIndexed { index, face ->
+            val matches = color == face.presetColor && expression == index
+            Surface(
+                onClick = { onPreset(index) }, enabled = enabled,
+                modifier = Modifier.size(90.dp).semantics { contentDescription = "${face.name} 구름 캐릭터"; selected = matches },
+                shape = RoundedCornerShape(18.dp), color = Color.White,
+                border = BorderStroke(2.dp, if (matches) Color(0xFF252528) else Color(0xFFE8E8EC)),
+            ) { Box(contentAlignment = Alignment.Center) {
+                DriverAvatar(face.presetColor, Modifier.fillMaxWidth().aspectRatio(4f / 3f), expression = index)
+            } }
         }
     }
 }

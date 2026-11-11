@@ -90,7 +90,7 @@ internal fun DriverSelectionScreen(
     linked: Boolean,
     odometerReady: Boolean,
     onStart: (Long) -> Unit,
-    onSave: suspend (Long?, String, Int) -> Unit,
+    onSave: suspend (Long?, String, Int, Int) -> Unit,
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
 ) {
@@ -205,10 +205,10 @@ internal fun DriverSelectionScreen(
                 else select(profile)
             },
         )
-        if (parked && editing) DriverProfileEditor(profiles.find { it.driver.id == editingId }, busy, error, { editing = false }) { name, color ->
+        if (parked && editing) DriverProfileEditor(profiles.find { it.driver.id == editingId }, busy, error, { editing = false }) { name, color, expression ->
             if (!busy) scope.launch {
                 busy = true; error = null
-                try { onSave(editingId, name, color); editing = false }
+                try { onSave(editingId, name, color, expression); editing = false }
                 catch (e: CancellationException) { throw e }
                 catch (_: Exception) { error = "저장하지 못했습니다. 다시 시도해 주세요." }
                 finally { busy = false }
@@ -250,9 +250,9 @@ private fun DriverProfileCard(profile: DriverProfile, size: Dp, managing: Boolea
     Column(Modifier.width(size + 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
             if (managing) Surface(Modifier.size(size), shape = RoundedCornerShape(18.dp), color = Color.White) {
-                Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f)) }
+                Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f), expression = profile.expression) }
             } else Surface(onClick = onSelect, modifier = Modifier.size(size).semantics { contentDescription = "${profile.displayName} 프로필로 운행 시작" }, shape = RoundedCornerShape(18.dp), color = Color.White) {
-                Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f)) }
+                Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f), expression = profile.expression) }
             }
             if (managing) Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ProfileTool("${profile.displayName} 프로필 수정", "edit", onEdit)

@@ -85,9 +85,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { drivers.add(name, department) }
     }
 
-    suspend fun saveProfile(id: Long?, name: String, color: Int) {
+    suspend fun saveProfile(id: Long?, name: String, color: Int, expression: Int) {
         check(RecorderState.snapshot.value.gear == VehicleGear.GEAR_PARK) { "Profile editing requires Park" }
-        if (id == null) drivers.addProfile(name, color) else drivers.editProfile(id, name, color)
+        if (id == null) drivers.addProfile(name, color, expression) else drivers.editProfile(id, name, color, expression)
     }
 
     suspend fun deleteProfile(id: Long): Boolean {
