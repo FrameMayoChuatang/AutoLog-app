@@ -164,7 +164,7 @@ private fun ProfileExpressionPicker(expression: Int, enabled: Boolean, onExpress
             Surface(
                 onClick = { onExpression(index) }, enabled = enabled,
                 modifier = Modifier.size(80.dp).semantics { contentDescription = "${face.name} 표정"; selected = expression == index },
-                shape = RoundedCornerShape(14.dp), color = Color.White,
+                shape = RoundedCornerShape(14.dp), color = ProfileColors[face.presetColor].copy(alpha = 0.18f),
                 border = BorderStroke(2.dp, if (expression == index) Color(0xFF252528) else Color(0xFFE8E8EC)),
             ) {
                 Column(Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {

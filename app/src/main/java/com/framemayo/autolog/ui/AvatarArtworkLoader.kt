@@ -20,19 +20,21 @@ internal class AvatarArtworkLoader(
         }))
     },
 ) {
-    private data class Key(val resourceId: Int, val sampleSize: Int)
+    private data class Key(val resourceId: Int, val sampleSize: Int, val eyesOnly: Boolean)
     private val cache = object : LruCache<Key, Bitmap>(maxBytes) {
         override fun sizeOf(key: Key, value: Bitmap): Int = value.allocationByteCount
     }
     private val decodeLock = Mutex()
 
-    fun cached(resourceId: Int, sampleSize: Int): Bitmap? = cache.get(Key(resourceId, sampleSize))
+    fun cached(resourceId: Int, sampleSize: Int, eyesOnly: Boolean = false): Bitmap? = cache.get(Key(resourceId, sampleSize, eyesOnly))
 
-    suspend fun load(resources: Resources, resourceId: Int, sampleSize: Int): Bitmap = withContext(dispatcher) {
+    suspend fun load(resources: Resources, resourceId: Int, sampleSize: Int, eyesOnly: Boolean = false): Bitmap = withContext(dispatcher) {
         // 목록 진입 시 여러 카드가 같은 이미지를 동시에 요청해도 디코딩은 한 번만 수행한다.
         decodeLock.withLock {
-            val key = Key(resourceId, sampleSize)
-            cache.get(key) ?: decode(resources, resourceId, sampleSize).also { cache.put(key, it) }
+            val key = Key(resourceId, sampleSize, eyesOnly)
+            cache.get(key) ?: decode(resources, resourceId, sampleSize)
+                .let { if (eyesOnly) extractAvatarEyes(it) else it }
+                .also { cache.put(key, it) }
         }
     }
 }
