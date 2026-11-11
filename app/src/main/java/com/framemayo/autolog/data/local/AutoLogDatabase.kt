@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class, TripLocationEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class AutoLogDatabase : RoomDatabase() {
@@ -21,8 +21,17 @@ abstract class AutoLogDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): AutoLogDatabase =
             Room.databaseBuilder(context, AutoLogDatabase::class.java, "autolog.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE trips ADD COLUMN sourceRevision INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE trips ADD COLUMN ackedRevision INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE trips ADD COLUMN serverVersion INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE trips SET syncState = 'PENDING', syncedAt = NULL WHERE syncState != 'PENDING'")
+            }
+        }
 
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {

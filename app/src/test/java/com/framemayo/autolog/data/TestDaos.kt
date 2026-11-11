@@ -17,7 +17,7 @@ internal fun fakeTripDao(): TripDao {
             "update" -> { val t = a[0] as TripEntity; rows[rows.indexOfFirst { it.id == t.id }] = t; Unit }
             "get" -> rows.firstOrNull { it.id == a[0] }
             "active" -> rows.lastOrNull { it.status == TripStatus.ACTIVE }
-            "pendingSync" -> rows.filter { it.syncState == SyncState.PENDING && it.status != TripStatus.ACTIVE }
+            "pendingSync" -> rows.filter { it.syncState == SyncState.PENDING }.sortedBy { it.startedAt }
             "deleteSyncedBefore" -> {
                 val n = rows.size
                 rows.removeAll { it.syncState == SyncState.SYNCED && it.status != TripStatus.ACTIVE && (it.syncedAt ?: Long.MAX_VALUE) < (a[0] as Long) }
@@ -26,6 +26,21 @@ internal fun fakeTripDao(): TripDao {
             "markSynced" -> {
                 val i = rows.indexOfFirst { it.id == a[0] && it.updatedAt == a[1] }
                 if (i >= 0) rows[i] = rows[i].copy(syncState = SyncState.SYNCED, syncedAt = a[2] as Long)
+                Unit
+            }
+            "heartbeat" -> {
+                val i = rows.indexOfFirst { it.id == a[0] }
+                if (i >= 0) rows[i] = rows[i].copy(lastOdometerKm = a[1] as Float, lastSavedAt = a[2] as Long)
+                Unit
+            }
+            "recordAck" -> {
+                val i = rows.indexOfFirst { it.id == a[0] && it.ackedRevision < (a[1] as Long) }
+                if (i >= 0) rows[i] = rows[i].copy(ackedRevision = a[1] as Long, serverVersion = a[2] as Long)
+                Unit
+            }
+            "rebase" -> {
+                val i = rows.indexOfFirst { it.id == a[0] }
+                if (i >= 0) rows[i] = rows[i].copy(serverVersion = a[1] as Long, sourceRevision = maxOf(rows[i].sourceRevision + 1, (a[2] as Long) + 1))
                 Unit
             }
             "setSyncState" -> {

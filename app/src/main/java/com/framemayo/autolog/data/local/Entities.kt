@@ -62,6 +62,9 @@ data class TripEntity(
     val syncState: SyncState = SyncState.PENDING,
     val updatedAt: Long = System.currentTimeMillis(),
     val syncedAt: Long? = null,
+    val sourceRevision: Long = 1,
+    val ackedRevision: Long = 0,
+    val serverVersion: Long = 0,
 )
 
 fun TripEntity.distanceKm(): Float = (endOdometerKm ?: lastOdometerKm) - startOdometerKm
