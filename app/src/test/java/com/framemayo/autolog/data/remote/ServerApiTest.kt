@@ -70,6 +70,15 @@ class ServerApiTest {
     }
 
     @Test
+    fun parsesJsonArrayBody() = runBlocking {
+        val arrayServer = TestServer { _, _, _, _ -> 200 to """[{"id":"a"},{"id":"b"}]""" }
+        val r = ServerApi(arrayServer.url).call("GET", "/x") as ApiResult.Http
+        arrayServer.stop()
+        assertNull(r.json)
+        assertEquals(2, r.array?.length())
+    }
+
+    @Test
     fun emptyBodyIsOk() = runBlocking {
         status = 204
         val r = api().call("POST", "/api/auth/logout") as ApiResult.Http
