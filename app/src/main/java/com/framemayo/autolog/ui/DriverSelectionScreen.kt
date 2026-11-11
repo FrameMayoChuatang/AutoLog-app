@@ -267,24 +267,26 @@ internal fun DriverSearchBar(query: String, onQuery: (String) -> Unit, onSearch:
             onClick = onOpen, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).semantics { contentDescription = "운전자 검색 열기" },
             shape = CircleShape, color = Color.White,
         ) {
-            Row(Modifier.padding(start = 20.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(start = 32.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(query.ifBlank { "운전자 이름 검색..." }, Modifier.weight(1f), color = if (query.isBlank()) Color(0xFF808088) else Color(0xFF171719), fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Surface(Modifier.size(52.dp), shape = CircleShape, color = Color.Black) {
                     Box(contentAlignment = Alignment.Center) { ProfileIcon("search", Modifier.size(28.dp), Color.White) }
                 }
             }
-        } else OutlinedTextField(
-            query, onQuery, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).semantics { contentDescription = "운전자 이름 검색" },
-            shape = CircleShape, singleLine = true, placeholder = { Text("운전자 이름 검색...", color = Color(0xFF808088), fontSize = 20.sp) },
-            textStyle = TextStyle(color = Color(0xFF171719), fontSize = 20.sp),
-            colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, focusedBorderColor = Color.White, unfocusedBorderColor = Color.White, cursorColor = Color.Black),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            trailingIcon = {
-                Surface(onClick = onSearch, Modifier.padding(6.dp).size(52.dp).semantics { contentDescription = "운전자 검색" }, shape = CircleShape, color = Color.Black) {
-                    Box(contentAlignment = Alignment.Center) { ProfileIcon("search", Modifier.size(28.dp), Color.White) }
-                }
-            },
-        )
+        } else Surface(Modifier.fillMaxWidth(), shape = CircleShape, color = Color.White) {
+            OutlinedTextField(
+                query, onQuery, modifier = Modifier.padding(start = 16.dp).fillMaxWidth().heightIn(min = 64.dp).semantics { contentDescription = "운전자 이름 검색" },
+                shape = CircleShape, singleLine = true, placeholder = { Text("운전자 이름 검색...", color = Color(0xFF808088), fontSize = 20.sp) },
+                textStyle = TextStyle(color = Color(0xFF171719), fontSize = 20.sp),
+                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, focusedBorderColor = Color.White, unfocusedBorderColor = Color.White, cursorColor = Color.Black),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                trailingIcon = {
+                    Surface(onClick = onSearch, Modifier.padding(6.dp).size(52.dp).semantics { contentDescription = "운전자 검색" }, shape = CircleShape, color = Color.Black) {
+                        Box(contentAlignment = Alignment.Center) { ProfileIcon("search", Modifier.size(28.dp), Color.White) }
+                    }
+                },
+            )
+        }
     }
 }
 
