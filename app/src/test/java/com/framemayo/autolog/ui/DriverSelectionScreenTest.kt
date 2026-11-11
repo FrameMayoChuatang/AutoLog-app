@@ -40,13 +40,16 @@ class DriverSelectionScreenTest {
         screenshot("selection-native")
     }
 
-    @Test fun recentFiveStayAboveSearchAndOthersStayBelow() {
+    @Test fun searchStaysAtTopRightAndOtherProfilesStayBelowRecent() {
         show()
         val recent = compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").fetchSemanticsNode().boundsInRoot
         val search = compose.onNodeWithContentDescription("운전자 이름 검색").fetchSemanticsNode().boundsInRoot
         val other = compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").fetchSemanticsNode().boundsInRoot
-        org.junit.Assert.assertTrue(recent.bottom < search.top)
-        org.junit.Assert.assertTrue(other.top > search.bottom)
+        val manage = compose.onNodeWithText("프로필 관리").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue(search.bottom < recent.top)
+        org.junit.Assert.assertTrue(search.left > manage.right)
+        org.junit.Assert.assertTrue(manage.center.y in search.top..search.bottom)
+        org.junit.Assert.assertTrue(other.top > recent.bottom)
     }
 
     @Test fun searchFiltersLowerListAndKeepsRecentProfiles() {
