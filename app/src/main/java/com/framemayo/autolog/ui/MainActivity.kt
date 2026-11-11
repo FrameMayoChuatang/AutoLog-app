@@ -1,9 +1,11 @@
 package com.framemayo.autolog.ui
 
+import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -27,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,11 +76,34 @@ class MainActivity : ComponentActivity() {
 private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPermission: () -> Unit) {
     val v = state.vehicle
     val linked = vm.linkState.collectAsStateWithLifecycle().value.link != null
-    state.consentPrompt?.let { ConsentDialog(it.name, vm, requestLocationPermission) }
+    // TODO: android.car를 제공하는 이미지에서 CarUxRestrictions를 연동한다.
+    // 현재 Pleos v2.1은 해당 API가 없어 OS 차단을 유지하고, P 확인 전에는 이 UI를 잠근다.
+    val parked = v.gear == VehicleGear.GEAR_PARK
+    var showVehicle by rememberSaveable { mutableStateOf(false) }
+    if (parked) {
+        state.consentPrompt?.let { ConsentDialog(it.name, vm, requestLocationPermission) }
+    }
+    if (state.activeTrip == null && (!showVehicle || !parked)) {
+        DriverSelectionScreen(
+            drivers = state.drivers,
+            recentDriverId = state.recentTrips.firstOrNull { it.driverId != null }?.driverId,
+            parked = parked,
+            linked = linked,
+            odometerReady = v.odometerKm?.let { it.isFinite() && it > 0f } == true,
+            onStart = vm::startTrip,
+            onAdd = vm::addDriver,
+            onOpenVehicle = { showVehicle = true },
+        )
+        return
+    }
+    BackHandler(enabled = showVehicle && state.activeTrip == null) { showVehicle = false }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        if (state.activeTrip == null) {
+            item { OutlinedButton(onClick = { showVehicle = false }) { Text("운전자 선택으로 돌아가기") } }
+        }
         item {
             Card {
                 Column(Modifier.padding(16.dp)) {
@@ -102,23 +128,6 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
                         Button(onClick = vm::endTrip, enabled = v.isParked && v.odometerKm != null) {
                             Text("운행 종료")
                         }
-                    }
-                }
-            }
-        } else {
-            item {
-                Card {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("누가 운전하나요?", style = MaterialTheme.typography.titleMedium)
-                        val canStart = linked && v.isParked && v.odometerKm != null
-                        if (!linked) Text("차량을 먼저 연결해 주세요.", color = MaterialTheme.colorScheme.error)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            state.drivers.forEach { d ->
-                                Button(onClick = { vm.startTrip(d.id) }, enabled = canStart) { Text(d.name) }
-                            }
-                            OutlinedButton(onClick = { vm.startTrip(null) }, enabled = canStart) { Text("나중에") }
-                        }
-                        AddDriver(vm::addDriver)
                     }
                 }
             }
@@ -194,17 +203,6 @@ private fun VehicleLinkCard(vm: MainViewModel) {
             }
             s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
-    }
-}
-
-@Composable
-private fun AddDriver(onAdd: (String, String) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var dept by remember { mutableStateOf("") }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(name, { name = it }, label = { Text("이름") })
-        OutlinedTextField(dept, { dept = it }, label = { Text("부서") })
-        OutlinedButton(onClick = { onAdd(name, dept); name = ""; dept = "" }) { Text("운전자 추가") }
     }
 }
 
