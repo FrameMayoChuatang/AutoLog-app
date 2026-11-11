@@ -179,14 +179,15 @@ internal fun DriverSelectionScreen(
                                 }
                             }
                         }
-                        if (others.isNotEmpty()) item {
+                        if (others.isNotEmpty() && !showingMore) item {
                             OutlinedButton(
-                                onClick = { showingMore = !showingMore },
+                                onClick = { showingMore = true },
                                 modifier = Modifier.padding(top = 180.dp, bottom = 24.dp).widthIn(min = 160.dp).heightIn(min = 56.dp),
                                 shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SelectionColors.outline),
                                 colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
-                            ) { Text(if (showingMore) "접기" else "더보기", fontSize = 20.sp) }
+                            ) { Text("더보기", fontSize = 20.sp) }
                         }
+                        if (showingMore && others.isNotEmpty()) item { Box(Modifier.fillMaxWidth().padding(top = 72.dp)) }
                         if (showingMore) items(others.chunked(columns), key = { row -> "others-${row.first().driver.id}" }) { row ->
                             Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.Top) { row.forEach { card(it) } }
                         }
