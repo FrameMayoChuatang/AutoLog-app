@@ -3,6 +3,7 @@ package com.framemayo.autolog.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +25,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,7 +48,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -110,12 +111,6 @@ internal fun DriverSearchDialog(
                     shape = RoundedCornerShape(28.dp), color = Color(0xFF17181D),
                 ) {
                     Column(Modifier.padding(horizontal = 40.dp, vertical = 32.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("운전자 검색", fontSize = 26.sp, fontWeight = FontWeight.Medium)
-                            TextButton(onClick = dismiss, modifier = Modifier.size(56.dp).semantics { contentDescription = "검색 닫기" }) {
-                                Text("×", fontSize = 30.sp, color = Color(0xFFB9BEC8))
-                            }
-                        }
                         Spacer(Modifier.height(88.dp))
                         Text(if (query.isBlank()) "전체 운전자" else "검색 결과 ${results.size}명", fontSize = 18.sp, color = Color(0xFFB9BEC8))
                         Spacer(Modifier.height(12.dp))
@@ -137,11 +132,18 @@ internal fun DriverSearchDialog(
                                 }
                             }
                         }
+                        Spacer(Modifier.height(24.dp))
+                        OutlinedButton(
+                            onClick = dismiss,
+                            modifier = Modifier.fillMaxWidth().height(56.dp).semantics { contentDescription = "검색 닫기" },
+                            shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFF696B75)),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFF25262D), contentColor = Color.White),
+                        ) { Text("닫기", fontSize = 20.sp) }
                     }
                 }
                 // 이동 중에도 카드 경계에 잘리지 않도록 입력창을 모달 표면과 별도로 배치한다.
                 Box(
-                    Modifier.align(Alignment.TopCenter).padding(top = 88.dp, start = 40.dp, end = 40.dp)
+                    Modifier.align(Alignment.TopCenter).padding(top = 32.dp, start = 40.dp, end = 40.dp)
                         .fillMaxWidth().onGloballyPositioned { targetBounds = it.boundsInWindow() },
                 ) {
                     DriverSearchBar(query, onQuery, { focusManager.clearFocus(); keyboard?.hide() }, Modifier.focusRequester(focus).onFocusChanged { inputFocused = it.hasFocus }.graphicsLayer {
