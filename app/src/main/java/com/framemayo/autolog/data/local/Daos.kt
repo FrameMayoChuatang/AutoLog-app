@@ -22,6 +22,9 @@ interface DriverDao {
     @Query("SELECT locationConsent FROM drivers WHERE id = :id")
     suspend fun consentOf(id: Long): Boolean?
 
+    @Query("SELECT * FROM drivers WHERE id = :id")
+    suspend fun byId(id: Long): DriverEntity?
+
     @Query("SELECT remoteId FROM drivers WHERE id = :id")
     suspend fun remoteIdOf(id: Long): String?
 
@@ -119,6 +122,12 @@ interface TripDao {
 
     @Query("UPDATE trips SET ackedRevision = :revision, serverVersion = :serverVersion WHERE id = :id AND ackedRevision < :revision")
     suspend fun recordAck(id: Long, revision: Long, serverVersion: Long)
+
+    @Query("UPDATE trips SET serverVersion = :serverVersion, confirmSentAt = CASE WHEN updatedAt = :updatedAt THEN :updatedAt ELSE confirmSentAt END WHERE id = :id")
+    suspend fun recordConfirm(id: Long, serverVersion: Long, updatedAt: Long)
+
+    @Query("UPDATE trips SET serverVersion = :serverVersion WHERE id = :id")
+    suspend fun setServerVersion(id: Long, serverVersion: Long)
 
     @Query("UPDATE trips SET serverVersion = :serverVersion, sourceRevision = MAX(sourceRevision + 1, :serverRevision + 1) WHERE id = :id")
     suspend fun rebase(id: Long, serverVersion: Long, serverRevision: Long)
