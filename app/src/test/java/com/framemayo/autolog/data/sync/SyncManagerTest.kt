@@ -327,4 +327,49 @@ class SyncManagerTest {
         assertTrue(sync.syncPending())
         assertEquals(SyncState.PENDING, dao.get(u.id)!!.syncState)
     }
+
+    @Test fun driverAssignedAfterMeasurementIsSentWithNewRevision() = runBlocking {
+        val t = repo.start(null, 100f).let { repo.end(110f)!! }
+        assertTrue(sync.syncPending())
+        assertNull(api.uploads.single().driverId)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+
+        assertTrue(repo.setDriver(t.id, 1))
+        assertEquals(SyncState.PENDING, dao.get(t.id)!!.syncState)
+        assertTrue(sync.syncPending())
+        val second = api.uploads.last()
+        assertEquals(DRIVER_UUID, second.driverId)
+        assertEquals(3, second.sourceRevision)
+        assertEquals(1, second.baseServerVersion)
+        assertEquals(DRIVER_UUID, api.store.getValue(t.uuid).payload.driverId)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun heldConfirmIsSentAfterDriverIsAssigned() = runBlocking {
+        val t = repo.start(null, 100f).let { repo.end(110f)!! }
+        repo.setPurpose(t.id, TripPurpose.PERSONAL)
+        assertTrue(sync.syncPending())
+        assertEquals(0, api.confirms.size)
+        assertEquals(SyncState.PENDING, dao.get(t.id)!!.syncState)
+
+        repo.setDriver(t.id, 1)
+        assertTrue(sync.syncPending())
+        assertEquals(1, api.confirms.size)
+        assertEquals(DRIVER_UUID, api.confirms.single().driverId)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun driverAssignedToInterruptedTripIsSentButStillNotConfirmable() = runBlocking {
+        val t = repo.start(null, 100f)
+        repo.recoverInterrupted()
+        sync.syncPending()
+        repo.setDriver(t.id, 1)
+        repo.setPurpose(t.id, TripPurpose.PERSONAL)
+        assertTrue(sync.syncPending())
+        val last = api.uploads.last()
+        assertEquals("INTERRUPTED", last.state)
+        assertEquals(DRIVER_UUID, last.driverId)
+        assertEquals(0, api.confirms.size)
+        assertEquals(SyncState.PENDING, dao.get(t.id)!!.syncState)
+    }
 }

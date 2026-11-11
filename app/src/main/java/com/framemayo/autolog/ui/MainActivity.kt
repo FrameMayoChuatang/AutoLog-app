@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.framemayo.autolog.data.local.DriverEntity
 import com.framemayo.autolog.data.local.DriverStatus
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
@@ -125,7 +126,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
         item { LocationConsentCard(state, vm, requestLocationPermission) }
 
         item { Text("최근 운행", style = MaterialTheme.typography.titleMedium) }
-        items(state.recentTrips, key = { it.id }) { trip -> TripRow(trip, vm) }
+        items(state.recentTrips, key = { it.id }) { trip -> TripRow(trip, state.drivers, vm) }
     }
 }
 
@@ -144,13 +145,22 @@ private val KST = ZoneId.of("Asia/Seoul")
 private val TIME = DateTimeFormatter.ofPattern("MM/dd HH:mm").withZone(KST)
 
 @Composable
-private fun TripRow(trip: TripEntity, vm: MainViewModel) {
+private fun TripRow(trip: TripEntity, drivers: List<DriverEntity>, vm: MainViewModel) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            val driverName = drivers.find { it.id == trip.driverId }?.name ?: "운전자 없음"
             Text(
-                "${TIME.format(Instant.ofEpochMilli(trip.startedAt))} · %.2f km · ${trip.status} · ${trip.purpose}"
-                    .format(trip.distanceKm())
+                "${TIME.format(Instant.ofEpochMilli(trip.startedAt))} · ${"%.2f".format(trip.distanceKm())} km · " +
+                    "${trip.status} · ${trip.purpose} · $driverName",
             )
+            if (trip.driverId == null && trip.endedAt != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("운전자 지정:")
+                    drivers.filter { it.status != DriverStatus.INACTIVE }.forEach { d ->
+                        PurposeButton(d.name) { vm.assignDriver(trip.id, d.id) }
+                    }
+                }
+            }
             if (trip.purpose == TripPurpose.UNCONFIRMED && trip.endedAt != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PurposeButton("업무(출퇴근)") { vm.setPurpose(trip.id, TripPurpose.BUSINESS_COMMUTE) }
