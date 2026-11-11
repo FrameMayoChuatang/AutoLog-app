@@ -113,4 +113,31 @@ class TripRepositorySyncTest {
         assertEquals(9, r.serverVersion)
         assertEquals(t.sourceRevision, r.sourceRevision)
     }
+
+    @Test fun setDriverOnlyFillsEmptyDriverAndRequestsSync() = runBlocking {
+        var pending = 0
+        val r = TripRepositoryImpl(fakeTripDao(), clock = { now++ }, onPending = { pending++ })
+        val t = r.start(null, 100f).let { r.end(110f)!! }
+        pending = 0
+        assertEquals(true, r.setDriver(t.id, 7))
+        assertEquals(1, pending)
+        val after = r.get(t.id)!!
+        assertEquals(7L, after.driverId)
+        assertEquals(t.sourceRevision + 1, after.sourceRevision)
+        assertEquals(SyncState.PENDING, after.syncState)
+
+        assertEquals(false, r.setDriver(t.id, 8))
+        assertEquals(7L, r.get(t.id)!!.driverId)
+        assertEquals(after.sourceRevision, r.get(t.id)!!.sourceRevision)
+        assertEquals(false, r.setDriver(999, 7))
+    }
+
+    @Test fun setDriverKeepsAckedRevisionAndServerVersion() = runBlocking {
+        val t = repo.start(null, 100f).let { repo.end(110f)!! }
+        repo.recordAck(t, serverVersion = 4)
+        repo.setDriver(t.id, 7)
+        val r = repo.get(t.id)!!
+        assertEquals(t.sourceRevision, r.ackedRevision)
+        assertEquals(4, r.serverVersion)
+    }
 }

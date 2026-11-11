@@ -33,6 +33,7 @@ class FakeSyncApi : SyncApi {
                 if (trip.baseServerVersion != 0L) SyncResult.Conflict
                 else SyncResult.Ok(1).also { store[trip.uuid] = Stored(trip, 1) }
             trip == cur.payload -> SyncResult.Ok(cur.serverVersion)
+            cur.payload.driverId != null && trip.driverId != cur.payload.driverId -> SyncResult.Conflict
             cur.locked || trip.sourceRevision <= cur.payload.sourceRevision || trip.baseServerVersion != cur.serverVersion ->
                 SyncResult.Conflict
             else -> {

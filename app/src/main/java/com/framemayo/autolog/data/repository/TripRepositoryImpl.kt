@@ -61,6 +61,21 @@ class TripRepositoryImpl(
         dao.update(trip.copy(purpose = purpose, memo = memo ?: trip.memo, syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(trip)))
         onPending()
     }
+    override suspend fun setDriver(tripId: Long, driverId: Long): Boolean {
+        val trip = dao.get(tripId) ?: return false
+        if (trip.driverId != null) return false
+        dao.update(
+            trip.copy(
+                driverId = driverId,
+                syncState = SyncState.PENDING,
+                sourceRevision = trip.sourceRevision + 1,
+                updatedAt = nextUpdatedAt(trip),
+            ),
+        )
+        onPending()
+        return true
+    }
+
     override suspend fun recoverInterrupted(): TripEntity? {
         val trip = dao.active() ?: return null
         val recovered = trip.copy(

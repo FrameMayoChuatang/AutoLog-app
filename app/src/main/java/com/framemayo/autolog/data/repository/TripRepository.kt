@@ -15,6 +15,8 @@ interface TripRepository {
     suspend fun heartbeat(odometerKm: Float)
     suspend fun end(odometerKm: Float): TripEntity?
     suspend fun setPurpose(tripId: Long, purpose: TripPurpose, memo: String? = null)
+
+    suspend fun setDriver(tripId: Long, driverId: Long): Boolean
     suspend fun recoverInterrupted(): TripEntity?
 
     suspend fun pendingSync(): List<TripEntity>

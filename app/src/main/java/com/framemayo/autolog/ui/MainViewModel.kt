@@ -122,6 +122,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun assignDriver(tripId: Long, driverId: Long) {
+        viewModelScope.launch { trips.setDriver(tripId, driverId) }
+    }
+
     fun setPurpose(tripId: Long, purpose: TripPurpose) {
         viewModelScope.launch {
             trips.setPurpose(tripId, purpose)
