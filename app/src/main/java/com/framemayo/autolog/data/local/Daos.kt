@@ -11,7 +11,8 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface DriverDao {
     @Query("""
-        SELECT d.*, COALESCE(p.displayName, d.name) AS displayName, COALESCE(p.color, 0) AS color
+        SELECT d.*, COALESCE(p.displayName, d.name) AS displayName, COALESCE(p.color, 0) AS color,
+               COALESCE(p.expression, 0) AS expression
         FROM drivers d LEFT JOIN driver_profiles p ON p.driverId = d.id
         WHERE COALESCE(p.hidden, 0) = 0
         ORDER BY (SELECT MAX(t.startedAt) FROM trips t WHERE t.driverId = d.id) DESC,
@@ -23,9 +24,9 @@ interface DriverDao {
     suspend fun saveProfile(profile: DriverProfileEntity)
 
     @Transaction
-    suspend fun addProfile(name: String, color: Int): Long {
+    suspend fun addProfile(name: String, color: Int, expression: Int = 0): Long {
         val id = insert(DriverEntity(name = name, department = ""))
-        saveProfile(DriverProfileEntity(id, null, color))
+        saveProfile(DriverProfileEntity(id, null, color, expression = expression))
         return id
     }
 

@@ -1,6 +1,7 @@
 package com.framemayo.autolog.data.local
 
 import androidx.room.Embedded
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
@@ -15,10 +16,12 @@ data class DriverProfileEntity(
     val displayName: String?,
     val color: Int = 0,
     val hidden: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val expression: Int = 0,
 )
 
 data class DriverProfile(
     @Embedded val driver: DriverEntity,
     val displayName: String,
     val color: Int,
+    val expression: Int = 0,
 )
