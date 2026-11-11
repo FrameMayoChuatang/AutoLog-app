@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -37,6 +38,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -76,11 +79,23 @@ internal fun DriverSearchDialog(
         }
     }
     Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        val focusManager = LocalFocusManager.current
         BoxWithConstraints(
-            Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(24.dp),
+            Modifier.fillMaxSize()
+                .semantics { contentDescription = "검색 모달 배경" }
+                .pointerInput(Unit) { detectTapGestures { dismiss() } }
+                .safeDrawingPadding().imePadding().padding(24.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.widthIn(max = 640.dp).fillMaxWidth().height(minOf(520.dp, maxHeight))) {
+            // 전체 화면 Dialog의 바깥 터치를 직접 처리하고, 모달 내부 탭은 포커스만 해제한다.
+            // 입력창·결과 버튼이 소비한 터치는 부모의 닫기 동작으로 전달되지 않는다.
+            Box(Modifier.widthIn(max = 640.dp).fillMaxWidth().height(minOf(520.dp, maxHeight))
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        focusManager.clearFocus()
+                        keyboard?.hide()
+                    }
+                }) {
                 Surface(
                     Modifier.fillMaxSize().graphicsLayer { alpha = progress.value },
                     shape = RoundedCornerShape(28.dp), color = Color(0xFF17181D),
