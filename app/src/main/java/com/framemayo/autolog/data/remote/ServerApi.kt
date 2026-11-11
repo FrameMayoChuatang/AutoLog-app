@@ -2,13 +2,19 @@ package com.framemayo.autolog.data.remote
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
 sealed interface ApiResult {
-    data class Http(val code: Int, val json: JSONObject?, val retryAfterSeconds: Int? = null) : ApiResult {
+    data class Http(
+        val code: Int,
+        val json: JSONObject?,
+        val retryAfterSeconds: Int? = null,
+        val array: JSONArray? = null,
+    ) : ApiResult {
         val ok: Boolean get() = code in 200..299
     }
 
@@ -47,6 +53,7 @@ class ServerApi(
                     code,
                     text?.takeIf { it.startsWith("{") }?.let { runCatching { JSONObject(it) }.getOrNull() },
                     conn.getHeaderField("Retry-After")?.trim()?.toIntOrNull(),
+                    text?.takeIf { it.startsWith("[") }?.let { runCatching { JSONArray(it) }.getOrNull() },
                 )
             } catch (_: IOException) {
                 ApiResult.Offline

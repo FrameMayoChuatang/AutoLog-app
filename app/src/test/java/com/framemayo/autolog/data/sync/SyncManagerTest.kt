@@ -25,6 +25,10 @@ private object FakeDrivers : DriverRepository {
     override suspend fun setLocationConsent(driverId: Long, consent: Boolean) = Unit
     override suspend fun consentOf(driverId: Long): Boolean? = null
     override suspend fun upsertRemote(drivers: List<RemoteDriver>) = Unit
+    override suspend fun snapshot(): List<DriverEntity> = emptyList()
+    override suspend fun link(localId: Long, remote: RemoteDriver) = Unit
+    override suspend fun consentPending(): List<DriverEntity> = emptyList()
+    override suspend fun markConsentSent(driver: DriverEntity) = Unit
 }
 
 class SyncManagerTest {

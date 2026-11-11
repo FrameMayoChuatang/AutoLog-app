@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.framemayo.autolog.data.local.DriverStatus
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.local.distanceKm
@@ -108,8 +109,10 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
                         val canStart = linked && v.isParked && v.odometerKm != null
                         if (!linked) Text("차량을 먼저 연결해 주세요.", color = MaterialTheme.colorScheme.error)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            state.drivers.forEach { d ->
-                                Button(onClick = { vm.startTrip(d.id) }, enabled = canStart) { Text(d.name) }
+                            state.drivers.filter { it.status != DriverStatus.INACTIVE }.forEach { d ->
+                                Button(onClick = { vm.startTrip(d.id) }, enabled = canStart) {
+                                    Text(if (d.status == DriverStatus.PENDING) "${d.name} (승인 대기)" else d.name)
+                                }
                             }
                             OutlinedButton(onClick = { vm.startTrip(null) }, enabled = canStart) { Text("나중에") }
                         }

@@ -57,7 +57,7 @@ class Migration6To7Test {
 
     private fun open(): AutoLogDatabase =
         Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
-            .addMigrations(AutoLogDatabase.MIGRATION_6_7)
+            .addMigrations(AutoLogDatabase.MIGRATION_6_7, AutoLogDatabase.MIGRATION_7_8)
             .allowMainThreadQueries()
             .build()
             .also { db = it }

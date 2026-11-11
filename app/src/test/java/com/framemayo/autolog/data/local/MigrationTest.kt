@@ -49,7 +49,7 @@ class MigrationTest {
         Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
             .addMigrations(
                 AutoLogDatabase.MIGRATION_1_2, AutoLogDatabase.MIGRATION_2_3,
-                AutoLogDatabase.MIGRATION_3_4, AutoLogDatabase.MIGRATION_4_5, AutoLogDatabase.MIGRATION_5_6, AutoLogDatabase.MIGRATION_6_7,
+                AutoLogDatabase.MIGRATION_3_4, AutoLogDatabase.MIGRATION_4_5, AutoLogDatabase.MIGRATION_5_6, AutoLogDatabase.MIGRATION_6_7, AutoLogDatabase.MIGRATION_7_8,
             )
             .allowMainThreadQueries()
             .build()
@@ -73,7 +73,7 @@ class MigrationTest {
 
     @Test fun v1MigratesToLatestKeepingData() {
         val room = open()
-        assertEquals(7, room.openHelper.readableDatabase.version)
+        assertEquals(8, room.openHelper.readableDatabase.version)
 
         val trips = room.rows("SELECT * FROM trips ORDER BY id")
         assertEquals(2, trips.size)
@@ -94,6 +94,8 @@ class MigrationTest {
         assertEquals("Kim", drivers.single()["name"])
         assertNull(drivers.single()["remoteId"])
         assertNull(drivers.single()["locationConsent"])
+        assertNull(drivers.single()["status"])
+        assertNull(drivers.single()["consentSentAt"])
     }
 
     @Test fun migratedUuidsAreStandardAndUnique() {

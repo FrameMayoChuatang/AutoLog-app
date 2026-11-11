@@ -31,12 +31,28 @@ interface DriverDao {
     @Update
     suspend fun update(driver: DriverEntity)
 
+    @Query("SELECT * FROM drivers ORDER BY id")
+    suspend fun all(): List<DriverEntity>
+
+    @Query("UPDATE drivers SET remoteId = :remoteId, status = :status WHERE id = :id AND remoteId IS NULL")
+    suspend fun link(id: Long, remoteId: String, status: DriverStatus)
+
+    @Query("UPDATE drivers SET status = 'INACTIVE' WHERE remoteId IS NOT NULL AND remoteId NOT IN (:remoteIds)")
+    suspend fun markMissingInactive(remoteIds: List<String>)
+
+    @Query("SELECT * FROM drivers WHERE remoteId IS NOT NULL AND locationConsent IS NOT NULL AND consentSentAt IS NOT consentUpdatedAt ORDER BY id")
+    suspend fun consentPending(): List<DriverEntity>
+
+    @Query("UPDATE drivers SET consentSentAt = :at WHERE id = :id AND consentUpdatedAt = :at")
+    suspend fun markConsentSent(id: Long, at: Long)
+
     @Transaction
     suspend fun upsertRemote(drivers: List<DriverEntity>) {
         drivers.forEach { d ->
             val cur = d.remoteId?.let { byRemoteId(it) }
-            if (cur == null) insert(d) else update(cur.copy(name = d.name, department = d.department))
+            if (cur == null) insert(d) else update(cur.copy(name = d.name, department = d.department, status = d.status))
         }
+        markMissingInactive(drivers.mapNotNull { it.remoteId })
     }
 }
 

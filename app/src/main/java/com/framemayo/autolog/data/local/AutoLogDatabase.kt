@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class, TripLocationEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class AutoLogDatabase : RoomDatabase() {
@@ -21,8 +21,15 @@ abstract class AutoLogDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): AutoLogDatabase =
             Room.databaseBuilder(context, AutoLogDatabase::class.java, "autolog.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .build()
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE drivers ADD COLUMN status TEXT")
+                db.execSQL("ALTER TABLE drivers ADD COLUMN consentSentAt INTEGER")
+            }
+        }
 
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {

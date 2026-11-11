@@ -6,6 +6,8 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.util.UUID
 
+enum class DriverStatus { PENDING, ACTIVE, INACTIVE }
+
 @Entity(tableName = "drivers", indices = [Index("remoteId", unique = true)])
 data class DriverEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -15,6 +17,8 @@ data class DriverEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val locationConsent: Boolean? = null,
     val consentUpdatedAt: Long? = null,
+    val status: DriverStatus? = null,
+    val consentSentAt: Long? = null,
 )
 
 @Entity(

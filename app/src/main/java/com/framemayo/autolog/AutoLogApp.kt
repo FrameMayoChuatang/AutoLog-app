@@ -1,6 +1,8 @@
 package com.framemayo.autolog
 
 import android.app.Application
+import com.framemayo.autolog.data.driver.DriverSyncManager
+import com.framemayo.autolog.data.driver.HttpDriverApi
 import com.framemayo.autolog.data.link.HttpVehicleLinkApi
 import com.framemayo.autolog.data.link.VehicleLinkRepository
 import com.framemayo.autolog.data.local.AutoLogDatabase
@@ -28,6 +30,7 @@ class AutoLogApp : Application() {
         super.onCreate()
         container = AppContainer(this)
         SyncScheduler.enqueue(this)
+        SyncScheduler.schedulePeriodic(this)
         RetentionScheduler.schedule(this)
     }
 }
@@ -36,13 +39,15 @@ class AppContainer(app: Application) {
     private val db = AutoLogDatabase.create(app)
     val vehicle = VehicleDataSource(app)
     val trips: TripRepository = TripRepositoryImpl(db.tripDao(), onPending = { SyncScheduler.enqueue(app) })
-    val drivers: DriverRepository = DriverRepositoryImpl(db.driverDao())
+    val drivers: DriverRepository = DriverRepositoryImpl(db.driverDao(), onPending = { SyncScheduler.enqueue(app) })
     val purposes: PurposeRepository = PurposeRepositoryImpl(db.purposeDao())
 
     val arrival = ArrivalLocationRecorder(db.tripLocationDao(), FusedLocationSource(app, AndroidLocationSource(app)))
 
     val server: ServerApi = ServerApi(app.getString(R.string.server_url), token = { vehicleLink.link.value?.accessToken }, onUnauthorized = { vehicleLink.disconnect() })
     val vehicleLink: VehicleLinkRepository = VehicleLinkRepository(app.getSharedPreferences("vehicle_link", android.content.Context.MODE_PRIVATE), HttpVehicleLinkApi(server))
+
+    val driverSync = DriverSyncManager(drivers, HttpDriverApi(server), isLinked = { vehicleLink.link.value != null })
 
     val sync = SyncManager(trips, drivers, HttpSyncApi(server), isLinked = { vehicleLink.link.value != null })
 }

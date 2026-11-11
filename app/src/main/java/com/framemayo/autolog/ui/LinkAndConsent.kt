@@ -24,8 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framemayo.autolog.data.link.VehicleLinkRepository
 
-// 앱 C 담당 화면: 차량 연결, 위치정보 수집 동의. 메인 화면(MainActivity)은 이 컴포저블을 가져다 배치만 한다.
-
 @Composable
 internal fun ConsentDialog(name: String, vm: MainViewModel, requestLocationPermission: () -> Unit) {
     AlertDialog(
