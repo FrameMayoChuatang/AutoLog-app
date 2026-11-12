@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 data class MainUiState(
@@ -181,11 +182,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         return result.takeIf { vehicleLink.link.value == link }
     }
 
-    suspend fun setPurpose(tripId: Long, purpose: TripPurpose, purposeText: String?) {
+    // 화면이 닫혀도 목적 저장 뒤의 위치정보 정리까지 완료해야 한다.
+    suspend fun setPurpose(tripId: Long, purpose: TripPurpose, purposeText: String?) = viewModelScope.async {
         check(RecorderState.snapshot.value.gear == VehicleGear.GEAR_PARK) { "주차 후 수정해 주세요." }
         val previous = trips.get(tripId) ?: error("운행 기록을 찾을 수 없습니다.")
         check(previous.endedAt != null) { "종료된 운행만 수정할 수 있습니다." }
         trips.setPurpose(tripId, purpose, purposeText = purposeText)
         arrival.settle(tripId, consentOf(previous.driverId), purpose)
-    }
+    }.await()
 }
