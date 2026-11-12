@@ -141,10 +141,11 @@ class VehicleDataSource(context: Context) {
         awaitClose { battery.unregisterEvChargePortOpen(listener) }
     }
 
-    /** EV 배터리 용량(kWh). 미지원이면 null. */
+    /** EV 배터리 용량(kWh). SDK의 Wh 값을 변환한다. 미지원이거나 비정상 값이면 null. */
     suspend fun batteryCapacityKwh(): Float? = suspendCancellableCoroutine { cont ->
         vehicle.getEvBattery().getEvBatteryCapacity(
-            { value: Float? -> if (cont.isActive) cont.resume(value?.takeIf { it.isFinite() && it > 0f }) },
+            // SDK 값은 Wh다. kWh로 바꿔 넘긴다(#101).
+            { value: Float? -> if (cont.isActive) cont.resume(sdkBatteryCapacityToKwh(value)) },
             { e: Exception ->
                 Log.w(TAG, "getEvBatteryCapacity failed", e)
                 if (cont.isActive) cont.resume(null)
