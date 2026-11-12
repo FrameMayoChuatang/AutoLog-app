@@ -149,3 +149,17 @@ app/src/main/java/com/framemayo/autolog
 
 - `app/src/main/res/drawable-nodpi/driver_cloud_body.png`는 사용자가 제공한 하늘색 원본을 built-in imagegen의 편집 모드로 처리한 이미지입니다. 표정별 원본 몸체의 크기·색상 차이를 없애기 위해 눈만 제거한 공통 몸체를 사용합니다. 눈과 눈썹은 제공된 각 표정 원본에서 실행 중 분리하며 흰 반사광을 보존합니다.
 - 편집 프롬프트: `Remove only the two brown oval eyes and their white highlights and shadows. Reconstruct seamless blue material beneath them. Preserve the exact original silhouette, framing, position, size, blue color, texture, lighting, white backdrop and four white cheek marks. No eyes, eyebrows, mouth, text or new objects.`
+
+### 개발용 가속 조작과 모의 거리 연결 (#119)
+
+Virtual Console의 가속/브레이크는 속도와 누적거리를 따로 관리합니다. 에뮬레이터 시연에서 가속에 따라 거리가 증가하게 하려면 콘솔 거리 옵션으로 빌드한 앱과 함께 아래 스크립트를 실행합니다. macOS/Linux의 Python 3 표준 라이브러리만 사용합니다.
+
+```sh
+adb forward tcp:8088 tcp:8088
+python3 scripts/console-driving-simulator.py
+```
+
+- 콘솔의 D/R 및 가속/브레이크 조작으로 바뀌는 속도를 0.5초마다 관측해 모의 누적거리로 발행합니다. 실측 주행거리 검증을 대신하지 않습니다.
+- P, 연결 실패, 3초를 넘는 관측 공백에서는 적산하지 않습니다. 재연결 첫 관측과 감지된 수동 누적거리 변경은 새 기준점으로 사용합니다. 서버 API에 조건부 쓰기가 없어 읽기와 발행 사이의 수동 조작까지 원자적으로 보호할 수는 없으므로 실행 중 누적거리 수동 편집은 피합니다.
+- 중복 실행은 호스트 사용자별 잠금으로 막습니다. Ctrl+C로 종료하며 앱·콘솔 재시작 후에는 다시 실행해야 합니다. 종료해도 기어·속도·기록을 변경하지 않습니다.
+- 검증: `python3 -B -m unittest discover -s scripts -p 'test_*.py'`
