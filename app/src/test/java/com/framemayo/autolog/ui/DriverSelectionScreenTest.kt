@@ -31,6 +31,12 @@ class DriverSelectionScreenTest {
         compose.setContent { DriverSelectionScreen(profiles, parked, linked, ready, onStart, { _, _, _, _ -> }, { true }, {}) }
     }
 
+    @Test fun pendingServerDriverKeepsApprovalLabel() {
+        val pending = profiles.take(1).map { it.copy(driver = it.driver.copy(status = com.framemayo.autolog.data.local.DriverStatus.PENDING)) }
+        compose.setContent { DriverSelectionScreen(pending, true, true, true, {}, { _, _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithText("승인 대기").assertIsDisplayed()
+    }
+
     @Test fun selectingAProfileStartsImmediately() {
         val starts = mutableListOf<Long>()
         show(onStart = { starts.add(it) })
@@ -349,6 +355,33 @@ class DriverSelectionScreenTest {
             org.junit.Assert.assertTrue(range.value() > 0f)
         }
         screenshot("editor-horizontal-pickers")
+    }
+
+    @Test
+    @Config(qualifiers = "w540dp-h420dp-land-night-mdpi")
+    fun keyboardInsetsKeepMatchingDriverAndCloseReachable() {
+        val starts = mutableListOf<Long>()
+        show(onStart = { starts.add(it) })
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
+        compose.runOnIdle {
+            val decor = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(
+                decor,
+                androidx.core.view.WindowInsetsCompat.Builder()
+                    .setInsets(androidx.core.view.WindowInsetsCompat.Type.ime(), androidx.core.graphics.Insets.of(0, 0, 0, 180))
+                    .setVisible(androidx.core.view.WindowInsetsCompat.Type.ime(), true)
+                    .build(),
+            )
+        }
+        compose.waitForIdle()
+        val result = compose.onNodeWithContentDescription("운전자7 검색 결과 선택")
+        result.performScrollTo().assertIsDisplayed()
+        // 실제 IME insets가 전달되어 키보드 위 영역 안에 결과가 배치되었는지 검증한다.
+        org.junit.Assert.assertTrue(result.fetchSemanticsNode().boundsInRoot.bottom <= 240f)
+        compose.onNodeWithContentDescription("검색 닫기").performScrollTo().assertIsDisplayed()
+        result.performScrollTo().performClick()
+        assertEquals(listOf(7L), starts)
     }
 
     private fun screenshot(name: String) {

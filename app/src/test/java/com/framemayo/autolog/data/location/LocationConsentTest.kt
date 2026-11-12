@@ -36,7 +36,7 @@ class LocationConsentTest {
             }
         } as DriverDao
         var now = 10L
-        val repo = DriverRepositoryImpl(dao) { now }
+        val repo = DriverRepositoryImpl(dao, clock = { now })
 
         repo.setLocationConsent(1, true)
         assertEquals(true to 10L, saved[1L])
