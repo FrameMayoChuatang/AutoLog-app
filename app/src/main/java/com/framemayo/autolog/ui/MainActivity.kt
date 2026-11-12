@@ -172,6 +172,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
 
 
         item { Text("최근 운행", Modifier.padding(top = 12.dp), fontSize = VehicleUi.Title, fontWeight = FontWeight.SemiBold) }
+        if (state.recentTrips.isEmpty()) item { Text("아직 운행 기록이 없어요.", fontSize = VehicleUi.Body, color = VehicleUi.Secondary) }
         items(state.recentTrips, key = { it.id }) { trip ->
             TripReviewCard(
                 trip, state, parked, { vm.assignDriver(trip.id, it) },

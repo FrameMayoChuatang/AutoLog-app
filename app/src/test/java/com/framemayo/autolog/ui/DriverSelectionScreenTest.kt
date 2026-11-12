@@ -97,6 +97,17 @@ class DriverSelectionScreenTest {
         assertEquals(emptyList<Long>(), starts)
     }
 
+    @Test fun recentTripsButtonOpensRecordsAndHidesWhileManaging() {
+        var opened = 0
+        compose.setContent {
+            DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _, _ -> }, { true }, {}, onOpenRecords = { opened++ })
+        }
+        compose.onNodeWithText("최근 운행").assertIsDisplayed().performClick()
+        assertEquals(1, opened)
+        compose.onNodeWithText("프로필 관리").performClick()
+        compose.onNodeWithText("최근 운행").assertDoesNotExist()
+    }
+
     @Test fun closingStartDialogDoesNotStart() {
         val starts = mutableListOf<Long>()
         show(onStart = { starts.add(it) })
