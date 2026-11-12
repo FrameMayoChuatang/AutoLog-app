@@ -115,20 +115,47 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자6 프로필 선택").performScrollTo().assertIsDisplayed().performClick()
         compose.onNodeWithText("주행 시작").performClick()
         assertEquals(listOf(6L), starts)
-        compose.onNodeWithText("접기").assertDoesNotExist()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("접기"))
+        compose.onNodeWithText("접기").assertIsDisplayed()
         compose.onNodeWithText("더보기").assertDoesNotExist()
-        compose.onNodeWithContentDescription("운전자6 프로필 선택").assertExists()
-        compose.onNodeWithContentDescription("운전자5 프로필 선택").performScrollTo().assertIsDisplayed()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("운전자6 프로필 선택"))
+        compose.onNodeWithContentDescription("운전자6 프로필 선택").assertIsDisplayed()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("운전자5 프로필 선택"))
+        compose.onNodeWithContentDescription("운전자5 프로필 선택").assertIsDisplayed()
     }
 
     @Test fun moreButtonOnlyAppearsWhenThereAreExtraProfiles() {
         val visibleProfiles = mutableStateOf(emptyList<DriverProfile>())
         compose.setContent { DriverSelectionScreen(visibleProfiles.value, true, true, true, {}, { _, _, _, _ -> }, { true }, {}) }
         compose.onNodeWithText("더보기").assertDoesNotExist()
+        compose.onNodeWithText("접기").assertDoesNotExist()
         compose.runOnIdle { visibleProfiles.value = profiles.take(5) }
         compose.onNodeWithText("더보기").assertDoesNotExist()
+        compose.onNodeWithText("접기").assertDoesNotExist()
         compose.runOnIdle { visibleProfiles.value = profiles.take(6) }
         compose.onNodeWithText("더보기").assertIsDisplayed()
+    }
+
+    @Test fun collapseReturnsToRecentProfilesAndAllowsReopeningInBothModes() {
+        val manyProfiles = (1L..30).map {
+            DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0)
+        }
+        compose.setContent { DriverSelectionScreen(manyProfiles, true, true, true, {}, { _, _, _, _ -> }, { true }, {}) }
+        repeat(2) { mode ->
+            if (mode == 1) compose.onNodeWithText("프로필 관리").performClick()
+            compose.onNodeWithText("더보기").performScrollTo().performClick()
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText("접기"))
+            compose.onNodeWithText("접기").assertIsDisplayed().performClick()
+            compose.onNodeWithText("접기").assertDoesNotExist()
+            compose.onNodeWithText("운전자30").assertDoesNotExist()
+            compose.onNodeWithText("운전자1").assertIsDisplayed()
+            compose.onNodeWithText("운전자5").assertIsDisplayed()
+            compose.onNodeWithText("더보기").performScrollTo().performClick()
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText("운전자30"))
+            compose.onNodeWithText("운전자30").assertIsDisplayed()
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText("접기"))
+            compose.onNodeWithText("접기").performClick()
+        }
     }
 
     @Test fun searchIsCenteredAboveHeadingAndOtherProfilesStayBelowRecent() {
