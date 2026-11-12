@@ -77,6 +77,20 @@ class VehicleDataSource(context: Context) {
         awaitClose { gear.unregisterGearSelection(listener) }
     }
 
+    /**
+     * 현재 기어를 한 번 조회한다. 실패하면 null.
+     * 리스너는 값이 "바뀔 때"만 오므로, 부팅 직후 기본값(P)과 같은 값을 설정하면 이벤트가 오지 않는다(#13).
+     */
+    suspend fun currentGear(): VehicleGear? = suspendCancellableCoroutine { cont ->
+        vehicle.getGear().getCurrentGearSelectionState(
+            { value: VehicleGear? -> if (cont.isActive) cont.resume(value) },
+            { e: Exception ->
+                Log.w(TAG, "getCurrentGearSelectionState failed", e)
+                if (cont.isActive) cont.resume(null)
+            },
+        )
+    }
+
     /** 연료량(%). 내연기관이 아니거나 미지원이면 실패로 닫힌다. */
     fun fuelPercent(): Flow<Float?> = callbackFlow {
         val fuel = vehicle.getFuel()
