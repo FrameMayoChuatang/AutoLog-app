@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,6 +78,10 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
     // 현재 Pleos v2.1은 해당 API가 없어 OS 차단을 유지하고, P 확인 전에는 이 UI를 잠근다.
     val parked = v.gear == VehicleGear.GEAR_PARK
     var showVehicle by rememberSaveable { mutableStateOf(false) }
+    // 운행을 마친 뒤에도 목적 선택과 기록 확인 화면에 머문다.
+    LaunchedEffect(state.activeTrip?.id) {
+        if (state.activeTrip != null) showVehicle = true
+    }
     if (parked) {
         state.consentPrompt?.let { ConsentDialog(it.name, vm, requestLocationPermission) }
     }
