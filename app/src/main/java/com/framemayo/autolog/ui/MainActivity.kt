@@ -87,9 +87,11 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
     // 현재 Pleos v2.1은 해당 API가 없어 OS 차단을 유지하고, P 확인 전에는 이 UI를 잠근다.
     val parked = v.gear == VehicleGear.GEAR_PARK
     var showVehicle by rememberSaveable { mutableStateOf(false) }
+    var showTripDetail by rememberSaveable { mutableStateOf(false) }
     // 운행을 마친 뒤에도 목적 선택과 기록 확인 화면에 머문다.
     LaunchedEffect(state.activeTrip?.id) {
         if (state.activeTrip != null) showVehicle = true
+        showTripDetail = false
     }
     if (parked) {
         state.consentPrompt?.let { ConsentDialog(it, state.driverName(it.id), vm, requestLocationPermission) }
@@ -110,6 +112,16 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
         )
         return
     }
+    val active = state.activeTrip
+    if (active != null && (!showTripDetail || !parked)) {
+        DrivingScreen(
+            active, state.driverName(active.driverId), state.profiles.find { it.driver.id == active.driverId },
+            parked = parked, canEnd = v.isParked && v.odometerKm != null,
+            onEnd = vm::endTrip, onOpenVehicle = { showTripDetail = true },
+        )
+        return
+    }
+    BackHandler(enabled = active != null) { showTripDetail = false }
     BackHandler(enabled = showVehicle && state.activeTrip == null) { showVehicle = false }
     LazyColumn(
         modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 32.dp),
@@ -118,11 +130,12 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
     ) {
         if (state.activeTrip == null) {
             item { VehicleSecondaryButton("← 운전자 선택으로 돌아가기", { showVehicle = false }) }
+        } else {
+            item { VehicleSecondaryButton("← 주행 중 화면으로 돌아가기", { showTripDetail = false }) }
         }
         item { VehicleStatusCard(v) }
 
 
-        val active = state.activeTrip
         if (active != null) {
             item {
                 VehicleSection("운행 중 · ${state.driverName(active.driverId)}") {
