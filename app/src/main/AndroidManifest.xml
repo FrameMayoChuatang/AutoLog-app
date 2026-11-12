@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
     <uses-permission android:name="pleos.car.permission.CAR_INFO" />
+    <!-- 연료량·EV 배터리·충전구 구독 (주유·충전 감지) -->
+    <uses-permission android:name="pleos.car.permission.CAR_ENERGY" />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

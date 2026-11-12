@@ -72,7 +72,13 @@ class TripRecorderService : LifecycleService() {
             }
             // 초기화가 늦어도 남은 ACTIVE 운행을 붙잡아 두지 않는다. 못 읽으면 첫 유효 누적거리로 늦게 판단한다.
             val km = withTimeoutOrNull(RECOVERY_WAIT_MS) { init.await(); vehicle.currentOdometerKm() }
-            Log.i(TAG, "recovery: ${recovery.recover(km, now())}")
+            val readAt = now()
+            onRecovered(recovery.recover(km, readAt), "recovery")
+            // 복구 때 읽은 실측값을 먼저 반영해, 구독 직후 늦게 도착하는 이전(더 작은) 값을 감소값으로 걸러 낸다.
+            // 이 값이 없으면 오래된 값이 자동 시작 기준점이 되어 앱이 꺼진 동안의 주행이 새 운행에 붙는다.
+            if (OdometerValidator.isValid(km, null)) {
+                RecorderState.update { it.copy(odometerKm = km, odometerUpdatedAt = readAt) }
+            }
 
             init.await()
             setCollector(CollectorStatus.RUNNING)
@@ -106,6 +112,22 @@ class TripRecorderService : LifecycleService() {
         }
     }
 
+    /**
+     * 복구로 끝난 운행은 정차 추적기가 보기 전에 끝나므로, 열려 있던 주차 구간을 운행 종료 시각으로 닫는다.
+     * (닫지 않으면 끝난 운행에 종료 시각 없는 정차가 남는다.)
+     */
+    private suspend fun onRecovered(result: RecoveryResult, label: String) {
+        val trip = when (result) {
+            is RecoveryResult.Completed -> result.trip
+            is RecoveryResult.Interrupted -> result.trip
+            is RecoveryResult.Resumed -> result.trip
+            RecoveryResult.None -> null
+        }
+        Log.i(TAG, "$label: ${result::class.simpleName} trip=${trip?.id}")
+        if (trip == null || result is RecoveryResult.Resumed) return
+        container.stops.close(trip.id, trip.endedAt ?: trip.lastSavedAt)
+    }
+
     private suspend fun collectOdometer() {
         val vehicle = container.vehicle
         vehicle.odometerKm().resubscribing(
@@ -119,7 +141,7 @@ class TripRecorderService : LifecycleService() {
             val now = now()
             if (!OdometerValidator.isValid(value, RecorderState.snapshot.value.odometerKm)) return@collect
             val km = value!!
-            if (recovery.awaitingOdometer) Log.i(TAG, "late recovery: ${recovery.onFirstValidOdometer(km, now)}")
+            if (recovery.awaitingOdometer) onRecovered(recovery.onFirstValidOdometer(km, now), "late recovery")
             RecorderState.update { it.copy(odometerKm = km, odometerUpdatedAt = now) }
             feedMotion(now) { onOdometer(km, now) }
             autoStart.onOdometer(km, now)?.let { Log.i(TAG, "auto trip started: ${it.id} from ${it.startOdometerKm}km") }
