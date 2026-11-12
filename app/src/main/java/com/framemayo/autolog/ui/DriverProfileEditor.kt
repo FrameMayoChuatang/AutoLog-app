@@ -2,12 +2,11 @@ package com.framemayo.autolog.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -139,10 +138,9 @@ internal fun DriverProfileEditor(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProfileColorPicker(color: Int, enabled: Boolean, onColor: (Int) -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         ProfileColors.forEachIndexed { index, swatch ->
             Surface(
                 onClick = { onColor(index) }, enabled = enabled,
@@ -156,10 +154,9 @@ private fun ProfileColorPicker(color: Int, enabled: Boolean, onColor: (Int) -> U
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProfileExpressionPicker(expression: Int, enabled: Boolean, onExpression: (Int) -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         ProfileExpressions.forEachIndexed { index, face ->
             Surface(
                 onClick = { onExpression(index) }, enabled = enabled,
@@ -176,10 +173,9 @@ private fun ProfileExpressionPicker(expression: Int, enabled: Boolean, onExpress
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProfilePresetPicker(color: Int, expression: Int, enabled: Boolean, onPreset: (Int) -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         ProfileExpressions.forEachIndexed { index, face ->
             val matches = color == face.presetColor && expression == index
             Surface(
