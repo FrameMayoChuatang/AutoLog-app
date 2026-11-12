@@ -28,6 +28,18 @@ class TripRepositorySyncTest {
         assertEquals("메모", repo.get(trip.id)!!.memo)
     }
 
+    @Test fun deferredDriverKeepsTripIdentityAndPurposeWhenAssignedLater() = runBlocking {
+        val started = repo.start(null, 100f)
+        repo.end(110f)
+        repo.setPurpose(started.id, TripPurpose.BUSINESS_GENERAL, purposeText = "방문")
+        org.junit.Assert.assertTrue(repo.setDriver(started.id, 2L))
+        val assigned = repo.get(started.id)!!
+        assertEquals(started.uuid, assigned.uuid)
+        assertEquals(2L, assigned.driverId)
+        assertEquals("방문", assigned.purposeText)
+        org.junit.Assert.assertFalse(repo.setDriver(started.id, 3L))
+    }
+
     @Test fun activeTripIsPendingSoRunningStateReachesServer() = runBlocking {
         val t = repo.start(1, 100f)
         assertEquals(listOf(t.uuid), repo.pendingSync().map { it.uuid })
