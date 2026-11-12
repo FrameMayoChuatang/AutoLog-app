@@ -70,7 +70,7 @@ internal fun DriverProfileEditor(
         MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF141416))) {
             BoxWithConstraints(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                 val stacked = maxWidth < 640.dp
-                val dialogHeight = minOf(maxHeight, if (stacked) 640.dp else 720.dp)
+                val dialogHeight = minOf(maxHeight, if (stacked) 640.dp else 600.dp)
                 Surface(Modifier.widthIn(max = 1200.dp).fillMaxWidth().height(dialogHeight), shape = RoundedCornerShape(24.dp), color = Color.White) {
                     Box {
                         val editor: @Composable (Modifier) -> Unit = { modifier ->
