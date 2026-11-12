@@ -9,6 +9,8 @@ import com.framemayo.autolog.data.link.LinkResult
 import com.framemayo.autolog.data.link.VehicleLink
 import com.framemayo.autolog.data.local.DriverEntity
 import com.framemayo.autolog.data.local.DriverProfile
+import com.framemayo.autolog.data.local.PurposeEntity
+import com.framemayo.autolog.data.remote.PurposeCatalog
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.sync.SyncScheduler
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 data class MainUiState(
@@ -172,11 +175,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { trips.setDriver(tripId, driverId) }
     }
 
-    fun setPurpose(tripId: Long, purpose: TripPurpose) {
-        viewModelScope.launch {
-            trips.setPurpose(tripId, purpose)
-            val trip = trips.get(tripId) ?: return@launch
-            arrival.settle(tripId, consentOf(trip.driverId), purpose)
-        }
+    suspend fun loadPurposes(): List<PurposeEntity>? {
+        val link = vehicleLink.link.value ?: return null
+        val result = PurposeCatalog(getApplication<Application>().container.server).load()
+        // 조회 도중 연결이 바뀌면 이전 회사의 목록을 보여주지 않는다.
+        return result.takeIf { vehicleLink.link.value == link }
     }
+
+    // 화면이 닫혀도 목적 저장 뒤의 위치정보 정리까지 완료해야 한다.
+    suspend fun setPurpose(tripId: Long, purpose: TripPurpose, purposeText: String?) = viewModelScope.async {
+        check(RecorderState.snapshot.value.gear == VehicleGear.GEAR_PARK) { "주차 후 수정해 주세요." }
+        val previous = trips.get(tripId) ?: error("운행 기록을 찾을 수 없습니다.")
+        check(previous.endedAt != null) { "종료된 운행만 수정할 수 있습니다." }
+        trips.setPurpose(tripId, purpose, purposeText = purposeText)
+        arrival.settle(tripId, consentOf(previous.driverId), purpose)
+    }.await()
 }

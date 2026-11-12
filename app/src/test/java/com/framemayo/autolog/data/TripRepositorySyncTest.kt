@@ -12,6 +12,22 @@ class TripRepositorySyncTest {
     private var now = 1_000L
     private val repo = TripRepositoryImpl(fakeTripDao(), clock = { now++ })
 
+    @Test fun businessPurposeIsIndependentFromMemoAndClearedForPersonalTrips() = runBlocking {
+        repo.start(1, 100f)
+        val trip = repo.end(110f)!!
+        repo.setPurpose(trip.id, TripPurpose.BUSINESS_GENERAL, memo = "메모", purposeText = "  거래처 방문  ")
+        val saved = repo.get(trip.id)!!
+        assertEquals("거래처 방문", saved.purposeText)
+        assertEquals("메모", saved.memo)
+        assertEquals(trip.sourceRevision, saved.sourceRevision)
+        org.junit.Assert.assertTrue(runCatching { repo.setPurpose(trip.id, TripPurpose.BUSINESS_GENERAL, purposeText = " ") }.isFailure)
+        org.junit.Assert.assertTrue(runCatching { repo.setPurpose(trip.id, TripPurpose.BUSINESS_GENERAL, purposeText = "가".repeat(201)) }.isFailure)
+        assertEquals(saved, repo.get(trip.id))
+        repo.setPurpose(trip.id, TripPurpose.PERSONAL)
+        org.junit.Assert.assertNull(repo.get(trip.id)!!.purposeText)
+        assertEquals("메모", repo.get(trip.id)!!.memo)
+    }
+
     @Test fun activeTripIsPendingSoRunningStateReachesServer() = runBlocking {
         val t = repo.start(1, 100f)
         assertEquals(listOf(t.uuid), repo.pendingSync().map { it.uuid })

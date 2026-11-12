@@ -139,46 +139,11 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
         item { LocationConsentCard(state, vm, requestLocationPermission) }
 
         item { Text("최근 운행", style = MaterialTheme.typography.titleMedium) }
-        items(state.recentTrips, key = { it.id }) { trip -> TripRow(trip, state, vm) }
-    }
-}
-
-private val KST = ZoneId.of("Asia/Seoul")
-private val TIME = DateTimeFormatter.ofPattern("MM/dd HH:mm").withZone(KST)
-
-@Composable
-private fun TripRow(trip: TripEntity, state: MainUiState, vm: MainViewModel) {
-    Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val driverName = state.driverName(trip.driverId)
-            Text(
-                "${TIME.format(Instant.ofEpochMilli(trip.startedAt))} · ${"%.2f".format(trip.distanceKm())} km · " +
-                    "${trip.status} · ${trip.purpose} · $driverName",
+        items(state.recentTrips, key = { it.id }) { trip ->
+            TripReviewCard(
+                trip, state, parked, { vm.assignDriver(trip.id, it) },
+                { purpose, text -> vm.setPurpose(trip.id, purpose, text) }, vm::loadPurposes,
             )
-            TripSyncStatusNotice(
-                state.syncStatus[trip.id] ?: trip.syncStatus(state.drivers.find { it.id == trip.driverId }, state.linked),
-                trip.purpose,
-            )
-            if (trip.driverId == null && trip.endedAt != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("운전자 지정:")
-                    state.profiles.forEach { profile ->
-                        PurposeButton(profile.displayName) { vm.assignDriver(trip.id, profile.driver.id) }
-                    }
-                }
-            }
-            if (trip.purpose == TripPurpose.UNCONFIRMED && trip.endedAt != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PurposeButton("업무(출퇴근)") { vm.setPurpose(trip.id, TripPurpose.BUSINESS_COMMUTE) }
-                    PurposeButton("업무(일반)") { vm.setPurpose(trip.id, TripPurpose.BUSINESS_GENERAL) }
-                    PurposeButton("개인") { vm.setPurpose(trip.id, TripPurpose.PERSONAL) }
-                }
-            }
         }
     }
-}
-
-@Composable
-private fun PurposeButton(label: String, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick) { Text(label) }
 }
