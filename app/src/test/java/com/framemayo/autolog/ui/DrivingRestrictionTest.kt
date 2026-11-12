@@ -1,0 +1,118 @@
+package com.framemayo.autolog.ui
+
+import ai.pleos.playground.vehicle.constant.control.VehicleGear
+import android.app.Application
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import com.framemayo.autolog.data.local.DriverEntity
+import com.framemayo.autolog.data.local.DriverProfile
+import com.framemayo.autolog.data.local.TripEntity
+import com.framemayo.autolog.service.CollectorStatus
+import com.framemayo.autolog.service.VehicleSnapshot
+import com.framemayo.autolog.ui.theme.AutoLogTheme
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class, qualifiers = "w1100dp-h900dp-land-night-mdpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class DrivingRestrictionTest {
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private val parked = VehicleSnapshot(serviceRunning = true, collector = CollectorStatus.RUNNING,
+        gear = VehicleGear.GEAR_PARK, odometerKm = 120f)
+    private val clearUx = DrivingUxState(ready = true, requiresOptimization = false)
+    private val profile = DriverProfile(DriverEntity(id = 1, name = "운전자", department = ""), "운전자", 0)
+    private val state = mutableStateOf(MainUiState(vehicle = parked, profiles = listOf(profile), linked = true))
+    private val ux = mutableStateOf(clearUx)
+
+    private fun show() = compose.setContent {
+        AutoLogTheme {
+            DrivingRestrictionGate(state.value, ux.value) {
+                DriverSelectionScreen(state.value.profiles, true, true, true, {}, { _, _, _, _ -> }, { true }, {})
+            }
+        }
+    }
+
+    @Test fun inputRequiresConfirmedParkAndUnrestrictedPlatform() {
+        assertTrue(canUseParkedControls(parked, clearUx))
+        for (gear in listOf(null, VehicleGear.GEAR_UNKNOWN, VehicleGear.GEAR_DRIVE, VehicleGear.GEAR_REVERSE, VehicleGear.GEAR_NEUTRAL)) {
+            assertFalse(canUseParkedControls(parked.copy(gear = gear), clearUx))
+        }
+        assertFalse(canUseParkedControls(parked, DrivingUxState()))
+        assertFalse(canUseParkedControls(parked, clearUx.copy(requiresOptimization = true)))
+        for (flag in listOf(1, 2, 4, 8, 16, 32, 64, 128, 256)) {
+            assertFalse(canUseParkedControls(parked, clearUx.copy(activeRestrictions = flag)))
+        }
+        assertFalse(canUseParkedControls(parked.copy(serviceRunning = false), clearUx))
+        assertFalse(canUseParkedControls(parked.copy(collector = CollectorStatus.RETRYING), clearUx))
+    }
+
+    @Test fun driveClosesSearchAndReturningToParkDoesNotRestoreIt() {
+        show()
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("운")
+        compose.runOnIdle { state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE)) }
+        compose.onNodeWithText("운행 현황").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertDoesNotExist()
+        compose.onNodeWithText("프로필 관리").assertDoesNotExist()
+        compose.runOnIdle { state.value = state.value.copy(vehicle = parked) }
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertIsDisplayed()
+        compose.onNodeWithContentDescription("검색 닫기").assertDoesNotExist()
+    }
+
+    @Test fun platformRestrictionClosesProfileEditorEvenInPark() {
+        show()
+        compose.onNodeWithContentDescription("운전자 추가").performClick()
+        compose.onNodeWithText("프로필 생성").assertIsDisplayed()
+        compose.runOnIdle { ux.value = clearUx.copy(activeRestrictions = 64) }
+        compose.onNodeWithText("프로필 생성").assertDoesNotExist()
+        compose.onNodeWithText("운행 현황").assertIsDisplayed()
+        compose.runOnIdle { ux.value = clearUx }
+        compose.onNodeWithText("프로필 생성").assertDoesNotExist()
+        compose.onNodeWithText("운전자 추가").assertIsDisplayed()
+    }
+
+    @Test fun connectionLossLocksInputAndDoesNotClaimRecording() {
+        show()
+        compose.runOnIdle {
+            ux.value = DrivingUxState()
+            state.value = state.value.copy(vehicle = parked.copy(collector = CollectorStatus.RETRYING))
+        }
+        compose.onNodeWithText("운행 현황").assertIsDisplayed()
+        compose.onNodeWithText("차량 정보 수신 대기").assertIsDisplayed()
+        compose.onNodeWithText("기록 중").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertDoesNotExist()
+    }
+
+    @Test fun activeTripDisplaysValuesWithoutActions() {
+        state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE),
+            activeTrip = TripEntity(id = 1, driverId = 1, startedAt = 0, startOdometerKm = 100f,
+                lastOdometerKm = 112.4f, lastSavedAt = 25 * 60_000L))
+        show()
+        compose.onNodeWithText("기록 중").assertIsDisplayed()
+        compose.onNodeWithText("운전자").assertIsDisplayed()
+        compose.onNodeWithText("12.4 km").assertIsDisplayed()
+        compose.onNodeWithText("25분").assertIsDisplayed()
+        compose.onNodeWithText("운행 종료").assertDoesNotExist()
+        compose.onAllNodes(hasClickAction()).assertCountEquals(0)
+    }
+
+    @Test
+    @Config(qualifiers = "w640dp-h360dp-land-night-mdpi")
+    fun compactDisplayKeepsStatusAndValuesVisible() {
+        state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE))
+        show()
+        compose.onNodeWithText("운행 현황").assertIsDisplayed()
+        compose.onNodeWithText("운행 시작 대기").assertIsDisplayed()
+        compose.onNodeWithText("주행 거리").assertIsDisplayed()
+        compose.onNodeWithText("주행 시간").assertIsDisplayed()
+        compose.onNodeWithText("검색과 편집은 주차 후 이용해 주세요.").assertIsDisplayed()
+    }
+}
