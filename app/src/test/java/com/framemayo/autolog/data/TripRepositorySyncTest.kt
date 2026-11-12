@@ -91,4 +91,53 @@ class TripRepositorySyncTest {
         val b = repo.start(1, 110f)
         assertNotEquals(a.uuid, b.uuid)
     }
+
+    @Test fun confirmIsRecordedOnlyWhenPurposeIsUnchangedSinceSending() = runBlocking {
+        val t = repo.start(1, 100f).let { repo.end(110f)!! }
+        repo.setPurpose(t.id, TripPurpose.PERSONAL)
+        val sentCopy = repo.get(t.id)!!
+        repo.setPurpose(t.id, TripPurpose.BUSINESS_GENERAL)
+        repo.recordConfirm(sentCopy, serverVersion = 5)
+        val changed = repo.get(t.id)!!
+        assertEquals(5, changed.serverVersion)
+        assertEquals(null, changed.confirmSentAt)
+
+        repo.recordConfirm(changed, serverVersion = 6)
+        assertEquals(changed.updatedAt, repo.get(t.id)!!.confirmSentAt)
+    }
+
+    @Test fun updateServerVersionKeepsRevisions() = runBlocking {
+        val t = repo.start(1, 100f).let { repo.end(110f)!! }
+        repo.updateServerVersion(t, 9)
+        val r = repo.get(t.id)!!
+        assertEquals(9, r.serverVersion)
+        assertEquals(t.sourceRevision, r.sourceRevision)
+    }
+
+    @Test fun setDriverOnlyFillsEmptyDriverAndRequestsSync() = runBlocking {
+        var pending = 0
+        val r = TripRepositoryImpl(fakeTripDao(), clock = { now++ }, onPending = { pending++ })
+        val t = r.start(null, 100f).let { r.end(110f)!! }
+        pending = 0
+        assertEquals(true, r.setDriver(t.id, 7))
+        assertEquals(1, pending)
+        val after = r.get(t.id)!!
+        assertEquals(7L, after.driverId)
+        assertEquals(t.sourceRevision + 1, after.sourceRevision)
+        assertEquals(SyncState.PENDING, after.syncState)
+
+        assertEquals(false, r.setDriver(t.id, 8))
+        assertEquals(7L, r.get(t.id)!!.driverId)
+        assertEquals(after.sourceRevision, r.get(t.id)!!.sourceRevision)
+        assertEquals(false, r.setDriver(999, 7))
+    }
+
+    @Test fun setDriverKeepsAckedRevisionAndServerVersion() = runBlocking {
+        val t = repo.start(null, 100f).let { repo.end(110f)!! }
+        repo.recordAck(t, serverVersion = 4)
+        repo.setDriver(t.id, 7)
+        val r = repo.get(t.id)!!
+        assertEquals(t.sourceRevision, r.ackedRevision)
+        assertEquals(4, r.serverVersion)
+    }
 }
