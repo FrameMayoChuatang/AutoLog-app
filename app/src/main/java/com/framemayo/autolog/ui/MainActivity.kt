@@ -39,6 +39,7 @@ import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.local.distanceKm
 import com.framemayo.autolog.data.local.durationMs
+import com.framemayo.autolog.data.sync.syncStatus
 import com.framemayo.autolog.data.location.FusedLocationSource
 import com.framemayo.autolog.service.TripRecorderService
 import com.framemayo.autolog.ui.theme.AutoLogTheme
@@ -153,6 +154,10 @@ private fun TripRow(trip: TripEntity, state: MainUiState, vm: MainViewModel) {
             Text(
                 "${TIME.format(Instant.ofEpochMilli(trip.startedAt))} · ${"%.2f".format(trip.distanceKm())} km · " +
                     "${trip.status} · ${trip.purpose} · $driverName",
+            )
+            TripSyncStatusNotice(
+                state.syncStatus[trip.id] ?: trip.syncStatus(state.drivers.find { it.id == trip.driverId }, state.linked),
+                trip.purpose,
             )
             if (trip.driverId == null && trip.endedAt != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
