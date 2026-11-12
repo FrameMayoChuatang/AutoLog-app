@@ -99,12 +99,16 @@ class HttpSyncApiTest {
 
     @Test fun fetchParsesVersionRevisionAndLock() = runBlocking {
         body = """{"serverVersion":4,"sourceRevision":2,"measurementLockedAt":"2026-11-11T00:00:00Z"}"""
-        assertEquals(FetchResult.Found(4, 2, true), api().fetch(uuid))
+        assertEquals(FetchResult.Found(4, 2, true, false), api().fetch(uuid))
         assertEquals("GET", method)
         body = """{"serverVersion":4,"sourceRevision":2,"measurementLockedAt":null}"""
-        assertEquals(FetchResult.Found(4, 2, false), api().fetch(uuid))
+        assertEquals(FetchResult.Found(4, 2, false, false), api().fetch(uuid))
         body = """{"serverVersion":4,"sourceRevision":2}"""
-        assertEquals(FetchResult.Found(4, 2, false), api().fetch(uuid))
+        assertEquals(FetchResult.Found(4, 2, false, false), api().fetch(uuid))
+        body = """{"serverVersion":5,"sourceRevision":2,"approvalStatus":"APPROVED"}"""
+        assertEquals(FetchResult.Found(5, 2, false, true), api().fetch(uuid))
+        body = """{"serverVersion":5,"sourceRevision":2,"approvalStatus":"PENDING"}"""
+        assertEquals(FetchResult.Found(5, 2, false, false), api().fetch(uuid))
     }
 
     @Test fun fetchStatusCodes() = runBlocking {
@@ -112,5 +116,45 @@ class HttpSyncApiTest {
         status = 401; assertEquals(FetchResult.Unauthorized, api().fetch(uuid))
         status = 500; assertEquals(FetchResult.Retry, api().fetch(uuid))
         status = 200; body = "{}"; assertEquals(FetchResult.Retry, api().fetch(uuid))
+    }
+
+    private val confirm = ConfirmPayload(
+        uuid = uuid, expectedVersion = 3, driverId = "0a94e986-dfcf-4e4a-b490-f96876c62aed",
+        classification = "BUSINESS", purposeText = "일반 업무", note = "계약 미팅", reason = "차량에서 운전자 확인",
+    )
+
+    @Test fun confirmSendsContractFieldsToConfirmPath() = runBlocking {
+        body = """{"serverVersion":4}"""
+        assertEquals(SyncResult.Ok(4), api().confirm(confirm))
+        assertEquals("POST", method)
+        assertEquals("/api/device/trips/$uuid/confirm", path)
+        assertEquals("Bearer DEVICE", auth)
+        val json = JSONObject(sent)
+        assertEquals(
+            setOf("expectedVersion", "driverId", "classification", "purposeText", "note", "reason"),
+            json.keys().asSequence().toSet(),
+        )
+        assertEquals(3, json.getLong("expectedVersion"))
+        assertEquals("BUSINESS", json.getString("classification"))
+    }
+
+    @Test fun confirmOmitsEmptyOptionalFields() = runBlocking {
+        api().confirm(confirm.copy(classification = "PERSONAL", purposeText = null, note = null))
+        val json = JSONObject(sent)
+        assertFalse(json.has("purposeText"))
+        assertFalse(json.has("note"))
+    }
+
+    @Test fun confirmStatusCodesMapToResults() = runBlocking {
+        val expected = mapOf(
+            409 to SyncResult.Conflict, 401 to SyncResult.Unauthorized, 400 to SyncResult.Rejected, 404 to SyncResult.Rejected,
+            403 to SyncResult.Retry, 429 to SyncResult.Retry, 500 to SyncResult.Retry,
+        )
+        for ((code, result) in expected) {
+            status = code; body = """{"code":"X"}"""
+            assertEquals("HTTP $code", result, api().confirm(confirm))
+        }
+        status = 200; body = "{}"
+        assertEquals(SyncResult.Retry, api().confirm(confirm))
     }
 }
