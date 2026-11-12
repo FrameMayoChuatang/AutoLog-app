@@ -110,6 +110,7 @@ internal fun DriverAvatar(color: Int, modifier: Modifier = Modifier, blinking: B
             shader.setFloatUniform("targetHue", ProfileHues[chosenColor] / 360f)
             shader.setFloatUniform("saturationScale", ProfileSaturations[chosenColor] / ProfileSaturations[0])
             shader.setFloatUniform("blink", if (canBlink) blink.value else 0f)
+            shader.setFloatUniform("eyeTop", if (expression == 3) 565f else 495f)
             shader.setFloatUniform("leftEye", if (expression == 0) 566f else 556f, if (expression == 3) 625f else 605f)
             shader.setFloatUniform("rightEye", if (expression == 2) -1000f else 714f, if (expression == 3) 630f else 616f)
             paint.shader = shader
@@ -150,6 +151,7 @@ uniform float saturationScale;
 uniform float2 leftEye;
 uniform float2 rightEye;
 uniform float blink;
+uniform float eyeTop;
 float3 rgb2hsv(float3 c) {
     float4 K=float4(0.,-1./3.,2./3.,-1.);
     float4 p=mix(float4(c.bg,K.wz),float4(c.gb,K.xy),step(c.b,c.g));
@@ -162,15 +164,9 @@ float3 hsv2rgb(float3 c) {
     return c.z*mix(float3(1.),clamp(p-1.,0.,1.),c.y);
 }
 float2 blinkEye(float2 pixel,float2 center) {
-    float2 d=pixel-center;
-    float2 local=float2(.961*d.x+.276*d.y,-.276*d.x+.961*d.y);
-    float weight=1.-smoothstep(48.,84.,abs(local.x));
-    float y=abs(local.y),openness=1.-blink*.965,inner=84.*openness;
-    if(y<130.) {
-        float mapped=y<inner?y/openness:84.+(y-inner)*46./(130.-inner);
-        local.y=mix(local.y,sign(local.y)*mapped,weight);
-    }
-    return center+float2(.961*local.x-.276*local.y,.276*local.x+.961*local.y);
+    // 각 눈을 독립적으로 같은 비율로 압축한다. 가장자리 가중치나 연속 변형은 잔상을 만든다.
+    float openness=1.-blink*.94;
+    return float2(pixel.x,center.y+(pixel.y-center.y)/openness);
 }
 half4 main(float2 position) {
     float2 pixel=float2(200.,310.)+position/viewport*float2(860.,645.);
@@ -185,8 +181,13 @@ half4 main(float2 position) {
         color=mix(color,hsv2rgb(hsv),body);
     }
     float2 eyePixel=pixel;
-    if(blink>0.) { eyePixel=blinkEye(eyePixel,leftEye);eyePixel=blinkEye(eyePixel,rightEye); }
-    half4 eyeColor=eyes.eval((eyePixel-float2(445.,495.))*eyeScale);
+    if(blink>0. && pixel.y>=eyeTop) {
+        float2 center=pixel.x<635.?leftEye:rightEye;
+        // 윙크의 닫힌 오른쪽 눈은 그대로 유지한다.
+        if(center.x>0.) eyePixel=blinkEye(pixel,center);
+    }
+    // 버럭 표정의 눈썹은 고정하고, 압축된 눈에서 눈썹 픽셀을 다시 샘플링하지 않는다.
+    half4 eyeColor=(pixel.y>=eyeTop && eyePixel.y<eyeTop)?half4(0.):eyes.eval((eyePixel-float2(445.,495.))*eyeScale);
     return half4(color*(1.-eyeColor.a)+eyeColor.rgb,1.);
 }
 """
