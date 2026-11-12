@@ -18,7 +18,7 @@ import com.framemayo.autolog.data.sync.TripSyncStatus
 
 /** 전송 완료와 운전자 확인 완료를 구분하고, 서버가 제공하지 않은 실패 원인은 추정하지 않는다. */
 @Composable
-internal fun TripSyncStatusNotice(status: TripSyncStatus, purpose: TripPurpose) {
+internal fun TripSyncStatusNotice(status: TripSyncStatus, purpose: TripPurpose, modifier: Modifier = Modifier) {
     val (title, description) = when (status) {
         TripSyncStatus.Synced -> "전송 완료" to if (purpose == TripPurpose.UNCONFIRMED)
             "측정값이 전송됐어요. 목적을 선택해 운행을 확인해 주세요." else "운행 기록이 서버에 반영됐어요."
@@ -39,7 +39,7 @@ internal fun TripSyncStatusNotice(status: TripSyncStatus, purpose: TripPurpose) 
         is TripSyncStatus.Held -> Color(0xFFF0CF8A)
         TripSyncStatus.Failed -> Color(0xFFFFB4AB)
     }
-    Surface(color = accent.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp)) {
+    Surface(modifier, color = accent.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, color = accent, fontSize = VehicleUi.ButtonText, fontWeight = FontWeight.SemiBold)
             Text(description, color = Color(0xFFD7DAE1), fontSize = VehicleUi.Caption, lineHeight = 28.sp)

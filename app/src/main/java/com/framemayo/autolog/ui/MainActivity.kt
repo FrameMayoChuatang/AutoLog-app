@@ -10,10 +10,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -142,8 +144,9 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
     }
     BackHandler(enabled = active != null) { showTripDetail = false }
     BackHandler(enabled = showVehicle && state.activeTrip == null) { showVehicle = false }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 32.dp),
+        modifier = Modifier.widthIn(max = 1100.dp).fillMaxSize().safeDrawingPadding().padding(horizontal = 32.dp),
         contentPadding = PaddingValues(vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
@@ -179,6 +182,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
                 { purpose, text -> vm.setPurpose(trip.id, purpose, text) }, vm::loadPurposes,
             )
         }
+    }
     }
 }
 

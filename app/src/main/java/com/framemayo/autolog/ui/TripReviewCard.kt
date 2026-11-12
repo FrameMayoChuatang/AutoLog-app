@@ -61,25 +61,47 @@ internal fun TripReviewCard(
         if (!parked) { reviewing = false; choosingDriver = false; candidateId = null; query = "" }
     }
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color(0xFF17181D)) {
-        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                val profile = state.profiles.find { it.driver.id == trip.driverId }
+                Surface(Modifier.size(64.dp), shape = RoundedCornerShape(16.dp), color = Color.White) {
+                    Box(contentAlignment = Alignment.Center) {
+                        DriverAvatar(profile?.color ?: 0, Modifier.fillMaxWidth().aspectRatio(4f / 3f), expression = profile?.expression ?: 0)
+                    }
+                }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(state.driverName(trip.driverId), fontSize = VehicleUi.Title, fontWeight = FontWeight.SemiBold)
                     Text(TripTime.format(Instant.ofEpochMilli(trip.startedAt)), fontSize = VehicleUi.Caption, color = Color(0xFFB9BEC8))
                 }
                 Text(trip.status.label(), fontSize = VehicleUi.Caption)
             }
-            Text("%.2f km · %d분".format(trip.distanceKm(), trip.durationMs() / 60_000), fontSize = VehicleUi.Value)
-            Text(trip.purpose.label(), fontSize = VehicleUi.Body)
-            if (trip.purpose == TripPurpose.BUSINESS_GENERAL) Text(trip.purposeText ?: "일반 업무", fontSize = VehicleUi.Caption, color = Color(0xFFB9BEC8))
-            if (trip.driverId == null) Text("운전자를 지정해 주세요", fontSize = VehicleUi.Caption, color = Color(0xFFF0CF8A))
-            TripSyncStatusNotice(status, trip.purpose)
+            val summary: @Composable () -> Unit = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("%.2f km · %d분".format(trip.distanceKm(), trip.durationMs() / 60_000), fontSize = VehicleUi.Value)
+                    Text(trip.purpose.label(), fontSize = VehicleUi.Body, color = Color(0xFFB9BEC8))
+                    if (trip.purpose == TripPurpose.BUSINESS_GENERAL) Text(trip.purposeText ?: "일반 업무", fontSize = VehicleUi.Caption, color = Color(0xFFB9BEC8))
+                    if (trip.driverId == null) Text("운전자를 지정해 주세요", fontSize = VehicleUi.Caption, color = Color(0xFFF0CF8A))
+                }
+            }
+            val reviewButton: @Composable () -> Unit = {
             if (trip.endedAt != null) Button(
                 onClick = { reviewing = true }, enabled = parked,
-                modifier = Modifier.align(Alignment.End).heightIn(min = 56.dp),
+                modifier = Modifier.heightIn(min = 56.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF17181D)),
             ) { Text(if (trip.purpose == TripPurpose.UNCONFIRMED) "운행 확인" else "확인 및 수정", fontSize = VehicleUi.ButtonText) }
+            }
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth < 600.dp) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    summary()
+                    reviewButton()
+                } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    Box(Modifier.weight(1f)) { summary() }
+                    reviewButton()
+                }
+            }
+            TripSyncStatusNotice(status, trip.purpose, Modifier.fillMaxWidth())
         }
     }
     if (reviewing && parked) {
