@@ -21,7 +21,7 @@ class DriverProfileConsentUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test fun creationAllowsEitherConsentChoiceAndScrollingKeepsConsentFixed() {
-        val saved = mutableListOf<Boolean>()
+        val saved = mutableListOf<Boolean?>()
         compose.setContent { DriverProfileEditor(null, false, null, {}, { _, _, _, consent -> saved.add(consent) }) }
         compose.onNodeWithContentDescription("운전자 이름").performTextInput("새 운전자")
         compose.onNodeWithText("저장").assertIsEnabled()
@@ -43,11 +43,23 @@ class DriverProfileConsentUiTest {
 
     @Test fun existingConsentCanBeUncheckedAndSaved() {
         val p = DriverProfile(DriverEntity(id = 1, name = "운전자", department = "", locationConsent = true), "운전자", 0)
-        val saved = mutableListOf<Boolean>()
+        val saved = mutableListOf<Boolean?>()
         compose.setContent { DriverProfileEditor(p, false, null, {}, { _, _, _, consent -> saved.add(consent) }) }
         compose.onNodeWithContentDescription("위치정보 수집 동의").assertIsOn().performClick().assertIsOff()
         compose.onNodeWithText("저장").assertIsEnabled().performClick()
         assertEquals(listOf(false), saved)
+    }
+
+    @Test fun unansweredDriverKeepsUnknownUnlessCheckboxIsChanged() {
+        val p = DriverProfile(DriverEntity(id = 1, name = "운전자", department = "", locationConsent = null), "운전자", 0)
+        val saved = mutableListOf<Boolean?>()
+        compose.setContent { DriverProfileEditor(p, false, null, {}, { _, _, _, consent -> saved.add(consent) }) }
+        compose.onNodeWithContentDescription("위치정보 수집 동의").assertIsOff()
+        compose.onNodeWithText("저장").performClick()
+        assertEquals(listOf<Boolean?>(null), saved)
+        compose.onNodeWithContentDescription("위치정보 수집 동의").performClick().performClick()
+        compose.onNodeWithText("저장").performClick()
+        assertEquals(listOf(null, false), saved)
     }
 
     @Test

@@ -33,18 +33,18 @@ interface DriverDao {
         return id
     }
 
-    /** 프로필과 선택한 동의 상태를 함께 저장하여 부분 저장을 막는다. */
+    /** 프로필과 선택한 동의 상태를 함께 저장하여 부분 저장을 막는다. [consent]가 null이면 동의는 바꾸지 않는다. */
     @Transaction
-    suspend fun saveProfileWithConsent(id: Long?, name: String, color: Int, expression: Int, consent: Boolean, at: Long): Long {
+    suspend fun saveProfileWithConsent(id: Long?, name: String, color: Int, expression: Int, consent: Boolean?, at: Long): Long {
         if (id == null) {
             val created = addProfile(name, color, expression)
-            setConsent(created, consent, at)
+            if (consent != null) setConsent(created, consent, at)
             return created
         }
         val driver = requireNotNull(byId(id)) { "프로필을 찾을 수 없습니다." }
         val previous = profile(id)
         saveProfile(DriverProfileEntity(id, name, color, previous?.hidden ?: false, expression))
-        if (driver.locationConsent != consent) setConsent(id, consent, at)
+        if (consent != null && driver.locationConsent != consent) setConsent(id, consent, at)
         return id
     }
 

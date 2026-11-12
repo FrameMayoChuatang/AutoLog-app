@@ -31,6 +31,24 @@ class DriverProfileTest {
     @Test fun withdrawalWhileLocationIsLoadingDoesNotRecreateLocation() = verifyDelayedLocation(false)
     @Test fun personalPurposeWhileLocationIsLoadingDoesNotRecreateLocation() = verifyDelayedLocation(true)
 
+    @Test fun editingUnansweredDriverWithoutChoiceKeepsConsentUnknown() = runBlocking {
+        val id = db.driverDao().insert(DriverEntity(name = "서버 운전자", department = "영업팀"))
+        repo.saveProfileWithConsent(id, "별명", 1, 2, null)
+        val driver = db.driverDao().byId(id)!!
+        assertNull(driver.locationConsent)
+        assertNull(driver.consentUpdatedAt)
+        assertEquals("별명", db.driverDao().profile(id)!!.displayName)
+
+        repo.saveProfileWithConsent(id, "별명", 1, 2, false)
+        assertEquals(false, db.driverDao().byId(id)!!.locationConsent)
+    }
+
+    @Test fun answeredDriverIgnoresNullAndKeepsChoice() = runBlocking {
+        val id = repo.saveProfileWithConsent(null, "운전자", 0, 0, true)
+        repo.saveProfileWithConsent(id, "운전자2", 0, 0, null)
+        assertEquals(true, db.driverDao().byId(id)!!.locationConsent)
+    }
+
     @Test fun locationSavedBeforeWithdrawalIsPurgedAndCannotBeReinserted() = runBlocking {
         val id = repo.saveProfileWithConsent(null, "운전자", 0, 0, true)
         val original = TripEntity(driverId = id, startedAt = 1, startOdometerKm = 1f, lastOdometerKm = 2f, lastSavedAt = 2)
