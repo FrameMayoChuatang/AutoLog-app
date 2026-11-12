@@ -42,6 +42,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
@@ -79,6 +81,15 @@ internal fun DriverSearchDialog(
     var inputFocused by remember { mutableStateOf(false) }
     var targetBounds by remember { mutableStateOf(Rect.Zero) }
     val results = profiles.filter { it.displayName.contains(query.trim(), ignoreCase = true) }
+    // 배경과 어울리는 단색 톤을 쓰되 눈과 플러그를 알아볼 수 있는 명암은 남긴다.
+    val emptyArtworkFilter = remember {
+        ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
+            0.053f, 0.179f, 0.018f, 0f, 45f,
+            0.053f, 0.179f, 0.018f, 0f, 46f,
+            0.053f, 0.179f, 0.018f, 0f, 51f,
+            0f, 0f, 0f, 1f, 0f,
+        )))
+    }
     val dismiss = { keyboard?.hide(); onDismiss() }
 
     LaunchedEffect(targetBounds != Rect.Zero) {
@@ -142,12 +153,13 @@ internal fun DriverSearchDialog(
                                         Image(
                                             painterResource(R.drawable.driver_search_empty), contentDescription = null,
                                             modifier = Modifier.fillMaxWidth().height(artworkHeight),
+                                            colorFilter = emptyArtworkFilter,
                                         )
                                         Spacer(Modifier.height(12.dp))
                                     }
                                     Text(
                                         if (query.isBlank()) "검색할 프로필이 없습니다." else "검색 결과가 없습니다.",
-                                        Modifier.fillMaxWidth(), color = Color(0xFFB7D9E8), fontSize = 22.sp,
+                                        Modifier.fillMaxWidth(), color = Color(0xFF92949C), fontSize = 22.sp,
                                         lineHeight = 28.sp, textAlign = TextAlign.Center,
                                     )
                                 }
