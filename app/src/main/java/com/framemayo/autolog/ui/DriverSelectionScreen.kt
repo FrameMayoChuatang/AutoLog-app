@@ -140,8 +140,12 @@ internal fun DriverSelectionScreen(
                     Row(Modifier.fillMaxWidth().onSizeChanged { topBarHeight = it.height }.padding(top = 24.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
                             onClick = { managing = !managing }, shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.heightIn(min = 56.dp), border = BorderStroke(1.dp, SelectionColors.outline),
-                            colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
+                            modifier = Modifier.heightIn(min = 56.dp),
+                            border = BorderStroke(1.dp, if (managing) Color.White else SelectionColors.outline),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (managing) Color.White else SelectionColors.surface,
+                                contentColor = if (managing) SelectionColors.surface else SelectionColors.onSurface,
+                            ),
                         ) { Text(if (managing) "완료" else "프로필 관리", fontSize = 18.sp) }
                         Box(Modifier.weight(1f).padding(start = 24.dp), contentAlignment = Alignment.CenterEnd) {
                             DriverSearchBar(
@@ -169,12 +173,14 @@ internal fun DriverSelectionScreen(
                                     Text(if (managing) "프로필 관리" else "운전자의 프로필을 선택하세요.", Modifier.fillMaxWidth().padding(bottom = 36.dp), fontSize = 34.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
                                     ProfileRow {
                                         recent.forEach { card(it) }
-                                        Column(Modifier.width(avatarSize + 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Surface(
-                                                onClick = { openEditor(null) }, modifier = Modifier.size(avatarSize).semantics { contentDescription = "운전자 추가" },
-                                                shape = RoundedCornerShape(18.dp), color = SelectionColors.surface, border = BorderStroke(1.dp, Color(0xFF555862)),
-                                            ) { Box(contentAlignment = Alignment.Center) { Text("+", fontSize = 64.sp, fontWeight = FontWeight.Light, color = SelectionColors.onSurfaceVariant) } }
-                                            Text("운전자 추가", Modifier.padding(top = 18.dp), fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
+                                        if (!managing) {
+                                            Column(Modifier.width(avatarSize + 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Surface(
+                                                    onClick = { openEditor(null) }, modifier = Modifier.size(avatarSize).semantics { contentDescription = "운전자 추가" },
+                                                    shape = RoundedCornerShape(18.dp), color = SelectionColors.surface, border = BorderStroke(1.dp, Color(0xFF555862)),
+                                                ) { Box(contentAlignment = Alignment.Center) { Text("+", fontSize = 64.sp, fontWeight = FontWeight.Light, color = SelectionColors.onSurfaceVariant) } }
+                                                Text("운전자 추가", Modifier.padding(top = 18.dp), fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
+                                            }
                                         }
                                     }
                                 }
