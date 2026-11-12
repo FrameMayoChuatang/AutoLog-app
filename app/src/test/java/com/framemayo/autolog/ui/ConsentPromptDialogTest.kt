@@ -26,7 +26,7 @@ class ConsentPromptDialogTest {
         compose.setContent { ConsentPromptDialog("최현수", false, { agreed++ }, { declined++ }, {}) }
         compose.onNodeWithText("위치정보 수집 동의").assertIsDisplayed()
         compose.onNodeWithText("최현수님의 업무 운행에 한해 도착 위치를 저장합니다.").assertIsDisplayed()
-        compose.onNodeWithText("개인 운행은 저장하지 않으며, 동의하지 않아도 운행 기록은 정상 작성됩니다.").assertIsDisplayed()
+        compose.onNodeWithText("개인 운행은 저장하지 않으며,\n동의하지 않아도 운행 기록은 정상 작성됩니다.").assertIsDisplayed()
         val agree = compose.onNodeWithText("동의").fetchSemanticsNode().boundsInRoot
         val decline = compose.onNodeWithText("동의 안 함").fetchSemanticsNode().boundsInRoot
         assertEquals(agree.width, decline.width, 1f)
