@@ -1,12 +1,10 @@
 package com.framemayo.autolog.data.sync
 
 import android.content.Context
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -27,13 +25,14 @@ class SyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
 }
 
 object SyncScheduler {
-    private const val NAME = "trip-sync"
-    private const val RETRY_NAME = "trip-sync-retry"
+    private const val NAME = "sync-now"
+    private const val RETRY_NAME = "sync-retry"
+    private const val PERIODIC_NAME = "sync-periodic"
+
+    private val LEGACY_NAMES = listOf("trip-sync", "trip-sync-retry")
     internal const val KEY_ATTEMPT = "attempt"
     private const val BASE_DELAY_SECONDS = 30L
     private const val MAX_DELAY_SECONDS = 300L
-
-    private val connected = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
     fun retryDelaySeconds(attempt: Int): Long {
         var delay = BASE_DELAY_SECONDS
@@ -42,18 +41,19 @@ object SyncScheduler {
     }
 
     fun schedulePeriodic(context: Context) {
-        val request = PeriodicWorkRequestBuilder<SyncWorker>(6, TimeUnit.HOURS).setConstraints(connected).build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork("sync-periodic", ExistingPeriodicWorkPolicy.KEEP, request)
+        val wm = WorkManager.getInstance(context)
+        LEGACY_NAMES.forEach(wm::cancelUniqueWork)
+        val request = PeriodicWorkRequestBuilder<SyncWorker>(6, TimeUnit.HOURS).build()
+        wm.enqueueUniquePeriodicWork(PERIODIC_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     fun enqueue(context: Context) {
-        val request = OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(connected).build()
+        val request = OneTimeWorkRequestBuilder<SyncWorker>().build()
         WorkManager.getInstance(context).enqueueUniqueWork(NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
     internal fun scheduleRetry(context: Context, attempt: Int) {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
-            .setConstraints(connected)
             .setInitialDelay(retryDelaySeconds(attempt), TimeUnit.SECONDS)
             .setInputData(Data.Builder().putInt(KEY_ATTEMPT, attempt).build())
             .build()
