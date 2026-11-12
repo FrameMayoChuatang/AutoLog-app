@@ -17,6 +17,8 @@ internal fun fakeTripDao(): TripDao {
             "update" -> { val t = a[0] as TripEntity; rows[rows.indexOfFirst { it.id == t.id }] = t; Unit }
             "get" -> rows.firstOrNull { it.id == a[0] }
             "active" -> rows.lastOrNull { it.status == TripStatus.ACTIVE }
+            "lastInterrupted" -> rows.lastOrNull { it.status == TripStatus.INTERRUPTED }
+            "lastEnded" -> rows.lastOrNull { it.status != TripStatus.ACTIVE }
             "pendingSync" -> rows.filter { it.syncState == SyncState.PENDING }.sortedBy { it.startedAt }
             "deleteSyncedBefore" -> {
                 val n = rows.size

@@ -145,6 +145,12 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE status = 'ACTIVE' ORDER BY id DESC LIMIT 1")
     suspend fun active(): TripEntity?
 
+    @Query("SELECT * FROM trips WHERE status = 'INTERRUPTED' ORDER BY id DESC LIMIT 1")
+    suspend fun lastInterrupted(): TripEntity?
+
+    @Query("SELECT * FROM trips WHERE status != 'ACTIVE' ORDER BY id DESC LIMIT 1")
+    suspend fun lastEnded(): TripEntity?
+
     @Query("SELECT * FROM trips WHERE status = 'ACTIVE' ORDER BY id DESC LIMIT 1")
     fun observeActive(): Flow<TripEntity?>
 
@@ -182,4 +188,34 @@ interface TripDao {
 
     @Query("UPDATE trips SET syncState = :state WHERE id = :id AND updatedAt = :updatedAt")
     suspend fun setSyncState(id: Long, updatedAt: Long, state: SyncState)
+}
+
+@Dao
+interface TripStopDao {
+    @Insert
+    suspend fun insert(stop: TripStopEntity): Long
+
+    @Query("SELECT * FROM trip_stops WHERE tripId = :tripId AND endedAt IS NULL ORDER BY id DESC LIMIT 1")
+    suspend fun open(tripId: Long): TripStopEntity?
+
+    @Query("UPDATE trip_stops SET endedAt = :endedAt WHERE tripId = :tripId AND endedAt IS NULL")
+    suspend fun close(tripId: Long, endedAt: Long)
+
+    @Query("SELECT * FROM trip_stops WHERE tripId = :tripId ORDER BY startedAt")
+    suspend fun forTrip(tripId: Long): List<TripStopEntity>
+
+    @Query("SELECT * FROM trip_stops WHERE tripId = :tripId ORDER BY startedAt")
+    fun observeForTrip(tripId: Long): Flow<List<TripStopEntity>>
+}
+
+@Dao
+interface EnergyEventDao {
+    @Insert
+    suspend fun insert(event: EnergyEventEntity): Long
+
+    @Query("SELECT * FROM energy_events ORDER BY detectedAt DESC LIMIT :limit")
+    fun observeRecent(limit: Int): Flow<List<EnergyEventEntity>>
+
+    @Query("SELECT * FROM energy_events WHERE tripId = :tripId ORDER BY detectedAt")
+    suspend fun forTrip(tripId: Long): List<EnergyEventEntity>
 }

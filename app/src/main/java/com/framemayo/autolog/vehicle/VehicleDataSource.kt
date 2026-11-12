@@ -3,6 +3,9 @@ package com.framemayo.autolog.vehicle
 import ai.pleos.playground.vehicle.Vehicle
 import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import ai.pleos.playground.vehicle.listener.DistanceDrivenListener
+import ai.pleos.playground.vehicle.listener.EvBatteryStateOfChargeListener
+import ai.pleos.playground.vehicle.listener.EvChargePortOpenListener
+import ai.pleos.playground.vehicle.listener.FuelPercentListener
 import ai.pleos.playground.vehicle.listener.GearSelectionListener
 import android.annotation.SuppressLint
 import android.content.Context
@@ -50,6 +53,7 @@ class VehicleDataSource(context: Context) {
 
             override fun onFailed(e: Exception) {
                 Log.w(TAG, "registerDistanceDriven failed", e)
+                close(e) // 수집기가 백오프 후 재구독한다.
             }
         }
         odometer.registerDistanceDriven(listener)
@@ -66,10 +70,72 @@ class VehicleDataSource(context: Context) {
 
             override fun onFailed(e: Exception) {
                 Log.w(TAG, "registerGearSelection failed", e)
+                close(e)
             }
         }
         gear.registerGearSelection(listener)
         awaitClose { gear.unregisterGearSelection(listener) }
+    }
+
+    /** 연료량(%). 내연기관이 아니거나 미지원이면 실패로 닫힌다. */
+    fun fuelPercent(): Flow<Float?> = callbackFlow {
+        val fuel = vehicle.getFuel()
+        val listener = object : FuelPercentListener {
+            override fun onFuelPercentUpdated(value: Int?) {
+                trySend(value?.toFloat())
+            }
+
+            override fun onFailed(e: Exception) {
+                Log.w(TAG, "registerFuelPercent failed", e)
+                close(e)
+            }
+        }
+        fuel.registerFuelPercent(listener)
+        awaitClose { fuel.unregisterFuelPercent(listener) }
+    }
+
+    /** EV 배터리 잔량(SoC, %). 전기차가 아니거나 미지원이면 실패로 닫힌다. */
+    fun batteryPercent(): Flow<Float?> = callbackFlow {
+        val battery = vehicle.getEvBattery()
+        val listener = object : EvBatteryStateOfChargeListener {
+            override fun onEvBatteryStateOfChargeUpdated(value: Int?) {
+                trySend(value?.toFloat())
+            }
+
+            override fun onFailed(e: Exception) {
+                Log.w(TAG, "registerEvBatteryStateOfCharge failed", e)
+                close(e)
+            }
+        }
+        battery.registerEvBatteryStateOfCharge(listener)
+        awaitClose { battery.unregisterEvBatteryStateOfCharge(listener) }
+    }
+
+    fun chargePortOpen(): Flow<Boolean?> = callbackFlow {
+        val battery = vehicle.getEvBattery()
+        val listener = object : EvChargePortOpenListener {
+            override fun onEvChargePortOpenUpdated(value: Boolean?) {
+                trySend(value)
+            }
+
+            override fun onFailed(e: Exception) {
+                Log.w(TAG, "registerEvChargePortOpen failed", e)
+                close(e)
+            }
+        }
+        battery.registerEvChargePortOpen(listener)
+        awaitClose { battery.unregisterEvChargePortOpen(listener) }
+    }
+
+    /** EV 배터리 용량(kWh). 미지원이면 null. */
+    suspend fun batteryCapacityKwh(): Float? = suspendCancellableCoroutine { cont ->
+        vehicle.getEvBattery().getEvBatteryCapacity(
+            { value: Float? -> if (cont.isActive) cont.resume(value?.takeIf { it.isFinite() && it > 0f }) },
+            { e: Exception ->
+                Log.w(TAG, "getEvBatteryCapacity failed", e)
+                if (cont.isActive) cont.resume(null)
+            },
+        )
     }
 
     companion object {

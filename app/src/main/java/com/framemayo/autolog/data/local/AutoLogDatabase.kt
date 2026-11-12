@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class, TripLocationEntity::class, DriverProfileEntity::class],
-    version = 11,
+    entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class, TripLocationEntity::class, DriverProfileEntity::class, TripStopEntity::class, EnergyEventEntity::class],
+    version = 12,
     exportSchema = false,
 )
 abstract class AutoLogDatabase : RoomDatabase() {
@@ -17,12 +17,42 @@ abstract class AutoLogDatabase : RoomDatabase() {
     abstract fun tripDao(): TripDao
     abstract fun purposeDao(): PurposeDao
     abstract fun tripLocationDao(): TripLocationDao
+    abstract fun tripStopDao(): TripStopDao
+    abstract fun energyEventDao(): EnergyEventDao
 
     companion object {
         fun create(context: Context): AutoLogDatabase =
             Room.databaseBuilder(context, AutoLogDatabase::class.java, "autolog.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_8_10, MIGRATION_9_10, MIGRATION_10_11)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_8_10, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                 .build()
+
+        // 앱 A: 자동 시작·종료 방식, 시작·종료 연료/배터리, 중간 정차, 주유·충전 이벤트.
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE trips ADD COLUMN startedBy TEXT NOT NULL DEFAULT 'MANUAL'")
+                db.execSQL("ALTER TABLE trips ADD COLUMN endedBy TEXT")
+                db.execSQL("ALTER TABLE trips ADD COLUMN startFuelPercent REAL")
+                db.execSQL("ALTER TABLE trips ADD COLUMN endFuelPercent REAL")
+                db.execSQL("ALTER TABLE trips ADD COLUMN startBatteryPercent REAL")
+                db.execSQL("ALTER TABLE trips ADD COLUMN endBatteryPercent REAL")
+                // 기존 종료 운행은 수동 종료/중단으로 표시한다.
+                db.execSQL("UPDATE trips SET endedBy = 'MANUAL' WHERE status = 'COMPLETED'")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS trip_stops (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, tripId INTEGER NOT NULL, " +
+                        "startedAt INTEGER NOT NULL, endedAt INTEGER, odometerKm REAL NOT NULL, " +
+                        "FOREIGN KEY(tripId) REFERENCES trips(id) ON UPDATE NO ACTION ON DELETE CASCADE)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_trip_stops_tripId ON trip_stops (tripId)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS energy_events (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, kind TEXT NOT NULL, tripId INTEGER, " +
+                        "detectedAt INTEGER NOT NULL, odometerKm REAL, beforePercent REAL NOT NULL, afterPercent REAL NOT NULL, " +
+                        "estimatedAmount REAL, estimatedCostWon INTEGER, " +
+                        "FOREIGN KEY(tripId) REFERENCES trips(id) ON UPDATE NO ACTION ON DELETE SET NULL)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_energy_events_tripId ON energy_events (tripId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_energy_events_detectedAt ON energy_events (detectedAt)")
+            }
+        }
 
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
