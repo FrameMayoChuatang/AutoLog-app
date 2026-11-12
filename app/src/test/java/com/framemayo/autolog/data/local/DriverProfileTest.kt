@@ -25,11 +25,11 @@ class DriverProfileTest {
 
     @After fun close() { db.close(); context.deleteDatabase("profiles-migration.db") }
 
-    @Test fun profileCreationRequiresConsentAndPersistsItWithAppearance() = runBlocking {
-        assertTrue(runCatching { repo.saveProfileWithConsent(null, "새 운전자", 1, 2, false) }.isFailure)
-        assertTrue(repo.all.first().isEmpty())
+    @Test fun profileCreationPersistsOptionalConsentWithAppearance() = runBlocking {
+        val declined = repo.saveProfileWithConsent(null, "미동의 운전자", 1, 2, false)
+        assertEquals(false, repo.consentOf(declined))
         val id = repo.saveProfileWithConsent(null, " 새 운전자 ", 1, 2, true)
-        val stored = repo.profiles.first().single()
+        val stored = repo.profiles.first().single { it.driver.id == id }
         assertEquals(id, stored.driver.id)
         assertEquals("새 운전자", stored.displayName)
         assertEquals(1, stored.color)

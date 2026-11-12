@@ -20,11 +20,11 @@ import org.robolectric.annotation.GraphicsMode
 class DriverProfileConsentUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    @Test fun creationRequiresConsentAndScrollingKeepsConsentFixed() {
+    @Test fun creationAllowsEitherConsentChoiceAndScrollingKeepsConsentFixed() {
         val saved = mutableListOf<Boolean>()
         compose.setContent { DriverProfileEditor(null, false, null, {}, { _, _, _, consent -> saved.add(consent) }) }
         compose.onNodeWithContentDescription("운전자 이름").performTextInput("새 운전자")
-        compose.onNodeWithText("저장").assertIsNotEnabled()
+        compose.onNodeWithText("저장").assertIsEnabled()
         val check = compose.onNodeWithContentDescription("위치정보 수집 동의")
         check.assertIsDisplayed().assertIsOff()
         val before = check.fetchSemanticsNode().boundsInRoot
@@ -33,10 +33,12 @@ class DriverProfileConsentUiTest {
         check.performClick().assertIsOn()
         compose.onNodeWithText("저장").assertIsDisplayed().assertIsEnabled()
         check.performClick()
-        compose.onNodeWithText("저장").assertIsNotEnabled()
+        compose.onNodeWithText("저장").assertIsEnabled()
+        compose.onNodeWithText("저장").performClick()
+        assertEquals(listOf(false), saved)
         check.performClick()
         compose.onNodeWithText("저장").performClick()
-        assertEquals(listOf(true), saved)
+        assertEquals(listOf(false, true), saved)
     }
 
     @Test fun existingConsentCanBeUncheckedAndSaved() {
