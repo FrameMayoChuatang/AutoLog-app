@@ -9,8 +9,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,10 +42,11 @@ internal fun DrivingRestrictionGate(state: MainUiState, ux: DrivingUxState, park
     if (allowed) parkedContent() else RestrictedDrivingScreen(state, ux)
 }
 
-/** 주행 중에는 조작·스크롤·캐릭터 애니메이션 없이 현재 기록의 핵심 수치만 보여준다. */
+/** 주행 중에는 조작·스크롤·애니메이션 없이 운전자 프로필과 현재 기록의 핵심 수치를 보여준다. */
 @Composable
 internal fun RestrictedDrivingScreen(state: MainUiState, ux: DrivingUxState) {
     val trip = state.activeTrip
+    val profile = state.profiles.find { it.driver.id == trip?.driverId }
     val receiving = state.vehicle.serviceRunning && state.vehicle.collector == CollectorStatus.RUNNING
     val status = when {
         !receiving -> "차량 정보 수신 대기"
@@ -58,13 +62,23 @@ internal fun RestrictedDrivingScreen(state: MainUiState, ux: DrivingUxState) {
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 24.dp)) {
             Text("운행 현황", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = VehicleUi.Primary)
             Text(status, fontSize = 22.sp, color = if (trip != null && receiving) VehicleUi.Positive else VehicleUi.Secondary)
-            if (trip != null) Text(state.driverName(trip.driverId).take(nameLimit), fontSize = 28.sp,
-                color = VehicleUi.Primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (trip != null) Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 24.dp)) {
+                Surface(Modifier.size(if (compact) 64.dp else 148.dp)
+                    .semantics { contentDescription = if (profile != null) "현재 운전자 프로필" else "미지정 운전자 프로필" },
+                    shape = RoundedCornerShape(if (compact) 16.dp else 24.dp), color = Color.White) {
+                    Box(contentAlignment = Alignment.Center) {
+                        DriverAvatar(profile?.color ?: 0, Modifier.fillMaxWidth().aspectRatio(4f / 3f),
+                            expression = profile?.expression ?: 0)
+                    }
+                }
+                Text(state.driverName(trip.driverId).take(nameLimit), fontSize = 28.sp,
+                    color = VehicleUi.Primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 ReadOnlyTripValue("주행 거리", trip?.let { "%.1f km".format(it.distanceKm()) } ?: "—", Modifier.weight(1f), compact)
                 ReadOnlyTripValue("주행 시간", trip?.let { "${(it.durationMs() / 60_000).coerceAtLeast(0)}분" } ?: "—", Modifier.weight(1f), compact)
             }
-            Text("검색과 편집은 주차 후 이용해 주세요.", fontSize = 20.sp, color = VehicleUi.Secondary)
         }
     }
 }
