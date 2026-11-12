@@ -1,5 +1,6 @@
 package com.framemayo.autolog.data.sync
 
+import com.framemayo.autolog.data.local.TripEndReason
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.local.TripStatus
@@ -82,6 +83,7 @@ fun TripEntity.toPayload(driverRemoteId: String?): TripPayload {
             endOdometerKm = endOdometerKm,
             lastOdometerKm = endOdometerKm,
             state = "COMPLETED",
+            collectionIssues = if (endedBy == TripEndReason.RECOVERED) emptyList() else null,
         )
         TripStatus.INTERRUPTED -> base.copy(
             lastObservedAt = lastSavedAt,
