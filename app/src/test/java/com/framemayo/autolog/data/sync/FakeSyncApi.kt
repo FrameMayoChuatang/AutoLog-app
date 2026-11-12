@@ -26,10 +26,13 @@ class FakeSyncApi : SyncApi {
 
     val confirms = mutableListOf<ConfirmPayload>()
 
+    var duringUpload: (suspend () -> Unit)? = null
+
     override suspend fun upload(trip: TripPayload): SyncResult {
         if (!online) return SyncResult.Retry
         if (unauthorized) return SyncResult.Unauthorized
         uploads += trip
+        duringUpload?.let { duringUpload = null; it() }
         if (trip.uuid in throwUuids) error("boom")
         if (trip.uuid in retryUuids) return SyncResult.Retry
         if (alwaysConflict || trip.uuid in conflictUuids) return SyncResult.Conflict
