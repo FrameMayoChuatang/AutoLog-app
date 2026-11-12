@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -96,6 +97,7 @@ internal fun DriverSelectionScreen(
     onSave: suspend (Long?, String, Int, Int) -> Unit,
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
+    onOpenRecords: () -> Unit = onOpenVehicle,
     footer: @Composable () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
@@ -158,7 +160,14 @@ internal fun DriverSelectionScreen(
                                 contentColor = if (managing) SelectionColors.surface else SelectionColors.onSurface,
                             ),
                         ) { Text(if (managing) "완료" else "프로필 관리", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
-
+                        Spacer(Modifier.weight(1f))
+                        if (!managing) OutlinedButton(
+                            onClick = { keyboard?.hide(); onOpenRecords() }, shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.widthIn(min = 180.dp).heightIn(min = 72.dp),
+                            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 16.dp),
+                            border = BorderStroke(1.dp, SelectionColors.outline),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
+                        ) { Text("최근 운행", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
                     }
                     LazyColumn(
                         Modifier.weight(1f).fillMaxWidth(), state = listState, horizontalAlignment = Alignment.CenterHorizontally,
