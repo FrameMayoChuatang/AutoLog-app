@@ -21,6 +21,7 @@
 3. Virtual Console: `adb forward tcp:8088 tcp:8088` → http://127.0.0.1:8088/
    - Motion → 기어 / Odometer (누적거리는 줄일 수 없음, 현재값보다 크게)
 4. 테스트: `./gradlew test`
+5. 서버와 함께 시연 환경을 띄우는 방법: [docs/DEMO_ENVIRONMENT.md](docs/DEMO_ENVIRONMENT.md)
 
 ## 구조
 
