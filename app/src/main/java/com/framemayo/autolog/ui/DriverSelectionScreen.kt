@@ -97,6 +97,7 @@ internal fun DriverSelectionScreen(
     onOpenVehicle: () -> Unit,
     onStartLater: () -> Unit = {},
     footer: @Composable () -> Unit = {},
+    onWithdrawConsent: (Long) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     var managing by rememberSaveable { mutableStateOf(false) }
@@ -231,15 +232,19 @@ internal fun DriverSelectionScreen(
                 else select(profile)
             },
         )
-        if (parked && editing) DriverProfileEditor(profiles.find { it.driver.id == editingId }, busy, error, { editing = false }) { name, color, expression ->
-            if (!busy) scope.launch {
-                busy = true; error = null
-                try { onSave(editingId, name, color, expression); editing = false }
-                catch (e: CancellationException) { throw e }
-                catch (_: Exception) { error = "저장하지 못했습니다. 다시 시도해 주세요." }
-                finally { busy = false }
-            }
-        }
+        if (parked && editing) DriverProfileEditor(
+            profiles.find { it.driver.id == editingId }, busy, error, { editing = false },
+            onSave = { name, color, expression ->
+                if (!busy) scope.launch {
+                    busy = true; error = null
+                    try { onSave(editingId, name, color, expression); editing = false }
+                    catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { error = "저장하지 못했습니다. 다시 시도해 주세요." }
+                    finally { busy = false }
+                }
+            },
+            onWithdrawConsent = { editingId?.let(onWithdrawConsent) },
+        )
         if (parked && deletingId != null) AlertDialog(
             onDismissRequest = { if (!busy) deletingId = null },
             title = { Text("프로필을 삭제할까요?") },

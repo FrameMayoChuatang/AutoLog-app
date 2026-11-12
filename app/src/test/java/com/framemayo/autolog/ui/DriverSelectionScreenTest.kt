@@ -6,6 +6,8 @@ import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.*
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.framemayo.autolog.data.local.DriverEntity
@@ -355,6 +357,30 @@ class DriverSelectionScreenTest {
         compose.onNodeWithText("저장").performClick()
         compose.waitForIdle()
         assertEquals(listOf(Triple("미소 운전자", 4, 2)), saved)
+    }
+
+    @Test fun consentedProfileCanWithdrawAfterConfirmation() {
+        var withdrawn = 0
+        val profile = profiles.first().let { it.copy(driver = it.driver.copy(locationConsent = true)) }
+        compose.setContent { DriverProfileEditor(profile, false, null, {}, { _, _, _ -> }, onWithdrawConsent = { withdrawn++ }) }
+        compose.onNodeWithText("동의 철회").performScrollTo().performClick()
+        assertEquals(0, withdrawn)
+        compose.onNodeWithText("철회하면 저장된 도착 위치도 삭제됩니다.").assertIsDisplayed()
+        compose.onNodeWithText("철회").performClick()
+        assertEquals(1, withdrawn)
+    }
+
+    @Test fun withdrawIsHiddenForUnansweredAndDeclinedProfiles() {
+        var consent by mutableStateOf<Boolean?>(null)
+        compose.setContent {
+            val p = profiles.first().let { it.copy(driver = it.driver.copy(locationConsent = consent)) }
+            DriverProfileEditor(p, false, null, {}, { _, _, _ -> })
+        }
+        compose.onNodeWithText("동의 철회").assertDoesNotExist()
+        compose.onNodeWithText("위치정보 수집").assertDoesNotExist()
+        consent = false
+        compose.onNodeWithText("동의 안 함 · 운행을 시작할 때 다시 동의할 수 있어요.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("동의 철회").assertDoesNotExist()
     }
 
     @Test fun editingRestoresExpressionAndEveryPresetSetsItsOriginalCombination() {
