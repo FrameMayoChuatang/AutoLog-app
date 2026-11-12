@@ -42,14 +42,15 @@ internal fun ConsentDialog(name: String, vm: MainViewModel, requestLocationPermi
 
 @Composable
 internal fun LocationConsentCard(state: MainUiState, vm: MainViewModel, requestLocationPermission: () -> Unit) {
-    if (state.drivers.isEmpty()) return
+    if (state.profiles.isEmpty()) return
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("위치정보 수집 설정", style = MaterialTheme.typography.titleMedium)
-            state.drivers.forEach { d ->
+            state.profiles.forEach { profile ->
+                val d = profile.driver
                 val agreed = d.locationConsent == true
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${d.name}: ${when (d.locationConsent) { true -> "동의"; false -> "동의 안 함"; null -> "미확인" }}")
+                    Text("${profile.displayName}: ${when (d.locationConsent) { true -> "동의"; false -> "동의 안 함"; null -> "미확인" }}")
                     OutlinedButton(onClick = { vm.setLocationConsent(d.id, !agreed); if (!agreed) requestLocationPermission() }) { Text(if (agreed) "철회" else "동의") }
                 }
             }
