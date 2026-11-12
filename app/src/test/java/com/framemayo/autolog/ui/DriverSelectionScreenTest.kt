@@ -52,6 +52,30 @@ class DriverSelectionScreenTest {
         compose.onNodeWithText("더보기").assertIsDisplayed()
     }
 
+    @Test fun profileGroupRemainsCenteredWhenFooterHeightChanges() {
+        var footerSize by mutableStateOf(240.dp)
+        compose.setContent {
+            DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {},
+                footer = { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.height(footerSize)) })
+        }
+        fun assertBalancedSpace() {
+            val list = compose.onNode(hasScrollAction()).fetchSemanticsNode().boundsInRoot
+            val search = compose.onNodeWithContentDescription("운전자 검색 열기").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val lastName = compose.onNodeWithText("운전자5").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val more = compose.onNodeWithText("더보기").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            // 버튼의 24dp 외부 여백을 경계로, 프로필 묶음 위·아래의 빈 공간이 균형을 이루어야 한다.
+            val before = search.top - list.top
+            val after = more.top - 24f - lastName.bottom
+            assertEquals(before, after, 2f)
+        }
+        assertBalancedSpace()
+        val withFooter = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot.top
+        compose.runOnIdle { footerSize = 0.dp }
+        assertBalancedSpace()
+        val withoutFooter = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot.top
+        assertEquals(120f, withoutFooter - withFooter, 2f)
+    }
+
     @Test fun unlinkedVehicleOnlyOffersPairingAfterProfileSelection() {
         var opened = 0
         var started = false
