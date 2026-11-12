@@ -9,8 +9,9 @@ import ai.pleos.playground.vehicle.listener.FuelPercentListener
 import ai.pleos.playground.vehicle.listener.GearSelectionListener
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.util.Log
-import com.framemayo.autolog.BuildConfig
+import com.framemayo.autolog.R
 import java.io.IOException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -22,7 +23,10 @@ import kotlin.coroutines.resume
 class VehicleDataSource(context: Context) {
 
     private val vehicle = Vehicle(context.applicationContext)
-    private val consoleOdometer = if (BuildConfig.DEBUG && BuildConfig.USE_CONSOLE_ODOMETER) ConsoleOdometerSource() else null
+    private val consoleOdometer = if (
+        context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 &&
+        context.resources.getBoolean(R.bool.use_console_odometer)
+    ) ConsoleOdometerSource() else null
     @Volatile private var initialized = false
 
     fun initialize() {
