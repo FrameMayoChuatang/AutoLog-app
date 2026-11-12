@@ -43,7 +43,7 @@ class ProfileConsentSaveTest {
         var deleted = false
         val allowDelete = CompletableDeferred<Unit>()
         val drivers = object : DriverRepository by app.container.drivers {
-            override suspend fun saveProfileWithConsent(id: Long?, name: String, color: Int, expression: Int, consent: Boolean): Long {
+            override suspend fun saveProfileWithConsent(id: Long?, name: String, color: Int, expression: Int, consent: Boolean?): Long {
                 assertEquals(7L, id)
                 savedConsent = consent
                 return 7L

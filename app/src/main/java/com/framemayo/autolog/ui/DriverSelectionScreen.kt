@@ -95,7 +95,7 @@ internal fun DriverSelectionScreen(
     linked: Boolean,
     odometerReady: Boolean,
     onStart: (Long) -> Unit,
-    onSave: suspend (Long?, String, Int, Int, Boolean) -> Unit,
+    onSave: suspend (Long?, String, Int, Int, Boolean?) -> Unit,
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
     onOpenRecords: () -> Unit = onOpenVehicle,

@@ -29,7 +29,7 @@ private class FakeDrivers : DriverRepository {
     override val profiles = flowOf(emptyList<com.framemayo.autolog.data.local.DriverProfile>())
     override suspend fun addProfile(name: String, color: Int, expression: Int) = 1L
     override suspend fun editProfile(id: Long, name: String, color: Int, expression: Int) = Unit
-    override suspend fun saveProfileWithConsent(id: Long?, name: String, color: Int, expression: Int, consent: Boolean) = id ?: 1L
+    override suspend fun saveProfileWithConsent(id: Long?, name: String, color: Int, expression: Int, consent: Boolean?) = id ?: 1L
     override suspend fun hideProfile(id: Long) = true
     override val profileSettings = flowOf(emptyList<com.framemayo.autolog.data.local.DriverProfileEntity>())
     override val all: Flow<List<DriverEntity>> = flowOf(emptyList())

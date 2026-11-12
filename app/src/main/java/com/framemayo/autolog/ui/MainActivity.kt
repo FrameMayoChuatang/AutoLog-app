@@ -128,7 +128,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             onStart = vm::startTrip,
             onSave = { id, name, color, expression, consent ->
                 vm.saveProfile(id, name, color, expression, consent)
-                if (consent) requestLocationPermission()
+                if (consent == true) requestLocationPermission()
             },
             onDelete = vm::deleteProfile,
             onOpenVehicle = { showVehicle = true },
