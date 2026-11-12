@@ -61,7 +61,7 @@ internal fun DriverProfileEditor(
     busy: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onSave: (String, Int, Int) -> Unit,
+    onSave: (String, Int, Int, Boolean) -> Unit,
 ) {
     var name by rememberSaveable(profile?.driver?.id) { mutableStateOf(profile?.displayName.orEmpty()) }
     var color by rememberSaveable(profile?.driver?.id) { mutableIntStateOf(profile?.color ?: 0) }
@@ -120,7 +120,7 @@ internal fun DriverProfileEditor(
                                         Text(if (profile == null) "업무 운행의 도착 위치 저장에 동의합니다." else "업무 운행의 도착 위치를 저장합니다.",
                                             fontSize = 16.sp, modifier = Modifier.padding(start = 8.dp))
                                     }
-                                    if (!short) Text(if (profile == null) "동의에 체크해야 프로필을 생성할 수 있습니다." else "체크를 해제하고 저장하면 동의를 철회합니다.",
+                                    Text(if (profile == null) "동의에 체크해야 프로필을 생성할 수 있습니다." else "체크 해제 후 저장하면 수집을 중단하고 기기의 도착 위치를 삭제합니다.",
                                         fontSize = 14.sp, color = Color(0xFF626269))
                                 }
                             }
@@ -130,7 +130,7 @@ internal fun DriverProfileEditor(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 DriverAvatar(color, Modifier.size(72.dp), expression = expression)
                                 Text(name.trim().ifEmpty { "나의 프로필" }, Modifier.weight(1f), fontSize = 20.sp, maxLines = 2)
-                                Button(onClick = { onSave(name.trim(), color, expression) },
+                                Button(onClick = { onSave(name.trim(), color, expression, locationConsent) },
                                     enabled = name.isNotBlank() && !busy && (profile != null || locationConsent),
                                     modifier = Modifier.heightIn(min = 56.dp), shape = CircleShape) {
                                     Text(if (busy) "저장 중…" else "저장", fontSize = 18.sp)
@@ -145,7 +145,7 @@ internal fun DriverProfileEditor(
                                     Text(name.trim().ifEmpty { "나의 프로필" }, fontSize = if (stacked) 26.sp else 34.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 2)
                                     DriverAvatar(color, Modifier.widthIn(max = if (stacked) 160.dp else 400.dp).fillMaxWidth().aspectRatio(4f / 3f), blinking = true, expression = expression)
                                     Button(
-                                        onClick = { onSave(name.trim(), color, expression) }, enabled = name.isNotBlank() && !busy && (profile != null || locationConsent),
+                                        onClick = { onSave(name.trim(), color, expression, locationConsent) }, enabled = name.isNotBlank() && !busy && (profile != null || locationConsent),
                                         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = CircleShape,
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF141416), contentColor = Color.White),
                                     ) { Text(if (busy) "저장 중…" else "저장", fontSize = 18.sp) }

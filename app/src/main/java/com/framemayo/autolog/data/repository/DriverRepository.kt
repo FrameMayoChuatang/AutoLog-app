@@ -13,6 +13,7 @@ interface DriverRepository {
     val profiles: Flow<List<DriverProfile>>
     suspend fun addProfile(name: String, color: Int, expression: Int = 0): Long
     suspend fun editProfile(id: Long, name: String, color: Int, expression: Int = 0)
+    suspend fun saveProfileWithConsent(id: Long?, name: String, color: Int, expression: Int, consent: Boolean): Long
     suspend fun hideProfile(id: Long): Boolean
     suspend fun add(name: String, department: String): Long
 
@@ -58,6 +59,13 @@ class DriverRepositoryImpl(
         require(name.isNotBlank() && name.trim().length <= 40 && color in 0..6 && expression in 0..6)
         val previous = dao.profile(id)
         dao.saveProfile(DriverProfileEntity(id, name.trim(), color, previous?.hidden ?: false, expression))
+    }
+
+    override suspend fun saveProfileWithConsent(id: Long?, name: String, color: Int, expression: Int, consent: Boolean): Long {
+        require(name.isNotBlank() && name.trim().length <= 40 && color in 0..6 && expression in 0..6)
+        val saved = dao.saveProfileWithConsent(id, name.trim(), color, expression, consent, clock())
+        onPending()
+        return saved
     }
 
     override suspend fun hideProfile(id: Long): Boolean = dao.hideProfile(id)
