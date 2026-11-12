@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -59,7 +60,9 @@ internal fun DriverProfileEditor(
     error: String?,
     onDismiss: () -> Unit,
     onSave: (String, Int, Int) -> Unit,
+    onWithdrawConsent: () -> Unit = {},
 ) {
+    var confirmingWithdraw by rememberSaveable(profile?.driver?.id) { mutableStateOf(false) }
     var name by rememberSaveable(profile?.driver?.id) { mutableStateOf(profile?.displayName.orEmpty()) }
     var color by rememberSaveable(profile?.driver?.id) { mutableIntStateOf(profile?.color ?: 0) }
     var expression by rememberSaveable(profile?.driver?.id) { mutableIntStateOf(profile?.expression ?: 0) }
@@ -99,6 +102,23 @@ internal fun DriverProfileEditor(
                                 ProfilePresetPicker(color, expression, enabled = !busy) { preset ->
                                     expression = preset
                                     color = ProfileExpressions[preset].presetColor
+                                }
+                                profile?.driver?.locationConsent?.let { consent ->
+                                    Spacer(Modifier.height(24.dp))
+                                    Text("위치정보 수집", color = Color(0xFF626269), fontSize = 16.sp)
+                                    Spacer(Modifier.height(12.dp))
+                                    if (!consent) Text("동의 안 함 · 운행을 시작할 때 다시 동의할 수 있어요.", fontSize = 18.sp, color = Color(0xFF626269))
+                                    else Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            if (confirmingWithdraw) "철회하면 저장된 도착 위치도 삭제됩니다." else "동의함 · 업무 운행의 도착 위치를 저장해요.",
+                                            Modifier.weight(1f), fontSize = 18.sp,
+                                            color = if (confirmingWithdraw) Color(0xFFA52C2C) else Color(0xFF141416),
+                                        )
+                                        OutlinedButton(
+                                            onClick = { if (confirmingWithdraw) { confirmingWithdraw = false; onWithdrawConsent() } else confirmingWithdraw = true },
+                                            enabled = !busy, modifier = Modifier.padding(start = 12.dp).heightIn(min = 56.dp), shape = RoundedCornerShape(12.dp),
+                                        ) { Text(if (confirmingWithdraw) "철회" else "동의 철회", fontSize = 18.sp, color = if (confirmingWithdraw) Color(0xFFA52C2C) else Color(0xFF141416)) }
+                                    }
                                 }
                                 error?.let { Text(it, color = Color(0xFFA52C2C), fontSize = 16.sp, modifier = Modifier.padding(top = 12.dp)) }
                             }

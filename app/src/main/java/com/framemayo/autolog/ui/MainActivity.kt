@@ -92,7 +92,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
         if (state.activeTrip != null) showVehicle = true
     }
     if (parked) {
-        state.consentPrompt?.let { ConsentDialog(state.driverName(it.id), vm, requestLocationPermission) }
+        state.consentPrompt?.let { ConsentDialog(it, state.driverName(it.id), vm, requestLocationPermission) }
     }
     if (state.activeTrip == null && (!showVehicle || !parked)) {
         DriverSelectionScreen(
@@ -105,6 +105,8 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             onDelete = vm::deleteProfile,
             onOpenVehicle = { showVehicle = true },
             onStartLater = { vm.startTrip(null) },
+            footer = { VehicleLinkCard(vm) },
+            onWithdrawConsent = { vm.setLocationConsent(it, false) },
         )
         return
     }
@@ -119,7 +121,6 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
         }
         item { VehicleStatusCard(v) }
 
-        item { VehicleLinkCard(vm) }
 
         val active = state.activeTrip
         if (active != null) {
@@ -137,7 +138,6 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             }
         }
 
-        item { LocationConsentCard(state, vm, requestLocationPermission) }
 
         item { Text("최근 운행", Modifier.padding(top = 12.dp), fontSize = VehicleUi.Title, fontWeight = FontWeight.SemiBold) }
         items(state.recentTrips, key = { it.id }) { trip ->
