@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -42,6 +43,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -67,6 +69,7 @@ internal fun DriverSearchDialog(
     onSelect: (DriverProfile) -> Unit,
 ) {
     val progress = remember { Animatable(0f) }
+    val density = LocalDensity.current
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     var inputFocused by remember { mutableStateOf(false) }
@@ -155,13 +158,19 @@ internal fun DriverSearchDialog(
                 Box(
                     Modifier.align(Alignment.TopCenter).padding(top = verticalPadding, start = horizontalPadding, end = horizontalPadding)
                         .fillMaxWidth().onGloballyPositioned { targetBounds = it.boundsInWindow() },
+                    contentAlignment = Alignment.TopCenter,
                 ) {
-                    DriverSearchBar(query, onQuery, { focusManager.clearFocus(); keyboard?.hide() }, Modifier.focusRequester(focus).onFocusChanged { inputFocused = it.hasFocus }.graphicsLayer {
+                    // 내용 전체를 scaleX로 압축하면 글자와 원형 아이콘도 찌그러지므로 실제 너비만 보간한다.
+                    val animatedWidth = with(density) {
+                        val targetWidth = targetBounds.width.takeIf { it > 0f } ?: 760.dp.toPx()
+                        val sourceWidth = sourceBounds.width.takeIf { it > 0f } ?: targetWidth
+                        (sourceWidth + (targetWidth - sourceWidth) * progress.value).toDp()
+                    }
+                    DriverSearchBar(query, onQuery, { focusManager.clearFocus(); keyboard?.hide() }, Modifier.width(animatedWidth).focusRequester(focus).onFocusChanged { inputFocused = it.hasFocus }.graphicsLayer {
                         if (sourceBounds != Rect.Zero && targetBounds != Rect.Zero) {
                             val remaining = 1f - progress.value
                             translationX = (sourceBounds.center.x - targetBounds.center.x) * remaining
                             translationY = (sourceBounds.center.y - targetBounds.center.y) * remaining
-                            scaleX = 1f + (sourceBounds.width / targetBounds.width - 1f) * remaining
                         }
                     }, maxWidth = 760.dp)
                 }

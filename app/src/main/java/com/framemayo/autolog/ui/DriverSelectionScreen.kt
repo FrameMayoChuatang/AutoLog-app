@@ -96,7 +96,6 @@ internal fun DriverSelectionScreen(
     onSave: suspend (Long?, String, Int, Int) -> Unit,
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
-    onStartLater: () -> Unit = {},
     footer: @Composable () -> Unit = {},
     onWithdrawConsent: (Long) -> Unit = {},
 ) {
@@ -121,12 +120,12 @@ internal fun DriverSelectionScreen(
         if (!parked) { searching = false; editing = false; deletingId = null; blocked = false; managing = false; query = ""; keyboard?.hide() }
     }
     BackHandler(managing && !searching && !editing && deletingId == null) { managing = false }
-    val start: (Long?) -> Unit = { driverId ->
+    val start: (Long) -> Unit = { driverId ->
         if (!linked || !odometerReady) blocked = true
         else {
             keyboard?.hide()
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            if (driverId == null) onStartLater() else onStart(driverId)
+            onStart(driverId)
         }
     }
     var selectedId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -152,20 +151,15 @@ internal fun DriverSelectionScreen(
                     Row(Modifier.fillMaxWidth().onSizeChanged { topBarHeight = it.height }.padding(top = 24.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
                             onClick = { managing = !managing }, shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.heightIn(min = 56.dp),
+                            modifier = Modifier.widthIn(min = 180.dp).heightIn(min = 72.dp),
+                            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 16.dp),
                             border = BorderStroke(1.dp, if (managing) Color.White else SelectionColors.outline),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = if (managing) Color.White else SelectionColors.surface,
                                 contentColor = if (managing) SelectionColors.surface else SelectionColors.onSurface,
                             ),
-                        ) { Text(if (managing) "완료" else "프로필 관리", fontSize = 18.sp) }
-                        Box(Modifier.weight(1f).padding(start = 24.dp), contentAlignment = Alignment.CenterEnd) {
-                            DriverSearchBar(
-                                query, { query = it }, { keyboard?.hide() },
-                                Modifier.onGloballyPositioned { searchBounds = it.boundsInWindow() }.graphicsLayer { alpha = if (searching) 0f else 1f },
-                                onOpen = { searching = true },
-                            )
-                        }
+                        ) { Text(if (managing) "완료" else "프로필 관리", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
+
                     }
                     LazyColumn(
                         Modifier.weight(1f).fillMaxWidth(), state = listState, horizontalAlignment = Alignment.CenterHorizontally,
@@ -182,6 +176,13 @@ internal fun DriverSelectionScreen(
                                     },
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
+                                    DriverSearchBar(
+                                        query, { query = it }, { keyboard?.hide() },
+                                        Modifier.padding(bottom = 32.dp)
+                                            .onGloballyPositioned { searchBounds = it.boundsInWindow() }
+                                            .graphicsLayer { alpha = if (searching) 0f else 1f },
+                                        onOpen = { searching = true },
+                                    )
                                     Text(if (managing) "프로필 관리" else "운전자의 프로필을 선택하세요.", Modifier.fillMaxWidth().padding(bottom = 36.dp), fontSize = 34.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
                                     ProfileRow {
                                         recent.forEach { card(it) }
@@ -195,11 +196,6 @@ internal fun DriverSelectionScreen(
                                             }
                                         }
                                     }
-                                    if (!managing) TextButton(
-                                        onClick = { start(null) },
-                                        modifier = Modifier.padding(top = 24.dp).heightIn(min = 56.dp),
-                                        colors = ButtonDefaults.textButtonColors(contentColor = SelectionColors.onSurfaceVariant),
-                                    ) { Text("운전자는 나중에 선택", fontSize = 20.sp) }
                                 }
                             }
                         }

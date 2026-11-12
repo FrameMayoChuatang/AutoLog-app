@@ -106,7 +106,6 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             onSave = vm::saveProfile,
             onDelete = vm::deleteProfile,
             onOpenVehicle = { showVehicle = true },
-            onStartLater = { vm.startTrip(null) },
             footer = { VehicleLinkCard(vm) },
             onWithdrawConsent = { vm.setLocationConsent(it, false) },
         )
