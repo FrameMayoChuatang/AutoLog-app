@@ -140,7 +140,10 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
 
         item { Text("최근 운행", style = MaterialTheme.typography.titleMedium) }
         items(state.recentTrips, key = { it.id }) { trip ->
-            TripReviewCard(trip, state, parked, { vm.assignDriver(trip.id, it) }, { vm.setPurpose(trip.id, it) })
+            TripReviewCard(
+                trip, state, parked, { vm.assignDriver(trip.id, it) },
+                { purpose, text -> vm.setPurpose(trip.id, purpose, text) }, vm::loadPurposes,
+            )
         }
     }
 }
