@@ -123,6 +123,29 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자30 프로필 수정").assertIsDisplayed()
     }
 
+    @Test fun searchTransitionExpandsFieldWithoutSquashingSearchIcon() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            DriverSearchDialog("", {}, profiles, androidx.compose.ui.geometry.Rect(300f, 300f, 780f, 364f), false, {}, {})
+        }
+        compose.waitForIdle()
+        val widths = mutableListOf<Float>()
+        var initialIconWidth: Float? = null
+        repeat(6) {
+            compose.mainClock.advanceTimeBy(80)
+            compose.waitForIdle()
+            val icon = compose.onNodeWithContentDescription("운전자 검색", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val field = compose.onNodeWithContentDescription("운전자 이름 검색").fetchSemanticsNode().boundsInRoot
+            assertEquals(icon.height, icon.width, 1f)
+            initialIconWidth?.let { width -> assertEquals(width, icon.width, 1f) }
+            initialIconWidth = icon.width
+            widths.add(field.width)
+        }
+        org.junit.Assert.assertTrue(widths.first() < widths.last())
+        widths.zipWithNext().forEach { (before, after) -> org.junit.Assert.assertTrue(after >= before) }
+        compose.mainClock.autoAdvance = true
+    }
+
     @Test fun searchOnlyFiltersDialogAndClosingClearsQuery() {
         show()
         compose.onNodeWithText("더보기").performClick()
