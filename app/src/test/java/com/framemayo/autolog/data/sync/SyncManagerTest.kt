@@ -305,6 +305,26 @@ class SyncManagerTest {
         assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
     }
 
+    @Test fun manyTripsAwaitingDriverApprovalDoNotStopLaterTrips() = runBlocking {
+        val waiting = (0 until 4).map { finishedWithPurpose(TripPurpose.PERSONAL, startKm = 100f + it * 100) }
+        driversFake.status = DriverStatus.PENDING
+        val later = repo.start(null, 900f).let { repo.end(910f)!! }
+
+        assertFalse(sync.syncPending())
+        assertEquals(SyncState.SYNCED, dao.get(later.id)!!.syncState)
+        assertTrue(waiting.all { dao.get(it.id)!!.ackedRevision > 0 })
+        assertEquals(0, api.confirms.size)
+    }
+
+    @Test fun manyRepeatedConflictsDoNotStopLaterTrips() = runBlocking {
+        val conflicted = (0 until 4).map { finishedTrip(100f + it * 100) }
+        api.conflictUuids += conflicted.map { it.uuid }
+        val later = finishedTrip(900f)
+
+        assertFalse(sync.syncPending())
+        assertEquals(SyncState.SYNCED, dao.get(later.id)!!.syncState)
+    }
+
     @Test fun oneBlockedTripDoesNotStopLaterTrips() = runBlocking {
         val a = finishedTrip(100f)
         val b = finishedTrip(200f)
