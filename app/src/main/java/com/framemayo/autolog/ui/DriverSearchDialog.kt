@@ -94,9 +94,20 @@ internal fun DriverSearchDialog(
                         } else dismiss()
                     }
                 }
-                .safeDrawingPadding().imePadding().padding(24.dp),
+                .safeDrawingPadding().imePadding().padding(horizontal = 24.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
+            val compactHeight = maxHeight < 360.dp
+            val verticalPadding = if (compactHeight) 12.dp else 32.dp
+            val horizontalPadding = if (compactHeight) 24.dp else 40.dp
+            val closeButton: @Composable () -> Unit = {
+                OutlinedButton(
+                    onClick = dismiss,
+                    modifier = Modifier.fillMaxWidth().height(56.dp).semantics { contentDescription = "검색 닫기" },
+                    shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFF696B75)),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFF25262D), contentColor = Color.White),
+                ) { Text("닫기", fontSize = 20.sp) }
+            }
             // 바깥 탭은 입력 종료 후 다음 탭에 모달을 닫고, 내부 빈 영역은 포커스만 해제한다.
             // 입력창·결과 버튼이 소비한 터치는 부모의 닫기 동작으로 전달되지 않는다.
             Box(Modifier.widthIn(max = 840.dp).fillMaxWidth().height(minOf(640.dp, maxHeight))
@@ -110,11 +121,12 @@ internal fun DriverSearchDialog(
                     Modifier.fillMaxSize().graphicsLayer { alpha = progress.value },
                     shape = RoundedCornerShape(28.dp), color = Color(0xFF17181D),
                 ) {
-                    Column(Modifier.padding(horizontal = 40.dp, vertical = 32.dp)) {
-                        Spacer(Modifier.height(88.dp))
-                        Text(if (query.isBlank()) "전체 운전자" else "검색 결과 ${results.size}명", fontSize = 18.sp, color = Color(0xFFB9BEC8))
-                        Spacer(Modifier.height(12.dp))
+                    Column(Modifier.padding(horizontal = horizontalPadding, vertical = verticalPadding)) {
+                        Spacer(Modifier.height(if (compactHeight) 80.dp else 88.dp))
                         LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item {
+                                Text(if (query.isBlank()) "전체 운전자" else "검색 결과 ${results.size}명", fontSize = 18.sp, color = Color(0xFFB9BEC8))
+                            }
                             if (results.isEmpty()) item { Text(if (query.isBlank()) "검색할 프로필이 없습니다." else "검색 결과가 없습니다.", Modifier.padding(vertical = 20.dp), fontSize = 20.sp) }
                             items(results, key = { it.driver.id }) { profile ->
                                 Surface(
@@ -122,8 +134,8 @@ internal fun DriverSearchDialog(
                                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = "${profile.displayName} 검색 결과 선택" },
                                     shape = RoundedCornerShape(16.dp), color = Color(0xFF25262D),
                                 ) {
-                                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                        Surface(Modifier.size(64.dp), shape = RoundedCornerShape(12.dp), color = Color.White) {
+                                    Row(Modifier.padding(if (compactHeight) 8.dp else 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                        Surface(Modifier.size(if (compactHeight) 40.dp else 64.dp), shape = RoundedCornerShape(12.dp), color = Color.White) {
                                             Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f), expression = profile.expression) }
                                         }
                                         Text(profile.displayName, Modifier.weight(1f), fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -131,19 +143,17 @@ internal fun DriverSearchDialog(
                                     }
                                 }
                             }
+                            if (compactHeight) item { closeButton() }
                         }
-                        Spacer(Modifier.height(24.dp))
-                        OutlinedButton(
-                            onClick = dismiss,
-                            modifier = Modifier.fillMaxWidth().height(56.dp).semantics { contentDescription = "검색 닫기" },
-                            shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFF696B75)),
-                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFF25262D), contentColor = Color.White),
-                        ) { Text("닫기", fontSize = 20.sp) }
+                        if (!compactHeight) {
+                            Spacer(Modifier.height(24.dp))
+                            closeButton()
+                        }
                     }
                 }
                 // 이동 중에도 카드 경계에 잘리지 않도록 입력창을 모달 표면과 별도로 배치한다.
                 Box(
-                    Modifier.align(Alignment.TopCenter).padding(top = 32.dp, start = 40.dp, end = 40.dp)
+                    Modifier.align(Alignment.TopCenter).padding(top = verticalPadding, start = horizontalPadding, end = horizontalPadding)
                         .fillMaxWidth().onGloballyPositioned { targetBounds = it.boundsInWindow() },
                 ) {
                     DriverSearchBar(query, onQuery, { focusManager.clearFocus(); keyboard?.hide() }, Modifier.focusRequester(focus).onFocusChanged { inputFocused = it.hasFocus }.graphicsLayer {
