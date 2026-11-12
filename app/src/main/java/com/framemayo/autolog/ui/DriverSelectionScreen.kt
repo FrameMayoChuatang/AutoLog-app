@@ -153,13 +153,7 @@ internal fun DriverSelectionScreen(
                                 contentColor = if (managing) SelectionColors.surface else SelectionColors.onSurface,
                             ),
                         ) { Text(if (managing) "완료" else "프로필 관리", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
-                        Box(Modifier.weight(1f).padding(start = 24.dp), contentAlignment = Alignment.CenterEnd) {
-                            DriverSearchBar(
-                                query, { query = it }, { keyboard?.hide() },
-                                Modifier.onGloballyPositioned { searchBounds = it.boundsInWindow() }.graphicsLayer { alpha = if (searching) 0f else 1f },
-                                onOpen = { searching = true },
-                            )
-                        }
+
                     }
                     LazyColumn(
                         Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
@@ -176,6 +170,13 @@ internal fun DriverSelectionScreen(
                                     },
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
+                                    DriverSearchBar(
+                                        query, { query = it }, { keyboard?.hide() },
+                                        Modifier.padding(bottom = 32.dp)
+                                            .onGloballyPositioned { searchBounds = it.boundsInWindow() }
+                                            .graphicsLayer { alpha = if (searching) 0f else 1f },
+                                        onOpen = { searching = true },
+                                    )
                                     Text(if (managing) "프로필 관리" else "운전자의 프로필을 선택하세요.", Modifier.fillMaxWidth().padding(bottom = 36.dp), fontSize = 34.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
                                     ProfileRow {
                                         recent.forEach { card(it) }
