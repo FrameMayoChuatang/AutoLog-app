@@ -2,6 +2,7 @@ package com.framemayo.autolog
 
 import android.app.Application
 import com.framemayo.autolog.data.driver.DriverSyncManager
+import com.framemayo.autolog.data.energy.EnergyRepository
 import com.framemayo.autolog.data.driver.HttpDriverApi
 import com.framemayo.autolog.data.link.HttpVehicleLinkApi
 import com.framemayo.autolog.data.link.VehicleLinkRepository
@@ -12,6 +13,7 @@ import com.framemayo.autolog.data.repository.PurposeRepository
 import com.framemayo.autolog.data.repository.PurposeRepositoryImpl
 import com.framemayo.autolog.data.repository.TripRepository
 import com.framemayo.autolog.data.repository.TripRepositoryImpl
+import com.framemayo.autolog.data.repository.TripStopRepository
 import com.framemayo.autolog.data.location.AndroidLocationSource
 import com.framemayo.autolog.data.location.FusedLocationSource
 import com.framemayo.autolog.data.location.ArrivalLocationRecorder
@@ -42,6 +44,8 @@ class AppContainer(app: Application) {
     val trips: TripRepository = TripRepositoryImpl(db.tripDao(), onPending = { SyncScheduler.enqueue(app) })
     val drivers: DriverRepository = DriverRepositoryImpl(db.driverDao(), onPending = { SyncScheduler.enqueue(app) })
     val purposes: PurposeRepository = PurposeRepositoryImpl(db.purposeDao())
+    val stops = TripStopRepository(db.tripStopDao())
+    val energy = EnergyRepository(db.energyEventDao())
 
     val arrival = ArrivalLocationRecorder(db.tripLocationDao(), FusedLocationSource(app, AndroidLocationSource(app)))
 

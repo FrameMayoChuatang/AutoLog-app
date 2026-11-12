@@ -31,12 +31,17 @@ app/src/main/java/com/framemayo/autolog
 ├─ vehicle/                 # Pleos SDK는 여기서만 호출
 │  ├─ VehicleDataSource.kt  # 누적거리·기어 Flow
 │  ├─ OdometerValidator.kt  # 0·감소값 무시 (P0)
-│  └─ StopDetector.kt       # 누적거리 45초 무변화 = 정차 후보 (P1)
+│  ├─ MotionTracker.kt      # 주행/신호대기/주차 판단, 중간 정차·종료 후보·장시간 주차 자동 종료
+│  ├─ AutoTripStarter.kt    # 이동 감지 자동 시작 판단
+│  └─ EnergyEventDetector.kt # 주유·충전 감지
 ├─ data/
 │  ├─ local/                # Room: drivers, trips
 │  └─ repository/           # TripRepository(시작·1초 저장·종료·복구), DriverRepository
 ├─ service/
-│  ├─ TripRecorderService.kt # 포그라운드 서비스: 수집 + 1초 저장 + 미완료 복구
+│  ├─ TripRecorderService.kt # 포그라운드 서비스: 수집 + 1초 저장 + 복구 + 정차·자동 시작·주유 감지
+│  ├─ TripRecovery.kt        # 강제 종료 운행 재개/실측 완료/INTERRUPTED 판단
+│  ├─ CollectorSupervisor.kt # SDK 초기화·구독 지수 백오프 재시도
+│  ├─ AutoTripController.kt  # 자동 시작 운행 생성
 │  ├─ BootReceiver.kt        # 부팅 시 서비스 자동 시작
 │  └─ RecorderState.kt       # 실시간 차량 상태 StateFlow
 └─ ui/                      # Compose 운전자 선택 화면 + 기존 차량·기록 화면
@@ -48,7 +53,28 @@ app/src/main/java/com/framemayo/autolog
 - 운행 시간 = 앱이 기록한 시작·종료 시각 (epoch ms 저장, 표시·출력은 KST)
 - 주행 중 앱 화면은 차단됨 → 시작·종료·목적 선택은 P에서만
 - 부팅 시 기록 서비스 자동 시작, 화면 자동 실행은 불가
-- 프로세스가 죽으면 종료 이벤트가 없음 → 1초마다 저장, 다음 실행 시 INTERRUPTED로 복구
+- 프로세스가 죽으면 종료 이벤트가 없음 → 1초마다 저장, 다음 실행 시 복구
+
+## 수집·복구 (앱 A)
+
+| 상황 | 동작 |
+|---|---|
+| 서비스 재시작, 마지막 저장 10분 이내 + 유효 누적거리 | 같은 운행 이어서 기록 (ACTIVE 유지) |
+| 재시작 시 누적거리가 마지막 저장값과 같음(±0.05km) | 마지막 저장 시각·누적거리로 COMPLETED(`endedBy = RECOVERED`) |
+| 누적거리를 못 읽음 | INTERRUPTED, 첫 유효 누적거리가 마지막 저장값과 같으면 늦게 COMPLETED |
+| 정지 중 차가 움직였음 | INTERRUPTED 유지. 종료값을 추정하지 않음 (서버 계약) |
+| SDK 초기화·구독 실패 | 1초부터 두 배씩 최대 30초 간격으로 재시도, 재구독 직후 누적거리 1회 조회. `RecorderState.collector`로 상태 노출 |
+| 기어 P | 주차(PARKED). 운행 중이면 `trip_stops`에 정차 구간 기록, 같은 운행 유지 |
+| P가 아니고 누적거리 45초 무변화 | 신호 대기(IDLE). 상태만 노출 |
+| 운행 중 주차 5분 | `RecorderState.endCandidate = true` (종료 안내용) |
+| 운행 중 주차 30분, 누적거리 변화 없음 | 주차 시작 시각·누적거리로 자동 종료 (`endedBy = AUTO_PARKED`) |
+| 운행 없음 + P 아님 + 누적거리 0.05km 이상 증가 | 운전자 미지정 운행 자동 시작 (`startedBy = AUTO`), 시작값은 움직이기 전 기준 누적거리 |
+| 정차 중 연료량 5%p 이상 증가 | 주유(REFUEL) 1건, 주유량·금액 추정 |
+| 정차 중 배터리 3%p 이상 증가 또는 충전구 열림 중 증가 | 충전(CHARGE) 세션 1건, kWh·금액 추정 |
+
+- 운행 시작·종료 시 연료량·배터리 잔량을 저장하고 `EnergyRepository.tripCost`로 운행별 사용량과 비용을 추정합니다. 단가·탱크 용량 기본값(`EnergyPricing`)은 추정용이며 서버로 전송하지 않습니다.
+- 정차 구간·주유/충전 이벤트·자동 시작/종료 방식은 차량 로컬 정보입니다. 서버 전송 계약은 바뀌지 않습니다.
+- Room DB v12에서 위 열과 `trip_stops`, `energy_events` 테이블을 추가합니다.
 
 ## 운전자 선택 UI
 
@@ -98,7 +124,7 @@ app/src/main/java/com/framemayo/autolog
 ## TODO
 
 - [ ] 운전자 선택 알림 (알림 센터 버튼) — `autoLog_test`의 DriverPrompt 이식
-- [ ] 정차 후보 시 종료 안내
+- [ ] 정차 후보 시 종료 안내 (앱 A는 `RecorderState.endCandidate` 제공, 안내 UI는 앱 B)
 - [ ] 서버 동기화 (오프라인 대기열)
 - [ ] CarUxRestrictions 연동 (주행 제한 정식 대응)
 - [ ] 국세청 운행기록부 출력은 서버/웹에서
