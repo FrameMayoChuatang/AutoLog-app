@@ -94,7 +94,7 @@ internal fun ConsentPromptDialog(
                         )
                         Text(
                             if (previouslyDeclined) "운행 거리와 시간은 정상 기록됩니다."
-                            else "개인 운행은 저장하지 않으며, 동의하지 않아도 운행 기록은 정상 작성됩니다.",
+                            else "개인 운행은 저장하지 않으며,\n동의하지 않아도 운행 기록은 정상 작성됩니다.",
                             fontSize = 24.sp, lineHeight = 36.sp, color = VehicleUi.Secondary,
                         )
                     }
