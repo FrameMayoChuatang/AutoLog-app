@@ -46,8 +46,33 @@ class DriverSelectionScreenTest {
         screenshot("selection-native")
     }
 
+    @Test fun moreButtonRevealsExtraProfilesAndCanCollapseThem() {
+        val starts = mutableListOf<Long>()
+        show(onStart = { starts.add(it) })
+        compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertDoesNotExist()
+        compose.onNodeWithText("더보기").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertIsDisplayed().performClick()
+        assertEquals(listOf(6L), starts)
+        compose.onNodeWithText("접기").performClick()
+        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertDoesNotExist()
+        compose.onNodeWithText("더보기").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").assertIsDisplayed()
+    }
+
+    @Test fun moreButtonOnlyAppearsWhenThereAreExtraProfiles() {
+        val visibleProfiles = mutableStateOf(emptyList<DriverProfile>())
+        compose.setContent { DriverSelectionScreen(visibleProfiles.value, true, true, true, {}, { _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithText("더보기").assertDoesNotExist()
+        compose.runOnIdle { visibleProfiles.value = profiles.take(5) }
+        compose.onNodeWithText("더보기").assertDoesNotExist()
+        compose.runOnIdle { visibleProfiles.value = profiles.take(6) }
+        compose.onNodeWithText("더보기").assertIsDisplayed()
+    }
+
     @Test fun searchStaysAtTopRightAndOtherProfilesStayBelowRecent() {
         show()
+        compose.onNodeWithText("더보기").performClick()
         val recent = compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").fetchSemanticsNode().boundsInRoot
         val search = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot
         val other = compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").fetchSemanticsNode().boundsInRoot
@@ -63,6 +88,7 @@ class DriverSelectionScreenTest {
             DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0)
         }
         compose.setContent { DriverSelectionScreen(manyProfiles, true, true, true, {}, { _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithText("더보기").performClick()
         val manageBefore = compose.onNodeWithText("프로필 관리").fetchSemanticsNode().boundsInRoot
         val searchBefore = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot
         compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("운전자30 프로필로 운행 시작"))
@@ -79,6 +105,7 @@ class DriverSelectionScreenTest {
 
     @Test fun searchOnlyFiltersDialogAndClosingClearsQuery() {
         show()
+        compose.onNodeWithText("더보기").performClick()
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed().performTextInput("7")
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertIsDisplayed()
@@ -156,6 +183,7 @@ class DriverSelectionScreenTest {
     @Test fun queryAndManagementModeSurviveRecreation() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithText("더보기").performClick()
         compose.onNodeWithText("프로필 관리", useUnmergedTree = true).performClick()
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
