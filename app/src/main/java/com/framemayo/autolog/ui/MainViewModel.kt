@@ -159,14 +159,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val km = vehicle.odometerKm?.takeIf { it.isFinite() && it > 0f } ?: return
         startingTrip = true
         viewModelScope.launch {
-            try { trips.start(driverId, km) } finally { startingTrip = false }
+            try { trips.start(driverId, km, energy = vehicle.energyLevels()) } finally { startingTrip = false }
         }
     }
 
     fun endTrip() {
-        val km = RecorderState.snapshot.value.odometerKm ?: return
+        val vehicle = RecorderState.snapshot.value
+        val km = vehicle.odometerKm ?: return
         viewModelScope.launch {
-            val ended = trips.end(km) ?: return@launch
+            val ended = trips.end(km, energy = vehicle.energyLevels()) ?: return@launch
             arrival.recordArrival(ended, consentOf(ended.driverId))
         }
     }

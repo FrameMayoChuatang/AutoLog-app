@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class, TripLocationEntity::class, DriverProfileEntity::class],
-    version = 11,
+    entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class, TripLocationEntity::class, DriverProfileEntity::class, TripStopEntity::class, EnergyEventEntity::class],
+    version = 12,
     exportSchema = false,
 )
 abstract class AutoLogDatabase : RoomDatabase() {
@@ -17,12 +17,43 @@ abstract class AutoLogDatabase : RoomDatabase() {
     abstract fun tripDao(): TripDao
     abstract fun purposeDao(): PurposeDao
     abstract fun tripLocationDao(): TripLocationDao
+    abstract fun tripStopDao(): TripStopDao
+    abstract fun energyEventDao(): EnergyEventDao
 
     companion object {
         fun create(context: Context): AutoLogDatabase =
             Room.databaseBuilder(context, AutoLogDatabase::class.java, "autolog.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_8_10, MIGRATION_9_10, MIGRATION_10_11)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_8_10, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                 .build()
+
+        // 앱 A: 자동 시작·종료 방식, 시작·종료 연료/배터리, 중간 정차, 주유·충전 이벤트.
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 개발 기기에서 브랜치를 오가도 실패하지 않도록 실제 열을 확인한다.
+                db.addColumnIfMissing("trips", "startedBy", "TEXT NOT NULL DEFAULT 'MANUAL'")
+                db.addColumnIfMissing("trips", "endedBy", "TEXT")
+                db.addColumnIfMissing("trips", "startFuelPercent", "REAL")
+                db.addColumnIfMissing("trips", "endFuelPercent", "REAL")
+                db.addColumnIfMissing("trips", "startBatteryPercent", "REAL")
+                db.addColumnIfMissing("trips", "endBatteryPercent", "REAL")
+                // 기존 완료 운행은 수동 종료로 표시한다.
+                db.execSQL("UPDATE trips SET endedBy = 'MANUAL' WHERE status = 'COMPLETED' AND endedBy IS NULL")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS trip_stops (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, tripId INTEGER NOT NULL, " +
+                        "startedAt INTEGER NOT NULL, endedAt INTEGER, odometerKm REAL NOT NULL, " +
+                        "FOREIGN KEY(tripId) REFERENCES trips(id) ON UPDATE NO ACTION ON DELETE CASCADE)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_trip_stops_tripId ON trip_stops (tripId)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS energy_events (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, kind TEXT NOT NULL, tripId INTEGER, " +
+                        "detectedAt INTEGER NOT NULL, odometerKm REAL, beforePercent REAL NOT NULL, afterPercent REAL NOT NULL, " +
+                        "estimatedAmount REAL, estimatedCostWon INTEGER, " +
+                        "FOREIGN KEY(tripId) REFERENCES trips(id) ON UPDATE NO ACTION ON DELETE SET NULL)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_energy_events_tripId ON energy_events (tripId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_energy_events_detectedAt ON energy_events (detectedAt)")
+            }
+        }
 
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -33,15 +64,7 @@ abstract class AutoLogDatabase : RoomDatabase() {
         // main과 프로필 시제품이 v8/v9를 각각 사용했으므로 버전뿐 아니라 실제 열을 확인한다.
         // 기존 프로필 표정도 보존해 개발 기기의 설정을 초기화하지 않는다.
         private fun mergeProfileSchema(db: SupportSQLiteDatabase) {
-            fun addColumnIfMissing(table: String, column: String, definition: String) {
-                val exists = db.query("PRAGMA table_info($table)").use { cursor ->
-                    val nameIndex = cursor.getColumnIndexOrThrow("name")
-                    var found = false
-                    while (cursor.moveToNext()) if (cursor.getString(nameIndex) == column) found = true
-                    found
-                }
-                if (!exists) db.execSQL("ALTER TABLE $table ADD COLUMN $column $definition")
-            }
+            fun addColumnIfMissing(table: String, column: String, definition: String) = db.addColumnIfMissing(table, column, definition)
             addColumnIfMissing("drivers", "status", "TEXT")
             addColumnIfMissing("drivers", "consentSentAt", "INTEGER")
             addColumnIfMissing("trips", "confirmSentAt", "INTEGER")
@@ -154,4 +177,14 @@ abstract class AutoLogDatabase : RoomDatabase() {
             }
         }
     }
+}
+
+private fun SupportSQLiteDatabase.addColumnIfMissing(table: String, column: String, definition: String) {
+    val exists = query("PRAGMA table_info($table)").use { cursor ->
+        val nameIndex = cursor.getColumnIndexOrThrow("name")
+        var found = false
+        while (cursor.moveToNext()) if (cursor.getString(nameIndex) == column) found = true
+        found
+    }
+    if (!exists) execSQL("ALTER TABLE $table ADD COLUMN $column $definition")
 }

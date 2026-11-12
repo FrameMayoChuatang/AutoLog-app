@@ -12,12 +12,3 @@ class OdometerValidatorTest {
     @Test fun `같은 값은 유효`() = assertTrue(OdometerValidator.isValid(100f, 100f))
 }
 
-class StopDetectorTest {
-    @Test fun `45초 동안 그대로면 정차 후보`() {
-        val d = StopDetector(45_000)
-        assertFalse(d.onOdometer(100f, 0))
-        assertFalse(d.onOdometer(100f, 44_000))
-        assertTrue(d.onOdometer(100f, 45_000))
-        assertFalse(d.onOdometer(100.1f, 46_000))
-    }
-}

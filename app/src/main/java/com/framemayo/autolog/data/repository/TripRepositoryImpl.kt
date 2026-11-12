@@ -1,10 +1,13 @@
 package com.framemayo.autolog.data.repository
 
+import com.framemayo.autolog.data.local.EnergyLevels
 import com.framemayo.autolog.data.local.SyncState
+import com.framemayo.autolog.data.local.TripEndReason
 import com.framemayo.autolog.data.local.TripDao
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.local.TripStatus
+import com.framemayo.autolog.data.local.TripTrigger
 import kotlinx.coroutines.flow.Flow
 
 class TripRepositoryImpl(
@@ -19,16 +22,25 @@ class TripRepositoryImpl(
 
     private fun nextUpdatedAt(trip: TripEntity): Long = maxOf(clock(), trip.updatedAt + 1)
 
-    override suspend fun start(driverId: Long?, odometerKm: Float): TripEntity {
+    override suspend fun start(
+        driverId: Long?,
+        odometerKm: Float,
+        startedAt: Long?,
+        trigger: TripTrigger,
+        energy: EnergyLevels?,
+    ): TripEntity {
         dao.active()?.let { return it }
         val now = clock()
         val trip = TripEntity(
             driverId = driverId,
-            startedAt = now,
+            startedAt = startedAt ?: now,
             startOdometerKm = odometerKm,
             lastOdometerKm = odometerKm,
             lastSavedAt = now,
             updatedAt = now,
+            startedBy = trigger,
+            startFuelPercent = energy?.fuelPercent,
+            startBatteryPercent = energy?.batteryPercent,
         )
         val saved = trip.copy(id = dao.insert(trip))
         onPending()
@@ -39,17 +51,25 @@ class TripRepositoryImpl(
         dao.heartbeat(trip.id, odometerKm, clock())
     }
 
-    override suspend fun end(odometerKm: Float): TripEntity? {
+    override suspend fun end(
+        odometerKm: Float,
+        endedAt: Long?,
+        reason: TripEndReason,
+        energy: EnergyLevels?,
+    ): TripEntity? {
         val trip = dao.active() ?: return null
         val now = nextUpdatedAt(trip)
         val ended = trip.copy(
-            endedAt = now,
+            endedAt = (endedAt ?: now).coerceAtLeast(trip.startedAt),
             endOdometerKm = odometerKm,
             lastOdometerKm = odometerKm,
             status = TripStatus.COMPLETED,
             syncState = SyncState.PENDING,
             sourceRevision = trip.sourceRevision + 1,
             updatedAt = now,
+            endedBy = reason,
+            endFuelPercent = energy?.fuelPercent ?: trip.endFuelPercent,
+            endBatteryPercent = energy?.batteryPercent ?: trip.endBatteryPercent,
         )
         dao.update(ended)
         onPending()
@@ -94,6 +114,28 @@ class TripRepositoryImpl(
         dao.update(recovered)
         onPending()
         return recovered
+    }
+
+    override suspend fun lastInterrupted(): TripEntity? = dao.lastInterrupted()
+
+    override suspend fun lastEnded(): TripEntity? = dao.lastEnded()
+
+    override suspend fun completeInterrupted(tripId: Long, endOdometerKm: Float, endedAt: Long): TripEntity? {
+        val trip = dao.get(tripId)?.takeIf { it.status == TripStatus.INTERRUPTED } ?: return null
+        if (endOdometerKm < trip.startOdometerKm) return null
+        val completed = trip.copy(
+            endedAt = endedAt.coerceAtLeast(trip.startedAt),
+            endOdometerKm = endOdometerKm,
+            lastOdometerKm = endOdometerKm,
+            status = TripStatus.COMPLETED,
+            endedBy = TripEndReason.RECOVERED,
+            syncState = SyncState.PENDING,
+            sourceRevision = trip.sourceRevision + 1,
+            updatedAt = nextUpdatedAt(trip),
+        )
+        dao.update(completed)
+        onPending()
+        return completed
     }
 
     override suspend fun pendingSync(): List<TripEntity> = dao.pendingSync()
