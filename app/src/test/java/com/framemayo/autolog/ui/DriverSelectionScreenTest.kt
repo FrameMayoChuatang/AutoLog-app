@@ -58,6 +58,25 @@ class DriverSelectionScreenTest {
         org.junit.Assert.assertTrue(other.top > recent.bottom)
     }
 
+    @Test fun topBarStaysFixedAndInteractiveAfterScrollingProfiles() {
+        val manyProfiles = (1L..30).map {
+            DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0)
+        }
+        compose.setContent { DriverSelectionScreen(manyProfiles, true, true, true, {}, { _, _, _ -> }, { true }, {}) }
+        val manageBefore = compose.onNodeWithText("프로필 관리").fetchSemanticsNode().boundsInRoot
+        val searchBefore = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot
+        compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("운전자30 프로필로 운행 시작"))
+        compose.onNodeWithContentDescription("운전자30 프로필로 운행 시작").assertIsDisplayed()
+        assertEquals(manageBefore, compose.onNodeWithText("프로필 관리").assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
+        assertEquals(searchBefore, compose.onNodeWithContentDescription("운전자 검색 열기").assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed()
+        compose.onNodeWithContentDescription("검색 닫기").performClick()
+        compose.onNodeWithText("프로필 관리").performClick()
+        compose.onNodeWithText("완료").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자30 프로필 수정").assertIsDisplayed()
+    }
+
     @Test fun searchDialogFiltersResultsAndSharesQueryWithTopBar() {
         show()
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
