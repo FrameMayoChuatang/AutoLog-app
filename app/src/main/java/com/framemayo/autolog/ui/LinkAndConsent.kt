@@ -1,5 +1,11 @@
 package com.framemayo.autolog.ui
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Surface
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
@@ -22,48 +29,92 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framemayo.autolog.data.link.VehicleLinkRepository
 import com.framemayo.autolog.data.local.DriverEntity
 
 @Composable
 internal fun ConsentDialog(driver: DriverEntity, name: String, vm: MainViewModel, requestLocationPermission: () -> Unit) {
-    val agree = { vm.answerConsent(true); requestLocationPermission() }
-    if (driver.locationConsent == false) {
-        AlertDialog(
-            onDismissRequest = vm::dismissConsent,
-            containerColor = VehicleUi.Surface,
-            title = { Text("위치정보 수집에 동의하지 않았어요", fontSize = VehicleUi.Title, color = VehicleUi.Caution) },
-            text = {
-                Text(
-                    "${name}님의 업무 운행 도착 위치가 저장되지 않습니다. 운행 거리와 시간은 정상 기록됩니다.",
-                    fontSize = VehicleUi.Body, lineHeight = 34.sp, color = VehicleUi.Secondary,
-                )
-            },
-            confirmButton = { VehiclePrimaryButton("동의하고 시작", agree) },
-            dismissButton = { VehicleSecondaryButton("동의 없이 시작", vm::startWithoutConsent) },
-        )
-        return
-    }
-    AlertDialog(
-        onDismissRequest = vm::dismissConsent,
-        containerColor = VehicleUi.Surface,
-        title = { Text("위치정보 수집 동의", fontSize = VehicleUi.Title, color = VehicleUi.Primary) },
-        text = {
-            Text(
-                "${name}님의 업무 운행에 한해 도착 위치를 저장합니다. 개인 운행은 저장하지 않으며, " +
-                    "동의하지 않아도 운행 기록은 정상 작성됩니다.",
-                fontSize = VehicleUi.Body, lineHeight = 34.sp, color = VehicleUi.Secondary,
-            )
-        },
-        confirmButton = { VehiclePrimaryButton("동의", agree) },
-        dismissButton = { VehicleSecondaryButton("동의 안 함", vm::declineConsent) },
+    ConsentPromptDialog(
+        name = name,
+        previouslyDeclined = driver.locationConsent == false,
+        onAgree = { vm.answerConsent(true); requestLocationPermission() },
+        onDecline = if (driver.locationConsent == false) vm::startWithoutConsent else vm::declineConsent,
+        onDismiss = vm::dismissConsent,
     )
+}
+
+/** 화면 크기에 맞춰 안내만 스크롤하고, 동의 선택 버튼은 항상 아래에 남긴다. */
+@Composable
+internal fun ConsentPromptDialog(
+    name: String,
+    previouslyDeclined: Boolean,
+    onAgree: () -> Unit,
+    onDecline: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        BoxWithConstraints(
+            Modifier.fillMaxSize().semantics { contentDescription = "위치정보 동의 모달 배경" }
+                .pointerInput(onDismiss) { detectTapGestures { onDismiss() } }
+                .safeDrawingPadding().padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            val stackedButtons = maxWidth < 560.dp
+            val padding = if (stackedButtons) 24.dp else 40.dp
+            Surface(
+                Modifier.widthIn(max = 760.dp).fillMaxWidth().heightIn(max = maxHeight)
+                    .pointerInput(Unit) { detectTapGestures {} },
+                shape = RoundedCornerShape(28.dp), color = VehicleUi.Surface,
+            ) {
+                Column(Modifier.padding(padding), verticalArrangement = Arrangement.spacedBy(32.dp)) {
+                    Column(
+                        Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        Text(
+                            if (previouslyDeclined) "위치정보 수집에 동의하지 않았어요" else "위치정보 수집 동의",
+                            fontSize = VehicleUi.Title, lineHeight = 42.sp, fontWeight = FontWeight.Bold,
+                            color = if (previouslyDeclined) VehicleUi.Caution else VehicleUi.Primary,
+                        )
+                        Text(
+                            if (previouslyDeclined) "${name}님의 업무 운행 도착 위치가 저장되지 않습니다."
+                            else "${name}님의 업무 운행에 한해 도착 위치를 저장합니다.",
+                            fontSize = 24.sp, lineHeight = 36.sp, color = VehicleUi.Primary,
+                        )
+                        Text(
+                            if (previouslyDeclined) "운행 거리와 시간은 정상 기록됩니다."
+                            else "개인 운행은 저장하지 않으며, 동의하지 않아도 운행 기록은 정상 작성됩니다.",
+                            fontSize = 24.sp, lineHeight = 36.sp, color = VehicleUi.Secondary,
+                        )
+                    }
+                    val declineText = if (previouslyDeclined) "동의 없이 시작" else "동의 안 함"
+                    val agreeText = if (previouslyDeclined) "동의하고 시작" else "동의"
+                    if (stackedButtons) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            VehicleSecondaryButton(declineText, onDecline, Modifier.fillMaxWidth().heightIn(min = 64.dp))
+                            VehiclePrimaryButton(agreeText, onAgree, Modifier.fillMaxWidth().heightIn(min = 64.dp))
+                        }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            VehicleSecondaryButton(declineText, onDecline, Modifier.weight(1f).heightIn(min = 64.dp))
+                            VehiclePrimaryButton(agreeText, onAgree, Modifier.weight(1f).heightIn(min = 64.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
