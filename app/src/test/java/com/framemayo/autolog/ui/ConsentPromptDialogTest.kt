@@ -1,6 +1,9 @@
 package com.framemayo.autolog.ui
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.*
@@ -27,6 +30,14 @@ class ConsentPromptDialogTest {
         compose.onNodeWithText("위치정보 수집 동의").assertIsDisplayed()
         compose.onNodeWithText("최현수님의 업무 운행에 한해 도착 위치를 저장합니다.").assertIsDisplayed()
         compose.onNodeWithText("개인 운행은 저장하지 않으며,\n동의하지 않아도 운행 기록은 정상 작성됩니다.").assertIsDisplayed()
+        compose.runOnIdle {
+            val view = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val file = File("build/reports/consent-dialog/initial.png")
+            file.parentFile!!.mkdirs()
+            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
         val agree = compose.onNodeWithText("동의").fetchSemanticsNode().boundsInRoot
         val decline = compose.onNodeWithText("동의 안 함").fetchSemanticsNode().boundsInRoot
         assertEquals(agree.width, decline.width, 1f)
