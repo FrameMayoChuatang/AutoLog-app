@@ -27,8 +27,8 @@ private class FakeDrivers : DriverRepository {
     var remoteId: String? = DRIVER_UUID
     var status: DriverStatus? = DriverStatus.ACTIVE
     override val profiles = flowOf(emptyList<com.framemayo.autolog.data.local.DriverProfile>())
-    override suspend fun addProfile(name: String, color: Int) = 1L
-    override suspend fun editProfile(id: Long, name: String, color: Int) = Unit
+    override suspend fun addProfile(name: String, color: Int, expression: Int) = 1L
+    override suspend fun editProfile(id: Long, name: String, color: Int, expression: Int) = Unit
     override suspend fun hideProfile(id: Long) = true
     override val all: Flow<List<DriverEntity>> = flowOf(emptyList())
     override suspend fun add(name: String, department: String) = 1L

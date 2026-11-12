@@ -23,4 +23,5 @@ data class DriverProfile(
     @Embedded val driver: DriverEntity,
     val displayName: String,
     val color: Int,
+    val expression: Int = 0,
 )

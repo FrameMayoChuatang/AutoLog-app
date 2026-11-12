@@ -44,7 +44,7 @@ class DriverSyncManagerTest {
     }
 
     @Test fun profileCreationSchedulesAndRegistersDriver() = runBlocking {
-        val id = repo.addProfile("프로필", 2)
+        val id = repo.addProfile("프로필", 2, 0)
         assertEquals(1, pendingCalls)
         assertTrue(sync.sync())
         assertEquals(id, drivers().single().id)

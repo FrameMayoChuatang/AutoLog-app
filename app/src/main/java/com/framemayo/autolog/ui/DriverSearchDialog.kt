@@ -136,7 +136,7 @@ internal fun DriverSearchDialog(
                                 ) {
                                     Row(Modifier.padding(if (compactHeight) 8.dp else 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                         Surface(Modifier.size(if (compactHeight) 40.dp else 64.dp), shape = RoundedCornerShape(12.dp), color = Color.White) {
-                                            Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f)) }
+                                            Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f), expression = profile.expression) }
                                         }
                                         Text(profile.displayName, Modifier.weight(1f), fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         if (managing) Text("수정", fontSize = 18.sp, color = Color(0xFFB9BEC8))

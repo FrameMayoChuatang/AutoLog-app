@@ -10,8 +10,8 @@ import kotlinx.coroutines.flow.Flow
 interface DriverRepository {
     val all: Flow<List<DriverEntity>>
     val profiles: Flow<List<DriverProfile>>
-    suspend fun addProfile(name: String, color: Int): Long
-    suspend fun editProfile(id: Long, name: String, color: Int)
+    suspend fun addProfile(name: String, color: Int, expression: Int = 0): Long
+    suspend fun editProfile(id: Long, name: String, color: Int, expression: Int = 0)
     suspend fun hideProfile(id: Long): Boolean
     suspend fun add(name: String, department: String): Long
 
@@ -45,17 +45,17 @@ class DriverRepositoryImpl(
 ) : DriverRepository {
     override val profiles: Flow<List<DriverProfile>> = dao.observeProfiles()
 
-    override suspend fun addProfile(name: String, color: Int): Long {
-        require(name.isNotBlank() && name.trim().length <= 40 && color in 0..4)
-        val id = dao.addProfile(name.trim(), color)
+    override suspend fun addProfile(name: String, color: Int, expression: Int): Long {
+        require(name.isNotBlank() && name.trim().length <= 40 && color in 0..6 && expression in 0..6)
+        val id = dao.addProfile(name.trim(), color, expression)
         onPending()
         return id
     }
 
-    override suspend fun editProfile(id: Long, name: String, color: Int) {
-        require(name.isNotBlank() && name.trim().length <= 40 && color in 0..4)
+    override suspend fun editProfile(id: Long, name: String, color: Int, expression: Int) {
+        require(name.isNotBlank() && name.trim().length <= 40 && color in 0..6 && expression in 0..6)
         val previous = dao.profile(id)
-        dao.saveProfile(DriverProfileEntity(id, name.trim(), color, previous?.hidden ?: false, previous?.expression ?: 0))
+        dao.saveProfile(DriverProfileEntity(id, name.trim(), color, previous?.hidden ?: false, expression))
     }
 
     override suspend fun hideProfile(id: Long): Boolean = dao.hideProfile(id)
