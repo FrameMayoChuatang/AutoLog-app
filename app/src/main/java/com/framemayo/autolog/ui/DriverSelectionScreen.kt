@@ -155,16 +155,6 @@ internal fun DriverSelectionScreen(
                             )
                         }
                     }
-                    if (!linked) Surface(
-                        onClick = onOpenVehicle, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        shape = RoundedCornerShape(16.dp), color = SelectionColors.surface,
-                        border = BorderStroke(1.dp, SelectionColors.outline),
-                    ) {
-                        Row(Modifier.padding(horizontal = 24.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("차량 미연결 · 관리자가 발급한 8자리 코드가 필요해요", Modifier.weight(1f), fontSize = 20.sp)
-                            Text("차량 연결하기", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
                     LazyColumn(
                         Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
                         contentPadding = PaddingValues(bottom = 40.dp),
