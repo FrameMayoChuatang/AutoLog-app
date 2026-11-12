@@ -387,28 +387,24 @@ class DriverSelectionScreenTest {
         assertEquals(listOf(Triple("미소 운전자", 4, 2)), saved)
     }
 
-    @Test fun consentedProfileCanWithdrawAfterConfirmation() {
-        var withdrawn = 0
-        val profile = profiles.first().let { it.copy(driver = it.driver.copy(locationConsent = true)) }
-        compose.setContent { DriverProfileEditor(profile, false, null, {}, { _, _, _ -> }, onWithdrawConsent = { withdrawn++ }) }
-        compose.onNodeWithText("동의 철회").performScrollTo().performClick()
-        assertEquals(0, withdrawn)
-        compose.onNodeWithText("철회하면 저장된 도착 위치도 삭제됩니다.").assertIsDisplayed()
-        compose.onNodeWithText("철회").performClick()
-        assertEquals(1, withdrawn)
-    }
-
-    @Test fun withdrawIsHiddenForUnansweredAndDeclinedProfiles() {
-        var consent by mutableStateOf<Boolean?>(null)
+    @Test fun profileEditorOmitsLocationConsentForEveryConsentState() {
+        val consent = mutableStateOf<Boolean?>(null)
+        val saved = mutableListOf<String>()
         compose.setContent {
-            val p = profiles.first().let { it.copy(driver = it.driver.copy(locationConsent = consent)) }
-            DriverProfileEditor(p, false, null, {}, { _, _, _ -> })
+            val profile = profiles.first().let { it.copy(driver = it.driver.copy(locationConsent = consent.value)) }
+            DriverProfileEditor(profile, false, null, {}, { name, _, _ -> saved.add(name) })
         }
-        compose.onNodeWithText("동의 철회").assertDoesNotExist()
-        compose.onNodeWithText("위치정보 수집").assertDoesNotExist()
-        consent = false
-        compose.onNodeWithText("동의 안 함 · 운행을 시작할 때 다시 동의할 수 있어요.").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("동의 철회").assertDoesNotExist()
+        listOf(null, false, true).forEach { state ->
+            compose.runOnIdle { consent.value = state }
+            compose.onNodeWithText("위치정보 수집").assertDoesNotExist()
+            compose.onNodeWithText("동의 철회").assertDoesNotExist()
+            compose.onNodeWithText("동의 안 함 · 운행을 시작할 때 다시 동의할 수 있어요.").assertDoesNotExist()
+            compose.onNodeWithContentDescription("운전자 이름").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("저장").assertIsEnabled()
+        }
+        compose.onNodeWithContentDescription("운전자 이름").performTextReplacement("수정한 이름")
+        compose.onNodeWithText("저장").performClick()
+        assertEquals(listOf("수정한 이름"), saved)
     }
 
     @Test fun editingRestoresExpressionAndEveryPresetSetsItsOriginalCombination() {
