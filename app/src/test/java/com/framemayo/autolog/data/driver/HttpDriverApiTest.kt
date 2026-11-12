@@ -35,14 +35,21 @@ class HttpDriverApiTest {
     private fun driverJson(status: String = "ACTIVE") =
         """{"id":"$id","companyId":"c","name":"Kim","department":"영업","status":"$status","locationConsent":true,"createdAt":"2026-11-11T00:00:00Z"}"""
 
-    @Test fun listParsesDriversAndSkipsUnknownStatus() = runBlocking {
-        body = "[${driverJson()},${driverJson("PENDING").replace(id, "22222222-2222-4222-8222-222222222222")},${driverJson("WEIRD")}]"
+    @Test fun listParsesDriversAndKeepsUnknownStatusAsPending() = runBlocking {
+        val third = "33333333-3333-4333-8333-333333333333"
+        body = "[${driverJson()},${driverJson("PENDING").replace(id, "22222222-2222-4222-8222-222222222222")},${driverJson("SUSPENDED").replace(id, third)}]"
         val r = api().list() as ApiOutcome.Ok
         assertEquals("GET", method)
         assertEquals("/api/device/drivers", path)
         assertEquals("Bearer DEVICE", auth)
-        assertEquals(listOf(DriverStatus.ACTIVE, DriverStatus.PENDING), r.value.map { it.status })
+        assertEquals(listOf(DriverStatus.ACTIVE, DriverStatus.PENDING, DriverStatus.PENDING), r.value.map { it.status })
+        assertEquals(third, r.value.last().remoteId)
         assertEquals(RemoteDriver(id, "Kim", "영업", DriverStatus.ACTIVE), r.value.first())
+    }
+
+    @Test fun listWithUnreadableDriverIsRetriedInsteadOfShrunk() = runBlocking {
+        body = """[${driverJson()},{"name":"아이디 없음","status":"ACTIVE"}]"""
+        assertEquals(ApiOutcome.Retry, api().list())
     }
 
     @Test fun registerSendsNameAndDepartmentAndParsesCreated() = runBlocking {
