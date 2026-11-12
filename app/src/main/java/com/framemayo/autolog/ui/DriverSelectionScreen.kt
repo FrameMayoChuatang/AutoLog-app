@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -95,7 +96,9 @@ internal fun DriverSelectionScreen(
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
     onStartLater: () -> Unit = {},
+    footer: @Composable () -> Unit = {},
 ) {
+    val listState = rememberLazyListState()
     var managing by rememberSaveable { mutableStateOf(false) }
     var showingMore by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -162,7 +165,7 @@ internal fun DriverSelectionScreen(
                         }
                     }
                     LazyColumn(
-                        Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
+                        Modifier.weight(1f).fillMaxWidth(), state = listState, horizontalAlignment = Alignment.CenterHorizontally,
                         contentPadding = PaddingValues(bottom = 40.dp),
                     ) {
                         item {
@@ -209,6 +212,10 @@ internal fun DriverSelectionScreen(
                         if (showingMore) items(others.chunked(columns), key = { row -> "others-${row.first().driver.id}" }) { row ->
                             Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.Top) { row.forEach { card(it) } }
                         }
+                        // 차량 연결은 운전자 선택 화면 맨 아래에 둔다. 연결 안내창의 `차량 연결하기`가 여기로 스크롤한다.
+                        if (!managing) item(key = "vehicle-link") {
+                            Box(Modifier.padding(top = 48.dp).widthIn(max = 960.dp).fillMaxWidth()) { footer() }
+                        }
                     }
                 }
             }
@@ -251,8 +258,12 @@ internal fun DriverSelectionScreen(
         )
         if (parked && blocked) AlertDialog(
             onDismissRequest = { blocked = false }, title = { Text(if (!linked) "차량 연결이 필요합니다" else "주행거리 수신 대기", fontSize = 28.sp) },
-            text = { Text(if (!linked) "관리자가 발급한 8자리 페어링 코드를 입력해 차량을 연결해 주세요. 연결 후 운행을 시작할 수 있습니다." else "차량의 유효한 주행거리 정보를 받은 후 다시 선택해 주세요.", fontSize = 22.sp, lineHeight = 32.sp) },
-            confirmButton = { TextButton(onClick = { blocked = false; onOpenVehicle() }, modifier = Modifier.heightIn(min = 56.dp)) { Text(if (!linked) "차량 연결하기" else "차량 상태 확인", fontSize = 20.sp) } },
+            text = { Text(if (!linked) "화면 아래 차량 연결에 관리자가 발급한 8자리 페어링 코드를 입력해 주세요. 연결 후 운행을 시작할 수 있습니다." else "차량의 유효한 주행거리 정보를 받은 후 다시 선택해 주세요.", fontSize = 22.sp, lineHeight = 32.sp) },
+            confirmButton = { TextButton(onClick = {
+                blocked = false
+                if (linked) onOpenVehicle()
+                else scope.launch { listState.animateScrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)) }
+            }, modifier = Modifier.heightIn(min = 56.dp)) { Text(if (!linked) "차량 연결하기" else "차량 상태 확인", fontSize = 20.sp) } },
             dismissButton = { TextButton(onClick = { blocked = false }, modifier = Modifier.heightIn(min = 56.dp)) { Text("닫기") } },
         )
     }

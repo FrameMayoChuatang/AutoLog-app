@@ -40,8 +40,18 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").performClick()
         compose.onNodeWithText("차량 연결이 필요합니다").assertIsDisplayed()
         compose.onNodeWithText("차량 연결하기").performClick()
-        assertEquals(1, opened)
+        compose.onNodeWithText("차량 연결이 필요합니다").assertDoesNotExist()
+        assertEquals(0, opened)
         assertEquals(false, started)
+    }
+
+    @Test fun vehicleLinkFooterIsShownBelowProfilesAndHiddenWhileManaging() {
+        compose.setContent {
+            DriverSelectionScreen(profiles, true, false, true, {}, { _, _, _, _ -> }, { true }, {}, footer = { androidx.compose.material3.Text("차량 연결 카드") })
+        }
+        compose.onNodeWithText("차량 연결 카드").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("프로필 관리").performClick()
+        compose.onNodeWithText("차량 연결 카드").assertDoesNotExist()
     }
 
     @Test fun laterStartsWithoutAProfileAndIsHiddenWhileManaging() {

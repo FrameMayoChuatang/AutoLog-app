@@ -126,7 +126,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (RecorderState.snapshot.value.gear != VehicleGear.GEAR_PARK || startingTrip || consentPrompt.value != null) return
         if (driverId != null && state.value.profiles.none { it.driver.id == driverId }) return
         val driver = state.value.drivers.find { it.id == driverId }
-        if (driver != null && driver.locationConsent == null) {
+        if (driver != null && driver.locationConsent != true) {
             consentPrompt.value = driver
             return
         }
@@ -140,6 +140,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             drivers.setLocationConsent(driver.id, consent)
             beginTrip(driver.id)
         }
+    }
+
+    fun declineConsent() {
+        val driver = consentPrompt.value ?: return
+        consentPrompt.value = driver.copy(locationConsent = false)
+        viewModelScope.launch {
+            drivers.setLocationConsent(driver.id, false)
+            arrival.purgeDriver(driver.id)
+        }
+    }
+
+    fun startWithoutConsent() {
+        val driver = consentPrompt.value ?: return
+        consentPrompt.value = null
+        beginTrip(driver.id)
     }
 
     fun dismissConsent() {

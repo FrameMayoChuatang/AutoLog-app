@@ -29,9 +29,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framemayo.autolog.data.link.VehicleLinkRepository
+import com.framemayo.autolog.data.local.DriverEntity
 
 @Composable
-internal fun ConsentDialog(name: String, vm: MainViewModel, requestLocationPermission: () -> Unit) {
+internal fun ConsentDialog(driver: DriverEntity, name: String, vm: MainViewModel, requestLocationPermission: () -> Unit) {
+    val agree = { vm.answerConsent(true); requestLocationPermission() }
+    if (driver.locationConsent == false) {
+        AlertDialog(
+            onDismissRequest = vm::dismissConsent,
+            containerColor = VehicleUi.Surface,
+            title = { Text("위치정보 수집에 동의하지 않았어요", fontSize = VehicleUi.Title, color = VehicleUi.Caution) },
+            text = {
+                Text(
+                    "${name}님의 업무 운행 도착 위치가 저장되지 않습니다. 운행 거리와 시간은 정상 기록됩니다.",
+                    fontSize = VehicleUi.Body, lineHeight = 34.sp, color = VehicleUi.Secondary,
+                )
+            },
+            confirmButton = { VehiclePrimaryButton("동의하고 시작", agree) },
+            dismissButton = { VehicleSecondaryButton("동의 없이 시작", vm::startWithoutConsent) },
+        )
+        return
+    }
     AlertDialog(
         onDismissRequest = vm::dismissConsent,
         containerColor = VehicleUi.Surface,
@@ -39,40 +57,13 @@ internal fun ConsentDialog(name: String, vm: MainViewModel, requestLocationPermi
         text = {
             Text(
                 "${name}님의 업무 운행에 한해 도착 위치를 저장합니다. 개인 운행은 저장하지 않으며, " +
-                    "동의하지 않아도 운행 기록은 정상 작성됩니다. 동의는 언제든 철회할 수 있습니다.",
+                    "동의하지 않아도 운행 기록은 정상 작성됩니다.",
                 fontSize = VehicleUi.Body, lineHeight = 34.sp, color = VehicleUi.Secondary,
             )
         },
-        confirmButton = { VehiclePrimaryButton("동의", { vm.answerConsent(true); requestLocationPermission() }) },
-        dismissButton = { VehicleSecondaryButton("동의 안 함", { vm.answerConsent(false) }) },
+        confirmButton = { VehiclePrimaryButton("동의", agree) },
+        dismissButton = { VehicleSecondaryButton("동의 안 함", vm::declineConsent) },
     )
-}
-
-@Composable
-internal fun LocationConsentCard(state: MainUiState, vm: MainViewModel, requestLocationPermission: () -> Unit) {
-    if (state.profiles.isEmpty()) return
-    VehicleSection("위치정보 수집") {
-        Text("업무 운행의 도착 위치만 저장합니다.", fontSize = VehicleUi.Caption, color = VehicleUi.Secondary)
-        state.profiles.forEachIndexed { index, profile ->
-            if (index > 0) HorizontalDivider(color = VehicleUi.Outline.copy(alpha = 0.4f))
-            val d = profile.driver
-            val agreed = d.locationConsent == true
-            val (label, color) = when (d.locationConsent) {
-                true -> "동의" to VehicleUi.Positive
-                false -> "동의 안 함" to VehicleUi.Secondary
-                null -> "미확인" to VehicleUi.Caution
-            }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(profile.displayName, Modifier.weight(1f), fontSize = VehicleUi.Body, color = VehicleUi.Primary)
-                Text(label, Modifier.padding(end = 20.dp), fontSize = VehicleUi.Caption, color = color)
-                VehicleSecondaryButton(
-                    if (agreed) "철회" else "동의",
-                    { vm.setLocationConsent(d.id, !agreed); if (!agreed) requestLocationPermission() },
-                    Modifier.widthIn(min = 120.dp),
-                )
-            }
-        }
-    }
 }
 
 @Composable
