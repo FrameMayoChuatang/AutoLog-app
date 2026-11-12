@@ -17,6 +17,26 @@ internal fun fakeTripDao(): TripDao {
             "insert" -> { val t = (a[0] as TripEntity).copy(id = nextId++); rows += t; t.id }
             "update" -> { val t = a[0] as TripEntity; rows[rows.indexOfFirst { it.id == t.id }] = t; Unit }
             "get" -> rows.firstOrNull { it.id == a[0] }
+            "updatePurpose" -> {
+                val i = rows.indexOfFirst { it.id == a[0] }
+                if (i >= 0) rows[i] = rows[i].copy(purpose = a[1] as TripPurpose, purposeText = a[2] as String?, memo = a[3] as String?, syncState = SyncState.PENDING, updatedAt = a[4] as Long)
+                Unit
+            }
+            "assignDriver" -> {
+                val i = rows.indexOfFirst { it.id == a[0] && it.driverId == null }
+                if (i >= 0) rows[i] = rows[i].copy(driverId = a[1] as Long, syncState = SyncState.PENDING, sourceRevision = rows[i].sourceRevision + 1, updatedAt = a[2] as Long)
+                if (i >= 0) 1 else 0
+            }
+            "complete" -> {
+                val i = rows.indexOfFirst { it.id == a[0] && it.status == TripStatus.ACTIVE }
+                if (i >= 0) rows[i] = rows[i].copy(
+                    endedAt = a[1] as Long, endOdometerKm = a[2] as Float, lastOdometerKm = a[2] as Float, status = TripStatus.COMPLETED,
+                    syncState = SyncState.PENDING, sourceRevision = rows[i].sourceRevision + 1, updatedAt = a[3] as Long,
+                    endedBy = a[4] as com.framemayo.autolog.data.local.TripEndReason,
+                    endFuelPercent = (a[5] as Float?) ?: rows[i].endFuelPercent, endBatteryPercent = (a[6] as Float?) ?: rows[i].endBatteryPercent,
+                )
+                if (i >= 0) 1 else 0
+            }
             "active" -> rows.lastOrNull { it.status == TripStatus.ACTIVE }
             "lastInterrupted" -> rows.lastOrNull { it.status == TripStatus.INTERRUPTED }
             "lastEnded" -> rows.lastOrNull { it.status != TripStatus.ACTIVE }

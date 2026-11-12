@@ -181,6 +181,20 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE status = 'ACTIVE' ORDER BY id DESC LIMIT 1")
     fun observeActive(): Flow<TripEntity?>
 
+    @Query("UPDATE trips SET purpose = :purpose, purposeText = :purposeText, memo = :memo, syncState = 'PENDING', updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updatePurpose(id: Long, purpose: TripPurpose, purposeText: String?, memo: String?, updatedAt: Long)
+
+    @Query("UPDATE trips SET driverId = :driverId, syncState = 'PENDING', sourceRevision = sourceRevision + 1, updatedAt = :updatedAt WHERE id = :id AND driverId IS NULL")
+    suspend fun assignDriver(id: Long, driverId: Long, updatedAt: Long): Int
+
+    @Query("""
+        UPDATE trips SET endedAt = :endedAt, endOdometerKm = :km, lastOdometerKm = :km, status = 'COMPLETED',
+            syncState = 'PENDING', sourceRevision = sourceRevision + 1, updatedAt = :updatedAt, endedBy = :endedBy,
+            endFuelPercent = COALESCE(:fuel, endFuelPercent), endBatteryPercent = COALESCE(:battery, endBatteryPercent)
+        WHERE id = :id AND status = 'ACTIVE'
+    """)
+    suspend fun complete(id: Long, endedAt: Long, km: Float, updatedAt: Long, endedBy: TripEndReason, fuel: Float?, battery: Float?): Int
+
     @Query("UPDATE trips SET lastOdometerKm = :km, lastSavedAt = :at WHERE id = :id")
     suspend fun heartbeat(id: Long, km: Float, at: Long)
 

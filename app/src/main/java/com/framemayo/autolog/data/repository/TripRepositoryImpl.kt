@@ -59,21 +59,10 @@ class TripRepositoryImpl(
     ): TripEntity? {
         val trip = dao.active() ?: return null
         val now = nextUpdatedAt(trip)
-        val ended = trip.copy(
-            endedAt = (endedAt ?: now).coerceAtLeast(trip.startedAt),
-            endOdometerKm = odometerKm,
-            lastOdometerKm = odometerKm,
-            status = TripStatus.COMPLETED,
-            syncState = SyncState.PENDING,
-            sourceRevision = trip.sourceRevision + 1,
-            updatedAt = now,
-            endedBy = reason,
-            endFuelPercent = energy?.fuelPercent ?: trip.endFuelPercent,
-            endBatteryPercent = energy?.batteryPercent ?: trip.endBatteryPercent,
-        )
-        dao.update(ended)
+        val end = (endedAt ?: now).coerceAtLeast(trip.startedAt)
+        if (dao.complete(trip.id, end, odometerKm, now, reason, energy?.fuelPercent, energy?.batteryPercent) == 0) return null
         onPending()
-        return ended
+        return dao.get(trip.id)
     }
 
     override suspend fun setPurpose(tripId: Long, purpose: TripPurpose, memo: String?, purposeText: String?) {
@@ -83,20 +72,13 @@ class TripRepositoryImpl(
                 require(it.isNotBlank() && it.length <= 200) { "업무 목적은 1~200자로 입력해 주세요." }
             }
         } else null
-        dao.update(trip.copy(purpose = purpose, purposeText = text, memo = memo ?: trip.memo, syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(trip)))
+        dao.updatePurpose(tripId, purpose, text, memo ?: trip.memo, nextUpdatedAt(trip))
         onPending()
     }
     override suspend fun setDriver(tripId: Long, driverId: Long): Boolean {
         val trip = dao.get(tripId) ?: return false
         if (trip.driverId != null) return false
-        dao.update(
-            trip.copy(
-                driverId = driverId,
-                syncState = SyncState.PENDING,
-                sourceRevision = trip.sourceRevision + 1,
-                updatedAt = nextUpdatedAt(trip),
-            ),
-        )
+        if (dao.assignDriver(tripId, driverId, nextUpdatedAt(trip)) == 0) return false
         onPending()
         return true
     }
