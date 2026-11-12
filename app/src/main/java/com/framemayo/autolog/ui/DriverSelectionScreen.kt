@@ -94,6 +94,7 @@ internal fun DriverSelectionScreen(
     onSave: suspend (Long?, String, Int, Int) -> Unit,
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
+    onStartLater: () -> Unit = {},
 ) {
     var managing by rememberSaveable { mutableStateOf(false) }
     var showingMore by rememberSaveable { mutableStateOf(false) }
@@ -115,10 +116,15 @@ internal fun DriverSelectionScreen(
         if (!parked) { searching = false; editing = false; deletingId = null; blocked = false; managing = false; query = ""; keyboard?.hide() }
     }
     BackHandler(managing && !searching && !editing && deletingId == null) { managing = false }
-    val select: (DriverProfile) -> Unit = { profile ->
+    val start: (Long?) -> Unit = { driverId ->
         if (!linked || !odometerReady) blocked = true
-        else { keyboard?.hide(); haptic.performHapticFeedback(HapticFeedbackType.LongPress); onStart(profile.driver.id) }
+        else {
+            keyboard?.hide()
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            if (driverId == null) onStartLater() else onStart(driverId)
+        }
     }
+    val select: (DriverProfile) -> Unit = { start(it.driver.id) }
     MaterialTheme(colorScheme = SelectionColors) {
         Surface(Modifier.fillMaxSize(), color = SelectionColors.background) {
             if (!parked) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -183,6 +189,11 @@ internal fun DriverSelectionScreen(
                                             }
                                         }
                                     }
+                                    if (!managing) TextButton(
+                                        onClick = { start(null) },
+                                        modifier = Modifier.padding(top = 24.dp).heightIn(min = 56.dp),
+                                        colors = ButtonDefaults.textButtonColors(contentColor = SelectionColors.onSurfaceVariant),
+                                    ) { Text("운전자는 나중에 선택", fontSize = 20.sp) }
                                 }
                             }
                         }

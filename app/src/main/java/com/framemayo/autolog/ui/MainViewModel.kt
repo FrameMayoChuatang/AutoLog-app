@@ -123,7 +123,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startTrip(driverId: Long?) {
         if (RecorderState.snapshot.value.gear != VehicleGear.GEAR_PARK || startingTrip || consentPrompt.value != null) return
-        if (state.value.profiles.none { it.driver.id == driverId }) return
+        if (driverId != null && state.value.profiles.none { it.driver.id == driverId }) return
         val driver = state.value.drivers.find { it.id == driverId }
         if (driver != null && driver.locationConsent == null) {
             consentPrompt.value = driver
