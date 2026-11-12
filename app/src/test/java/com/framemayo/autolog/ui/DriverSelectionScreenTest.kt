@@ -180,6 +180,33 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자 이름").assertTextContains("운전자7")
     }
 
+    @Test fun managementHidesAddingUntilDoneAndKeepsEditingAvailable() {
+        compose.setContent { DriverSelectionScreen(profiles.take(3), true, true, true, {}, { _, _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithContentDescription("운전자 추가").assertIsDisplayed()
+        compose.onNodeWithText("프로필 관리").performClick()
+        compose.onNodeWithText("완료").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자 추가").assertDoesNotExist()
+        compose.onNodeWithText("운전자 추가").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자1 프로필 수정").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자1 프로필 삭제").assertIsDisplayed()
+        screenshot("management-after")
+        compose.onNodeWithText("완료").performClick()
+        compose.onNodeWithText("프로필 관리").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자1 프로필 수정").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 추가").assertIsDisplayed().performClick()
+        compose.onNodeWithText("프로필 생성").assertIsDisplayed()
+    }
+
+    @Test fun emptyManagementCanExitWithBackAndRestoreAdding() {
+        compose.setContent { DriverSelectionScreen(emptyList(), true, true, true, {}, { _, _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithText("프로필 관리").performClick()
+        compose.onNodeWithContentDescription("운전자 추가").assertDoesNotExist()
+        compose.onNodeWithText("완료").assertIsDisplayed()
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithText("완료").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 추가").assertIsDisplayed()
+    }
+
     @Test fun queryAndManagementModeSurviveRecreation() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _, _ -> }, { true }, {}) }
@@ -191,6 +218,7 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자 이름 검색").assertTextContains("7")
         compose.onNodeWithContentDescription("검색 닫기").performClick()
         compose.onNodeWithText("완료").assertExists()
+        compose.onNodeWithContentDescription("운전자 추가").assertDoesNotExist()
         compose.onNodeWithContentDescription("운전자7 프로필 수정").assertExists()
         compose.onNodeWithContentDescription("운전자6 프로필 수정").assertExists()
     }
