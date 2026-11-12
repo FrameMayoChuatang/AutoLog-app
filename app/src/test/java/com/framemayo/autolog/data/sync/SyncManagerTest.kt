@@ -178,6 +178,27 @@ class SyncManagerTest {
         assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
     }
 
+    @Test fun recoveredTripClearsInterruptedIssueOnServer() = runBlocking {
+        val t = repo.start(1, 100f)
+        repo.heartbeat(104.5f)
+        val interrupted = repo.recoverInterrupted()!!
+        sync.syncPending()
+        repo.completeInterrupted(interrupted.id, 104.5f, interrupted.lastSavedAt)
+
+        assertTrue(sync.syncPending())
+        val sent = api.uploads.last()
+        assertEquals("COMPLETED", sent.state)
+        assertEquals(104.5f, sent.endOdometerKm)
+        assertEquals(emptyList<String>(), sent.collectionIssues)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun normallyCompletedTripOmitsCollectionIssues() = runBlocking {
+        finishedTrip()
+        assertTrue(sync.syncPending())
+        assertNull(api.uploads.single().collectionIssues)
+    }
+
     @Test fun oldestTripIsSentFirstAndOneOfflineStopsTheRest() = runBlocking {
         val a = finishedTrip(100f)
         val b = finishedTrip(200f)
@@ -303,6 +324,26 @@ class SyncManagerTest {
         assertTrue(sync.syncPending())
         assertEquals(1, api.confirms.size)
         assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun manyTripsAwaitingDriverApprovalDoNotStopLaterTrips() = runBlocking {
+        val waiting = (0 until 4).map { finishedWithPurpose(TripPurpose.PERSONAL, startKm = 100f + it * 100) }
+        driversFake.status = DriverStatus.PENDING
+        val later = repo.start(null, 900f).let { repo.end(910f)!! }
+
+        assertFalse(sync.syncPending())
+        assertEquals(SyncState.SYNCED, dao.get(later.id)!!.syncState)
+        assertTrue(waiting.all { dao.get(it.id)!!.ackedRevision > 0 })
+        assertEquals(0, api.confirms.size)
+    }
+
+    @Test fun manyRepeatedConflictsDoNotStopLaterTrips() = runBlocking {
+        val conflicted = (0 until 4).map { finishedTrip(100f + it * 100) }
+        api.conflictUuids += conflicted.map { it.uuid }
+        val later = finishedTrip(900f)
+
+        assertFalse(sync.syncPending())
+        assertEquals(SyncState.SYNCED, dao.get(later.id)!!.syncState)
     }
 
     @Test fun oneBlockedTripDoesNotStopLaterTrips() = runBlocking {

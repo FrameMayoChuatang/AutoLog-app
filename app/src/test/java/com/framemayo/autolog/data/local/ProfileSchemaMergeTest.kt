@@ -48,7 +48,7 @@ class ProfileSchemaMergeTest {
         val name = "schema-merge-$version-$prototype.db"
         context.deleteDatabase(name)
         fun open() = Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
-            .addMigrations(AutoLogDatabase.MIGRATION_8_10, AutoLogDatabase.MIGRATION_9_10, AutoLogDatabase.MIGRATION_10_11)
+            .addMigrations(AutoLogDatabase.MIGRATION_8_10, AutoLogDatabase.MIGRATION_9_10, AutoLogDatabase.MIGRATION_10_11, AutoLogDatabase.MIGRATION_11_12)
             .allowMainThreadQueries().build()
         try {
             open().use { db ->
@@ -73,7 +73,7 @@ class ProfileSchemaMergeTest {
             // 두 번 열어 마이그레이션뿐 아니라 새 identity hash로 재시작도 검증한다.
             repeat(2) {
                 open().use { db ->
-                    assertEquals(11, db.openHelper.readableDatabase.version)
+                    assertEquals(12, db.openHelper.readableDatabase.version)
                     val driver = db.driverDao().byId(1)!!
                     assertEquals("server-id", driver.remoteId)
                     assertEquals(true, driver.locationConsent)

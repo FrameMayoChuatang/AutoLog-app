@@ -126,7 +126,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (RecorderState.snapshot.value.gear != VehicleGear.GEAR_PARK || startingTrip || consentPrompt.value != null) return
         if (driverId != null && state.value.profiles.none { it.driver.id == driverId }) return
         val driver = state.value.drivers.find { it.id == driverId }
-        if (driver != null && driver.locationConsent == null) {
+        if (driver != null && driver.locationConsent != true) {
             consentPrompt.value = driver
             return
         }
@@ -140,6 +140,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             drivers.setLocationConsent(driver.id, consent)
             beginTrip(driver.id)
         }
+    }
+
+    fun declineConsent() {
+        val driver = consentPrompt.value ?: return
+        consentPrompt.value = driver.copy(locationConsent = false)
+        viewModelScope.launch {
+            drivers.setLocationConsent(driver.id, false)
+            arrival.purgeDriver(driver.id)
+        }
+    }
+
+    fun startWithoutConsent() {
+        val driver = consentPrompt.value ?: return
+        consentPrompt.value = null
+        beginTrip(driver.id)
     }
 
     fun dismissConsent() {
@@ -159,14 +174,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val km = vehicle.odometerKm?.takeIf { it.isFinite() && it > 0f } ?: return
         startingTrip = true
         viewModelScope.launch {
-            try { trips.start(driverId, km) } finally { startingTrip = false }
+            try { trips.start(driverId, km, energy = vehicle.energyLevels()) } finally { startingTrip = false }
         }
     }
 
     fun endTrip() {
-        val km = RecorderState.snapshot.value.odometerKm ?: return
+        val vehicle = RecorderState.snapshot.value
+        val km = vehicle.odometerKm ?: return
         viewModelScope.launch {
-            val ended = trips.end(km) ?: return@launch
+            val ended = trips.end(km, energy = vehicle.energyLevels()) ?: return@launch
             arrival.recordArrival(ended, consentOf(ended.driverId))
         }
     }

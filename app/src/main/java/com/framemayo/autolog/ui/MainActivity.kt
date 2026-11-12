@@ -30,7 +30,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.framemayo.autolog.service.VehicleSnapshot
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framemayo.autolog.data.local.DriverEntity
@@ -79,12 +87,14 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
     // 현재 Pleos v2.1은 해당 API가 없어 OS 차단을 유지하고, P 확인 전에는 이 UI를 잠근다.
     val parked = v.gear == VehicleGear.GEAR_PARK
     var showVehicle by rememberSaveable { mutableStateOf(false) }
+    var showTripDetail by rememberSaveable { mutableStateOf(false) }
     // 운행을 마친 뒤에도 목적 선택과 기록 확인 화면에 머문다.
     LaunchedEffect(state.activeTrip?.id) {
         if (state.activeTrip != null) showVehicle = true
+        showTripDetail = false
     }
     if (parked) {
-        state.consentPrompt?.let { ConsentDialog(state.driverName(it.id), vm, requestLocationPermission) }
+        state.consentPrompt?.let { ConsentDialog(it, state.driverName(it.id), vm, requestLocationPermission) }
     }
     if (state.activeTrip == null && (!showVehicle || !parked)) {
         DriverSelectionScreen(
@@ -96,49 +106,52 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             onSave = vm::saveProfile,
             onDelete = vm::deleteProfile,
             onOpenVehicle = { showVehicle = true },
+            footer = { VehicleLinkCard(vm) },
+            onWithdrawConsent = { vm.setLocationConsent(it, false) },
         )
         return
     }
+    val active = state.activeTrip
+    if (active != null && (!showTripDetail || !parked)) {
+        DrivingScreen(
+            active, state.driverName(active.driverId), state.profiles.find { it.driver.id == active.driverId },
+            parked = parked, canEnd = v.isParked && v.odometerKm != null,
+            onEnd = vm::endTrip, onOpenVehicle = { showTripDetail = true },
+        )
+        return
+    }
+    BackHandler(enabled = active != null) { showTripDetail = false }
     BackHandler(enabled = showVehicle && state.activeTrip == null) { showVehicle = false }
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 32.dp),
+        contentPadding = PaddingValues(vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         if (state.activeTrip == null) {
-            item { OutlinedButton(onClick = { showVehicle = false }) { Text("운전자 선택으로 돌아가기") } }
+            item { VehicleSecondaryButton("← 운전자 선택으로 돌아가기", { showVehicle = false }) }
+        } else {
+            item { VehicleSecondaryButton("← 주행 중 화면으로 돌아가기", { showTripDetail = false }) }
         }
-        item {
-            Card {
-                Column(Modifier.padding(16.dp)) {
-                    Text("차량 상태", style = MaterialTheme.typography.titleMedium)
-                    Text("기록 서비스: ${if (v.serviceRunning) "실행 중" else "꺼짐"}")
-                    Text("누적거리: ${v.odometerKm?.let { "%.1f km".format(it) } ?: "수신 대기"}")
-                    Text("기어: ${v.gear?.name ?: "알 수 없음"}  /  정차 ${v.stationaryMs / 1000}초${if (v.stopCandidate) " (정차 후보)" else ""}")
-                }
-            }
-        }
+        item { VehicleStatusCard(v) }
 
-        item { VehicleLinkCard(vm) }
 
-        val active = state.activeTrip
         if (active != null) {
             item {
-                Card {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val driver = state.driverName(active.driverId)
-                        Text("운행 중 · $driver", style = MaterialTheme.typography.titleMedium)
-                        Text("%.2f km · %d분".format(active.distanceKm(), active.durationMs() / 60_000))
-                        Button(onClick = vm::endTrip, enabled = v.isParked && v.odometerKm != null) {
-                            Text("운행 종료")
-                        }
+                VehicleSection("운행 중 · ${state.driverName(active.driverId)}") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "%.2f km · %d분".format(active.distanceKm(), active.durationMs() / 60_000),
+                            Modifier.weight(1f), fontSize = VehicleUi.Value, fontWeight = FontWeight.Bold, color = VehicleUi.Primary,
+                        )
+                        VehiclePrimaryButton("운행 종료", vm::endTrip, enabled = v.isParked && v.odometerKm != null)
                     }
+                    if (!v.isParked) Text("주차(P) 후 종료할 수 있어요.", fontSize = VehicleUi.Caption, color = VehicleUi.Caution)
                 }
             }
         }
 
-        item { LocationConsentCard(state, vm, requestLocationPermission) }
 
-        item { Text("최근 운행", style = MaterialTheme.typography.titleMedium) }
+        item { Text("최근 운행", Modifier.padding(top = 12.dp), fontSize = VehicleUi.Title, fontWeight = FontWeight.SemiBold) }
         items(state.recentTrips, key = { it.id }) { trip ->
             TripReviewCard(
                 trip, state, parked, { vm.assignDriver(trip.id, it) },
@@ -146,4 +159,37 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             )
         }
     }
+}
+
+@Composable
+private fun VehicleStatusCard(v: VehicleSnapshot) {
+    VehicleSection("차량 상태") {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            StatusTile("누적거리", v.odometerKm?.let { "%,.1f km".format(it) } ?: "수신 대기", Modifier.weight(1f), ok = v.odometerKm?.let { it > 0f } == true)
+            StatusTile("기어", v.gear.label(), Modifier.weight(1f), ok = v.gear == VehicleGear.GEAR_PARK)
+            StatusTile("기록 서비스", if (v.serviceRunning) "실행 중" else "꺼짐", Modifier.weight(1f), ok = v.serviceRunning)
+        }
+        if (v.gear == VehicleGear.GEAR_PARK && v.stationaryMs > 0) {
+            Text("정차 ${v.stationaryMs / 1000}초${if (v.stopCandidate) " · 운행 종료 후보" else ""}", fontSize = VehicleUi.Caption, color = VehicleUi.Secondary)
+        }
+    }
+}
+
+@Composable
+private fun StatusTile(label: String, value: String, modifier: Modifier, ok: Boolean) {
+    Surface(modifier, shape = RoundedCornerShape(16.dp), color = VehicleUi.Tile) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(label, fontSize = VehicleUi.Caption, color = VehicleUi.Secondary)
+            Text(value, fontSize = VehicleUi.Value, lineHeight = 38.sp, fontWeight = FontWeight.Bold, color = if (ok) VehicleUi.Primary else VehicleUi.Caution)
+        }
+    }
+}
+
+private fun VehicleGear?.label(): String = when (this) {
+    null, VehicleGear.GEAR_UNKNOWN -> "확인 중"
+    VehicleGear.GEAR_PARK -> "P · 주차"
+    VehicleGear.GEAR_REVERSE -> "R · 후진"
+    VehicleGear.GEAR_NEUTRAL -> "N · 중립"
+    VehicleGear.GEAR_DRIVE -> "D · 주행"
+    else -> "D · 주행"
 }

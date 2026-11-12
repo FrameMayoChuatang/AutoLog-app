@@ -15,7 +15,7 @@ class SyncManager(
     private val api: SyncApi,
     private val isLinked: () -> Boolean = { true },
 ) {
-    private enum class Outcome { DONE, RETRY, STOP }
+    private enum class Outcome { DONE, RETRY, LATER, STOP }
 
     suspend fun syncPending(): Boolean {
         if (!isLinked()) return true
@@ -28,6 +28,7 @@ class SyncManager(
                     allDone = false
                     if (++retryStreak >= MAX_RETRY_STREAK) return false
                 }
+                Outcome.LATER -> allDone = false
                 Outcome.STOP -> return true // 401: 다시 페어링해야 함
             }
         }
@@ -68,7 +69,7 @@ class SyncManager(
             }
             trip = trips.get(trip.id) ?: return Outcome.DONE
         }
-        return Outcome.RETRY
+        return Outcome.LATER
     }
 
     private suspend fun settle(measured: TripEntity): Outcome {
@@ -84,7 +85,7 @@ class SyncManager(
         if (first.status != TripStatus.COMPLETED) return Outcome.DONE
         val driver = first.driverId?.let { drivers.find(it) } ?: return Outcome.DONE
         val remoteId = driver.remoteId ?: return Outcome.DONE
-        if (driver.status == DriverStatus.PENDING) return Outcome.RETRY // 관리자 승인을 기다리는 중이라 곧 다시 확인
+        if (driver.status == DriverStatus.PENDING) return Outcome.LATER
         if (driver.status != DriverStatus.ACTIVE) return Outcome.DONE
 
         var trip = first
@@ -111,7 +112,7 @@ class SyncManager(
             }
             trip = trips.get(trip.id) ?: return Outcome.DONE
         }
-        return Outcome.RETRY
+        return Outcome.LATER
     }
 
     private suspend fun fail(trip: TripEntity): Outcome {
