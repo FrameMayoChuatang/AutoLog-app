@@ -10,6 +10,38 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DriverDao {
+    @Query("""
+        SELECT d.*, COALESCE(p.displayName, d.name) AS displayName, COALESCE(p.color, 0) AS color
+        FROM drivers d LEFT JOIN driver_profiles p ON p.driverId = d.id
+        WHERE COALESCE(p.hidden, 0) = 0 AND (d.status IS NULL OR d.status != 'INACTIVE')
+        ORDER BY (SELECT MAX(t.startedAt) FROM trips t WHERE t.driverId = d.id) DESC,
+                 d.createdAt DESC, d.id DESC
+    """)
+    fun observeProfiles(): Flow<List<DriverProfile>>
+
+    @Upsert
+    suspend fun saveProfile(profile: DriverProfileEntity)
+
+    @Transaction
+    suspend fun addProfile(name: String, color: Int): Long {
+        val id = insert(DriverEntity(name = name, department = ""))
+        saveProfile(DriverProfileEntity(id, null, color))
+        return id
+    }
+
+    @Query("SELECT * FROM driver_profiles WHERE driverId = :id")
+    suspend fun profile(id: Long): DriverProfileEntity?
+
+    @Query("SELECT EXISTS(SELECT 1 FROM trips WHERE driverId = :id AND status = 'ACTIVE')")
+    suspend fun hasActiveTrip(id: Long): Boolean
+
+    @Transaction
+    suspend fun hideProfile(id: Long): Boolean {
+        if (hasActiveTrip(id)) return false
+        saveProfile((profile(id) ?: DriverProfileEntity(id, null)).copy(hidden = true))
+        return true
+    }
+
     @Insert
     suspend fun insert(driver: DriverEntity): Long
 

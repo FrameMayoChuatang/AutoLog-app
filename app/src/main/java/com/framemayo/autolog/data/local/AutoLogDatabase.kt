@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class, TripLocationEntity::class],
-    version = 9,
+    entities = [DriverEntity::class, TripEntity::class, PurposeEntity::class, TripLocationEntity::class, DriverProfileEntity::class],
+    version = 10,
     exportSchema = false,
 )
 abstract class AutoLogDatabase : RoomDatabase() {
@@ -21,8 +21,39 @@ abstract class AutoLogDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): AutoLogDatabase =
             Room.databaseBuilder(context, AutoLogDatabase::class.java, "autolog.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_8_10, MIGRATION_9_10)
                 .build()
+
+        // main과 프로필 시제품이 v8/v9를 각각 사용했으므로 버전뿐 아니라 실제 열을 확인한다.
+        // 기존 프로필 표정도 보존해 개발 기기의 설정을 초기화하지 않는다.
+        private fun mergeProfileSchema(db: SupportSQLiteDatabase) {
+            fun addColumnIfMissing(table: String, column: String, definition: String) {
+                val exists = db.query("PRAGMA table_info($table)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndexOrThrow("name")
+                    var found = false
+                    while (cursor.moveToNext()) if (cursor.getString(nameIndex) == column) found = true
+                    found
+                }
+                if (!exists) db.execSQL("ALTER TABLE $table ADD COLUMN $column $definition")
+            }
+            addColumnIfMissing("drivers", "status", "TEXT")
+            addColumnIfMissing("drivers", "consentSentAt", "INTEGER")
+            addColumnIfMissing("trips", "confirmSentAt", "INTEGER")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS driver_profiles (driverId INTEGER NOT NULL, displayName TEXT, color INTEGER NOT NULL, " +
+                    "hidden INTEGER NOT NULL, expression INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(driverId), " +
+                    "FOREIGN KEY(driverId) REFERENCES drivers(id) ON UPDATE NO ACTION ON DELETE CASCADE)",
+            )
+            addColumnIfMissing("driver_profiles", "expression", "INTEGER NOT NULL DEFAULT 0")
+        }
+
+        val MIGRATION_8_10 = object : Migration(8, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) = mergeProfileSchema(db)
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) = mergeProfileSchema(db)
+        }
 
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {

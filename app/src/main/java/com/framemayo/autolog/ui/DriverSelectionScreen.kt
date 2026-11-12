@@ -1,67 +1,61 @@
 package com.framemayo.autolog.ui
 
-import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -69,249 +63,211 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.framemayo.autolog.data.local.DriverEntity
+import com.framemayo.autolog.data.local.DriverStatus
+import com.framemayo.autolog.data.local.DriverProfile
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
-private val SelectionDarkColors = darkColorScheme(
-    primary = Color(0xFFB9CEFF), onPrimary = Color(0xFF122647),
-    background = Color(0xFF111314), onBackground = Color(0xFFF4F5F7),
-    surface = Color(0xFF1E2228), onSurface = Color(0xFFF4F5F7),
-    onSurfaceVariant = Color(0xFFB9BEC8), outline = Color(0xFF939BA9),
-)
-private val SelectionLightColors = lightColorScheme(
-    primary = Color(0xFF214C9B), onPrimary = Color.White,
-    background = Color(0xFFF5F6F8), onBackground = Color(0xFF181B20),
-    surface = Color.White, onSurface = Color(0xFF181B20),
-    onSurfaceVariant = Color(0xFF505866), outline = Color(0xFF626B79),
+private val SelectionColors = darkColorScheme(
+    background = Color(0xFF0B0C0F), onBackground = Color(0xFFF4F5F7),
+    surface = Color(0xFF17181D), onSurface = Color(0xFFF4F5F7),
+    onSurfaceVariant = Color(0xFFB9BEC8), outline = Color(0xFF696B75),
 )
 
-/** 운전자 선택은 화면 상태로만 보관하고, 시작 버튼에서 기존 운행 로직을 호출한다. */
+/** 프로필 순서는 저장소가 실제 운행 시각으로 정렬한다. 검색 결과는 최근 5명과 별도로 표시한다. */
 @Composable
 internal fun DriverSelectionScreen(
-    drivers: List<DriverEntity>,
-    recentDriverId: Long?,
+    profiles: List<DriverProfile>,
     parked: Boolean,
     linked: Boolean,
     odometerReady: Boolean,
     onStart: (Long) -> Unit,
-    onAdd: (String, String) -> Unit,
+    onSave: suspend (Long?, String, Int) -> Unit,
+    onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
 ) {
-    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) SelectionDarkColors else SelectionLightColors) {
-        var selectedId by rememberSaveable { mutableStateOf<Long?>(null) }
-        var query by rememberSaveable { mutableStateOf("") }
-        var searching by rememberSaveable { mutableStateOf(false) }
-        var adding by rememberSaveable { mutableStateOf(false) }
-        val selected = drivers.firstOrNull { it.id == selectedId }
-        val canInteract = parked
-        val haptic = LocalHapticFeedback.current
-        val keyboard = LocalSoftwareKeyboardController.current
-        val visibleDrivers = remember(drivers, query, recentDriverId) {
-            drivers.filter { it.name.contains(query.trim(), ignoreCase = true) }
-                .sortedByDescending { it.id == recentDriverId }
-        }
-        LaunchedEffect(canInteract) {
-            if (!canInteract) {
-                adding = false
-                searching = false
-                query = ""
-                keyboard?.hide()
-            }
-        }
-        val guidance = when {
-            !canInteract -> "P에 주차한 후 운전자를 선택해 주세요."
-            !linked -> "운행을 시작하려면 차량을 먼저 연결해 주세요."
-            !odometerReady -> "차량의 주행거리 정보를 기다리고 있어요."
-            selected == null -> "운전자를 선택하면 운행을 시작할 수 있어요."
-            else -> "${selected.name}님으로 운행을 기록합니다."
-        }
-        Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
-            BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-                val compact = maxWidth < 600.dp
-                val side = if (compact) 24.dp else 48.dp
-                val availableWidth = maxWidth - side * 2
-                val spacious = maxHeight > 900.dp
-                Column(Modifier.fillMaxSize().padding(horizontal = side)) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("AUTOLOG", fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
-                        OutlinedButton(
-                            onClick = onOpenVehicle, enabled = canInteract,
-                            modifier = Modifier.heightIn(min = 64.dp), shape = RoundedCornerShape(12.dp),
-                        ) { Text(if (linked) "차량 · 기록" else "차량 연결", fontSize = 20.sp) }
-                    }
-                    if (!canInteract) {
-                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                                Text("P", fontSize = 56.sp, fontWeight = FontWeight.Medium)
-                                Text("주차 후 이용해 주세요", fontSize = 30.sp, textAlign = TextAlign.Center)
-                                Text("차량 상태가 확인되면 선택할 수 있어요.", fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+    var managing by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var editing by rememberSaveable { mutableStateOf(false) }
+    var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deletingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var blocked by rememberSaveable { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val keyboard = LocalSoftwareKeyboardController.current
+    val haptic = LocalHapticFeedback.current
+    val recent = profiles.take(5)
+    val others = if (query.isBlank()) profiles.drop(5) else profiles.filter { it.displayName.contains(query.trim(), ignoreCase = true) }
+    LaunchedEffect(parked) {
+        if (!parked) { editing = false; deletingId = null; blocked = false; managing = false; query = ""; keyboard?.hide() }
+    }
+    BackHandler(managing && !editing && deletingId == null) { managing = false }
+    MaterialTheme(colorScheme = SelectionColors) {
+        Surface(Modifier.fillMaxSize(), color = SelectionColors.background) {
+            if (!parked) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Text("P", fontSize = 56.sp)
+                    Text("주차 후 이용해 주세요", fontSize = 30.sp)
+                    Text("차량 상태가 확인되면 선택할 수 있어요.", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
+                }
+            } else BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 32.dp)) {
+                val avatarSize = ((maxWidth - 20.dp * 5) / 6 - 16.dp).coerceIn(120.dp, 148.dp)
+                val viewportHeight = maxHeight
+                val columns = ((maxWidth + 20.dp) / (avatarSize + 36.dp)).toInt().coerceAtLeast(1)
+                val openEditor: (Long?) -> Unit = { editingId = it; error = null; editing = true }
+                val select: (DriverProfile) -> Unit = { profile ->
+                    if (!linked || !odometerReady) blocked = true
+                    else { keyboard?.hide(); haptic.performHapticFeedback(HapticFeedbackType.LongPress); onStart(profile.driver.id) }
+                }
+                val card: @Composable (DriverProfile) -> Unit = { profile ->
+                    DriverProfileCard(profile, avatarSize, managing, { select(profile) }, { openEditor(profile.driver.id) }, { error = null; deletingId = profile.driver.id })
+                }
+                LazyColumn(
+                    Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
+                    contentPadding = PaddingValues(bottom = 40.dp),
+                ) {
+                    item {
+                        Box(Modifier.fillMaxWidth()) {
+                            Row(Modifier.fillMaxWidth().padding(top = 24.dp)) {
+                                OutlinedButton(
+                                    onClick = { managing = !managing }, shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.heightIn(min = 56.dp), border = BorderStroke(1.dp, SelectionColors.outline),
+                                    colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
+                                ) { Text(if (managing) "완료" else "프로필 관리", fontSize = 18.sp) }
                             }
-                        }
-                    } else {
-                        val columns = minOf((availableWidth.value / 184).toInt().coerceIn(1, 4), visibleDrivers.size + 1)
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(columns),
-                            modifier = Modifier.weight(1f).widthIn(max = 960.dp).fillMaxWidth().align(Alignment.CenterHorizontally),
-                            horizontalArrangement = Arrangement.spacedBy(24.dp),
-                            verticalArrangement = Arrangement.spacedBy(24.dp),
-                            contentPadding = PaddingValues(top = if (spacious) 64.dp else 16.dp, bottom = 32.dp),
-                        ) {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Text("누가 운전하시나요?", fontSize = if (compact) 32.sp else 40.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
-                                    Text("이번 운행을 기록할 운전자를 선택해 주세요.", fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-                                    if (searching) {
-                                        OutlinedTextField(
-                                            value = query, onValueChange = { query = it },
-                                            modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
-                                            label = { Text("운전자 이름", fontSize = 20.sp) },
-                                            textStyle = TextStyle(fontSize = 22.sp), singleLine = true,
-                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                                            trailingIcon = {
-                                                TextButton(onClick = { query = ""; searching = false; keyboard?.hide() }, modifier = Modifier.sizeIn(minWidth = 64.dp, minHeight = 64.dp)) {
-                                                    Text("닫기", fontSize = 18.sp)
-                                                }
-                                            },
-                                        )
-                                    } else {
-                                        TextButton(onClick = { searching = true }, modifier = Modifier.heightIn(min = 64.dp)) {
-                                            Text("운전자 검색", fontSize = 20.sp)
-                                        }
+                            Column(
+                                Modifier.fillMaxWidth().layout { measurable, constraints ->
+                                    val group = measurable.measure(constraints)
+                                    // 실제 그룹 높이로 중앙을 계산하되, 좁은 화면에서는 관리 버튼 아래부터 스크롤한다.
+                                    val top = ((viewportHeight.roundToPx() - group.height) / 2).coerceAtLeast(104.dp.roundToPx())
+                                    layout(group.width, top + group.height) { group.placeRelative(0, top) }
+                                },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(if (managing) "프로필 관리" else "운전자의 프로필을 선택하세요.", Modifier.fillMaxWidth().padding(bottom = 36.dp), fontSize = 34.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+                                ProfileRow {
+                                    recent.forEach { card(it) }
+                                    Column(Modifier.width(avatarSize + 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Surface(
+                                            onClick = { openEditor(null) }, modifier = Modifier.size(avatarSize).semantics { contentDescription = "운전자 추가" },
+                                            shape = RoundedCornerShape(18.dp), color = SelectionColors.surface, border = BorderStroke(1.dp, Color(0xFF555862)),
+                                        ) { Box(contentAlignment = Alignment.Center) { Text("+", fontSize = 64.sp, fontWeight = FontWeight.Light, color = SelectionColors.onSurfaceVariant) } }
+                                        Text("운전자 추가", Modifier.padding(top = 18.dp), fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
                                     }
-                                }
-                            }
-                            if (visibleDrivers.isEmpty()) {
-                                item(span = { GridItemSpan(maxLineSpan) }) {
-                                    Text(
-                                        if (query.isBlank()) "등록된 운전자가 없어요. 운전자를 추가해 주세요." else "검색한 운전자가 없어요. 이름을 확인해 주세요.",
-                                        fontSize = 20.sp, textAlign = TextAlign.Center,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                            items(visibleDrivers, key = { it.id }) { driver ->
-                                DriverProfile(driver, driver.id == selectedId, driver.id == recentDriverId) {
-                                    selectedId = driver.id
-                                    keyboard?.hide()
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                }
-                            }
-                            item(key = "add") {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Surface(
-                                        onClick = { adding = true },
-                                        modifier = Modifier.size(156.dp).semantics { contentDescription = "운전자 추가" }, shape = RoundedCornerShape(20.dp),
-                                        color = Color.Transparent,
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text("+", fontSize = 64.sp, fontWeight = FontWeight.Light)
-                                        }
-                                    }
-                                    Spacer(Modifier.height(16.dp))
-                                    Text("운전자 추가", fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
                     }
-                    Column(
-                        Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Text(guidance, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-                        Button(
-                            onClick = { selected?.let { onStart(it.id) } },
-                            enabled = selected != null && canInteract && linked && odometerReady,
-                            modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth().heightIn(min = 72.dp),
-                            shape = RoundedCornerShape(12.dp),
-                        ) { Text("운행 시작", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
+                    item {
+                        DriverSearchBar(query, { query = it }, { keyboard?.hide() }, Modifier.padding(top = 72.dp, bottom = 32.dp))
+                        if (query.isNotBlank() && others.isEmpty()) Text("검색 결과가 없습니다.", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
+                    }
+                    items(others.chunked(columns), key = { row -> "others-${row.first().driver.id}" }) { row ->
+                        Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.Top) { row.forEach { card(it) } }
                     }
                 }
             }
         }
-        if (adding && canInteract) AddDriverDialog(onDismiss = { adding = false }) { name, department ->
-            onAdd(name, department)
-            adding = false
+        if (parked && editing) DriverProfileEditor(profiles.find { it.driver.id == editingId }, busy, error, { editing = false }) { name, color ->
+            if (!busy) scope.launch {
+                busy = true; error = null
+                try { onSave(editingId, name, color); editing = false }
+                catch (e: CancellationException) { throw e }
+                catch (_: Exception) { error = "저장하지 못했습니다. 다시 시도해 주세요." }
+                finally { busy = false }
+            }
+        }
+        if (parked && deletingId != null) AlertDialog(
+            onDismissRequest = { if (!busy) deletingId = null },
+            title = { Text("프로필을 삭제할까요?") },
+            text = { Text(error ?: "${profiles.find { it.driver.id == deletingId }?.displayName.orEmpty()} 프로필을 목록에서 삭제합니다. 기존 운행 기록은 유지됩니다.") },
+            confirmButton = { TextButton(enabled = !busy, onClick = {
+                val id = deletingId ?: return@TextButton
+                scope.launch {
+                    busy = true; error = null
+                    try { if (onDelete(id)) deletingId = null else error = "운행 중인 프로필은 삭제할 수 없습니다." }
+                    catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { error = "삭제하지 못했습니다. 다시 시도해 주세요." }
+                    finally { busy = false }
+                }
+            }, modifier = Modifier.heightIn(min = 56.dp)) { Text("삭제") } },
+            dismissButton = { TextButton(onClick = { deletingId = null }, enabled = !busy, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소") } },
+        )
+        if (parked && blocked) AlertDialog(
+            onDismissRequest = { blocked = false }, title = { Text(if (!linked) "차량 연결이 필요합니다" else "주행거리 수신 대기") },
+            text = { Text(if (!linked) "차량을 연결한 후 운행을 시작할 수 있습니다." else "차량의 유효한 주행거리 정보를 받은 후 다시 선택해 주세요.") },
+            confirmButton = { TextButton(onClick = { blocked = false; onOpenVehicle() }, modifier = Modifier.heightIn(min = 56.dp)) { Text("차량 상태 확인") } },
+            dismissButton = { TextButton(onClick = { blocked = false }, modifier = Modifier.heightIn(min = 56.dp)) { Text("닫기") } },
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProfileRow(content: @Composable () -> Unit) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(24.dp)) { content() }
+}
+
+@Composable
+private fun DriverProfileCard(profile: DriverProfile, size: Dp, managing: Boolean, onSelect: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+    Column(Modifier.width(size + 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box {
+            if (managing) Surface(Modifier.size(size), shape = RoundedCornerShape(18.dp), color = Color.White) {
+                Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f)) }
+            } else Surface(onClick = onSelect, modifier = Modifier.size(size).semantics { contentDescription = "${profile.displayName} 프로필로 운행 시작" }, shape = RoundedCornerShape(18.dp), color = Color.White) {
+                Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f)) }
+            }
+            if (managing) Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ProfileTool("${profile.displayName} 프로필 수정", "edit", onEdit)
+                ProfileTool("${profile.displayName} 프로필 삭제", "delete", onDelete)
+            }
+        }
+        Text(profile.displayName, Modifier.padding(top = 18.dp), fontSize = 22.sp, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (profile.driver.status == DriverStatus.PENDING) {
+            Text("승인 대기", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun DriverProfile(driver: DriverEntity, selected: Boolean, recent: Boolean, onClick: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val avatarColors = listOf(
-        Color(0xFF1452A0), Color(0xFF9B3543), Color(0xFF256658), Color(0xFF65509B),
-    )
-    val avatarColor = avatarColors[Math.floorMod(driver.id - 1, avatarColors.size.toLong()).toInt()]
-    Column(
-        Modifier.clip(RoundedCornerShape(20.dp))
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier.size(156.dp)
-                .border(if (selected) 3.dp else 0.dp, if (selected) colors.primary else Color.Transparent, RoundedCornerShape(20.dp))
-                .padding(6.dp).clip(RoundedCornerShape(15.dp))
-                .background(Brush.linearGradient(listOf(avatarColor, avatarColor.copy(alpha = 0.92f)))),
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(Modifier.fillMaxSize().padding(34.dp)) {
-                val ink = Color.White
-                drawCircle(ink, radius = size.width * 0.065f, center = Offset(size.width * 0.18f, size.height * 0.30f))
-                drawCircle(ink, radius = size.width * 0.065f, center = Offset(size.width * 0.82f, size.height * 0.30f))
-                drawArc(ink, 20f, 140f, false, Offset(size.width * 0.20f, size.height * 0.35f), Size(size.width * 0.60f, size.height * 0.40f), style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
-            }
-            if (selected) {
-                Text("✓", Modifier.align(Alignment.TopEnd).padding(8.dp).background(colors.primary, CircleShape).padding(horizontal = 6.dp), color = colors.onPrimary, fontSize = 20.sp)
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        Text(driver.name, fontSize = 24.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        Text(driver.department.ifBlank { "운전자" }, Modifier.padding(top = 6.dp), fontSize = 18.sp, color = colors.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        Text(if (selected) "선택됨" else if (recent) "최근 운전자" else "", Modifier.padding(top = 8.dp), fontSize = 18.sp, color = colors.primary)
+private fun ProfileTool(label: String, icon: String, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = Modifier.size(48.dp).semantics { contentDescription = label }, shape = CircleShape, color = Color(0xEE171719), border = BorderStroke(1.dp, Color(0x80FFFFFF))) {
+        Box(contentAlignment = Alignment.Center) { ProfileIcon(icon, Modifier.size(24.dp), Color.White) }
     }
 }
 
 @Composable
-private fun AddDriverDialog(onDismiss: () -> Unit, onAdd: (String, String) -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var department by rememberSaveable { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("운전자 추가", fontSize = 28.sp) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(name, { name = it.take(50) }, label = { Text("이름", fontSize = 20.sp) }, textStyle = TextStyle(fontSize = 22.sp), singleLine = true)
-                OutlinedTextField(department, { department = it.take(50) }, label = { Text("부서 (선택)", fontSize = 20.sp) }, textStyle = TextStyle(fontSize = 22.sp), singleLine = true)
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onAdd(name.trim(), department.trim()) }, enabled = name.isNotBlank(), modifier = Modifier.heightIn(min = 64.dp)) { Text("추가", fontSize = 20.sp) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 64.dp)) { Text("취소", fontSize = 20.sp) } },
-    )
+private fun DriverSearchBar(query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, modifier: Modifier) {
+    Box(modifier.widthIn(max = 480.dp).fillMaxWidth()) {
+        OutlinedTextField(
+            query, onQuery, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).semantics { contentDescription = "운전자 이름 검색" },
+            shape = CircleShape, singleLine = true, placeholder = { Text("운전자 이름 검색...", color = Color(0xFF808088), fontSize = 20.sp) },
+            textStyle = TextStyle(color = Color(0xFF171719), fontSize = 20.sp),
+            colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, focusedBorderColor = Color.White, unfocusedBorderColor = Color.White, cursorColor = Color.Black),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            trailingIcon = {
+                Surface(onClick = onSearch, Modifier.padding(6.dp).size(52.dp).semantics { contentDescription = "운전자 검색" }, shape = CircleShape, color = Color.Black) {
+                    Box(contentAlignment = Alignment.Center) { ProfileIcon("search", Modifier.size(28.dp), Color.White) }
+                }
+            },
+        )
+    }
 }
 
-@Preview(name = "Driver selection · night", widthDp = 1100, heightDp = 760, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Preview(name = "Driver selection · split", widthDp = 540, heightDp = 900, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Composable
-private fun DriverSelectionPreview() {
-    DriverSelectionScreen(
-        drivers = listOf(
-            DriverEntity(id = 1, name = "김민수", department = "영업팀"),
-            DriverEntity(id = 2, name = "이서연", department = "운영팀"),
-            DriverEntity(id = 3, name = "박지훈", department = "경영지원팀"),
-        ),
-        recentDriverId = 1, parked = true, linked = true, odometerReady = true,
-        onStart = {}, onAdd = { _, _ -> }, onOpenVehicle = {},
-    )
+private fun ProfileIcon(kind: String, modifier: Modifier, color: Color) {
+    Canvas(modifier) {
+        val unit = size.width / 24f
+        fun point(x: Float, y: Float) = Offset(x * unit, y * unit)
+        fun line(x1: Float, y1: Float, x2: Float, y2: Float) = drawLine(color, point(x1, y1), point(x2, y2), 2 * unit, StrokeCap.Round)
+        when (kind) {
+            "search" -> { drawCircle(color, 8 * unit, point(11f, 11f), style = Stroke(2 * unit)); line(17f, 17f, 21f, 21f) }
+            "edit" -> { line(5f, 16f, 16f, 5f); line(8f, 19f, 19f, 8f); line(16f, 5f, 19f, 8f); line(5f, 16f, 4f, 20f); line(4f, 20f, 8f, 19f) }
+            "delete" -> { line(4f, 6f, 20f, 6f); line(9f, 3f, 15f, 3f); line(6f, 6f, 7f, 21f); line(18f, 6f, 17f, 21f); line(7f, 21f, 17f, 21f); line(10f, 10f, 10f, 17f); line(14f, 10f, 14f, 17f) }
+        }
+    }
 }
