@@ -64,22 +64,22 @@ internal fun TripReviewCard(
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(state.driverName(trip.driverId), fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-                    Text(TripTime.format(Instant.ofEpochMilli(trip.startedAt)), fontSize = 18.sp, color = Color(0xFFB9BEC8))
+                    Text(state.driverName(trip.driverId), fontSize = VehicleUi.Title, fontWeight = FontWeight.SemiBold)
+                    Text(TripTime.format(Instant.ofEpochMilli(trip.startedAt)), fontSize = VehicleUi.Caption, color = Color(0xFFB9BEC8))
                 }
-                Text(trip.status.label(), fontSize = 20.sp)
+                Text(trip.status.label(), fontSize = VehicleUi.Caption)
             }
-            Text("%.2f km · %d분".format(trip.distanceKm(), trip.durationMs() / 60_000), fontSize = 30.sp)
-            Text(trip.purpose.label(), fontSize = 22.sp)
-            if (trip.purpose == TripPurpose.BUSINESS_GENERAL) Text(trip.purposeText ?: "일반 업무", fontSize = 20.sp, color = Color(0xFFB9BEC8))
-            if (trip.driverId == null) Text("운전자를 지정해 주세요", fontSize = 20.sp, color = Color(0xFFF0CF8A))
+            Text("%.2f km · %d분".format(trip.distanceKm(), trip.durationMs() / 60_000), fontSize = VehicleUi.Value)
+            Text(trip.purpose.label(), fontSize = VehicleUi.Body)
+            if (trip.purpose == TripPurpose.BUSINESS_GENERAL) Text(trip.purposeText ?: "일반 업무", fontSize = VehicleUi.Caption, color = Color(0xFFB9BEC8))
+            if (trip.driverId == null) Text("운전자를 지정해 주세요", fontSize = VehicleUi.Caption, color = Color(0xFFF0CF8A))
             TripSyncStatusNotice(status, trip.purpose)
             if (trip.endedAt != null) Button(
                 onClick = { reviewing = true }, enabled = parked,
                 modifier = Modifier.align(Alignment.End).heightIn(min = 56.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF17181D)),
-            ) { Text(if (trip.purpose == TripPurpose.UNCONFIRMED) "운행 확인" else "확인 및 수정", fontSize = 20.sp) }
+            ) { Text(if (trip.purpose == TripPurpose.UNCONFIRMED) "운행 확인" else "확인 및 수정", fontSize = VehicleUi.ButtonText) }
         }
     }
     if (reviewing && parked) {
@@ -107,44 +107,44 @@ internal fun TripReviewCard(
                 shape = RoundedCornerShape(28.dp), color = Color(0xFF17181D),
             ) {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(32.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Text("운행 확인", fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${TripTime.format(Instant.ofEpochMilli(trip.startedAt))} · ${trip.status.label()}", fontSize = 20.sp)
-                    Text("운전자 · ${state.driverName(trip.driverId)}", fontSize = 24.sp)
+                    Text("운행 확인", fontSize = VehicleUi.Title, fontWeight = FontWeight.SemiBold)
+                    Text("${TripTime.format(Instant.ofEpochMilli(trip.startedAt))} · ${trip.status.label()}", fontSize = VehicleUi.Caption)
+                    Text("운전자 · ${state.driverName(trip.driverId)}", fontSize = VehicleUi.Body)
                     if (trip.driverId == null) {
                         OutlinedButton(onClick = { choosingDriver = true }, enabled = !saving && state.profiles.isNotEmpty(), modifier = Modifier.heightIn(min = 56.dp)) {
-                            Text("운전자 지정", fontSize = 20.sp)
+                            Text("운전자 지정", fontSize = VehicleUi.ButtonText)
                         }
-                        if (state.profiles.isEmpty()) Text("선택할 프로필이 없어요. 운전자 선택 화면에서 프로필을 추가해 주세요.", fontSize = 18.sp)
-                        Text("운전자를 나중에 지정해도 선택한 목적은 보관됩니다.", fontSize = 18.sp, color = Color(0xFFB9BEC8))
+                        if (state.profiles.isEmpty()) Text("선택할 프로필이 없어요. 운전자 선택 화면에서 프로필을 추가해 주세요.", fontSize = VehicleUi.Caption)
+                        Text("운전자를 나중에 지정해도 선택한 목적은 보관됩니다.", fontSize = VehicleUi.Caption, color = Color(0xFFB9BEC8))
                     }
-                    Text("운행 목적", fontSize = 22.sp)
+                    Text("운행 목적", fontSize = VehicleUi.Body)
                     PurposeChoices(selectedPurpose, !saving) { selectedPurpose = it }
                     if (selectedPurpose == TripPurpose.BUSINESS_GENERAL) {
                         OutlinedTextField(
                             value = purposeText, onValueChange = { purposeText = it.take(200) },
                             modifier = Modifier.fillMaxWidth(), enabled = !saving,
-                            label = { Text("업무 목적") }, placeholder = { Text("예: 거래처 방문, 물품 수령") },
-                            supportingText = { Text("${purposeText.length}/200 · 직접 입력하거나 회사 목록에서 선택하세요") },
-                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp),
+                            label = { Text("업무 목적", fontSize = VehicleUi.Caption) }, placeholder = { Text("예: 거래처 방문, 물품 수령", fontSize = VehicleUi.Body) },
+                            supportingText = { Text("${purposeText.length}/200 · 직접 입력하거나 회사 목록에서 선택하세요", fontSize = VehicleUi.Caption) },
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = VehicleUi.Body),
                             shape = RoundedCornerShape(14.dp), maxLines = 3,
                         )
-                        if (loading) Text("회사 목적 목록을 불러오는 중이에요.", fontSize = 18.sp)
-                        else if (unavailable) Text("목록을 불러오지 못했어요. 업무 목적을 직접 입력할 수 있어요.", fontSize = 18.sp)
+                        if (loading) Text("회사 목적 목록을 불러오는 중이에요.", fontSize = VehicleUi.Caption)
+                        else if (unavailable) Text("목록을 불러오지 못했어요. 업무 목적을 직접 입력할 수 있어요.", fontSize = VehicleUi.Caption)
                         else if (catalog.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(catalog, key = { it.remoteId }) { item ->
                                 FilterChip(
                                     selected = purposeText == item.name,
                                     onClick = { purposeText = item.name }, enabled = !saving,
                                     modifier = Modifier.heightIn(min = 56.dp).widthIn(max = 280.dp),
-                                    label = { Text(item.name, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                    label = { Text(item.name, fontSize = VehicleUi.ButtonText, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                 )
                             }
                         }
                     }
                     TripSyncStatusNotice(status, trip.purpose)
-                    saveError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 20.sp) }
+                    saveError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = VehicleUi.Caption) }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        OutlinedButton(onClick = { reviewing = false }, enabled = !saving, modifier = Modifier.weight(1f).heightIn(min = 56.dp)) { Text("닫기", fontSize = 20.sp) }
+                        OutlinedButton(onClick = { reviewing = false }, enabled = !saving, modifier = Modifier.weight(1f).heightIn(min = 56.dp)) { Text("닫기", fontSize = VehicleUi.ButtonText) }
                         Button(
                             onClick = {
                                 if (!saving) {
@@ -162,7 +162,7 @@ internal fun TripReviewCard(
                             enabled = !saving && selectedPurpose != TripPurpose.UNCONFIRMED && (selectedPurpose != TripPurpose.BUSINESS_GENERAL || purposeText.isNotBlank()),
                             modifier = Modifier.weight(1f).heightIn(min = 56.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF17181D)),
-                        ) { Text("목적 저장", fontSize = 20.sp) }
+                        ) { Text("목적 저장", fontSize = VehicleUi.ButtonText) }
                     }
                 }
             }
@@ -176,10 +176,10 @@ internal fun TripReviewCard(
     val candidate = state.profiles.find { it.driver.id == candidateId }
     if (candidate != null && trip.driverId == null && parked) AlertDialog(
         onDismissRequest = { candidateId = null },
-        title = { Text("운전자를 지정할까요?", fontSize = 26.sp) },
-        text = { Text("${candidate.displayName}님으로 지정합니다. 지정한 운전자는 차량에서 다시 변경할 수 없습니다.", fontSize = 22.sp) },
-        confirmButton = { TextButton(onClick = { onAssign(candidate.driver.id); candidateId = null }, modifier = Modifier.heightIn(min = 56.dp)) { Text("지정", fontSize = 20.sp) } },
-        dismissButton = { TextButton(onClick = { candidateId = null }, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소", fontSize = 20.sp) } },
+        title = { Text("운전자를 지정할까요?", fontSize = VehicleUi.Title) },
+        text = { Text("${candidate.displayName}님으로 지정합니다. 지정한 운전자는 차량에서 다시 변경할 수 없습니다.", fontSize = VehicleUi.Body) },
+        confirmButton = { TextButton(onClick = { onAssign(candidate.driver.id); candidateId = null }, modifier = Modifier.heightIn(min = 56.dp)) { Text("지정", fontSize = VehicleUi.ButtonText) } },
+        dismissButton = { TextButton(onClick = { candidateId = null }, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소", fontSize = VehicleUi.ButtonText) } },
     )
 }
 
@@ -192,7 +192,7 @@ private fun PurposeChoices(selected: TripPurpose, enabled: Boolean, onSelect: (T
                 selected = selected == purpose, onClick = { onSelect(purpose) }, enabled = enabled,
                 modifier = Modifier.heightIn(min = 56.dp), shape = RoundedCornerShape(14.dp),
                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color.White, selectedLabelColor = Color(0xFF17181D)),
-                label = { Text(purpose.label(), fontSize = 22.sp) },
+                label = { Text(purpose.label(), fontSize = VehicleUi.ButtonText) },
             )
         }
     }

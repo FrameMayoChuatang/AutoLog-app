@@ -52,7 +52,7 @@ class DriverSelectionScreenTest {
         compose.setContent {
             DriverSelectionScreen(profiles, true, false, true, {}, { _, _, _, _, _ -> }, { true }, {}, footer = { androidx.compose.material3.Text("차량 연결 카드") })
         }
-        compose.onNodeWithText("차량 연결 카드").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("차량 연결 카드").assertIsDisplayed()
         compose.onNodeWithText("프로필 관리").performClick()
         compose.onNodeWithText("차량 연결 카드").assertDoesNotExist()
     }
@@ -95,6 +95,17 @@ class DriverSelectionScreenTest {
         compose.onNodeWithText("주행 시작").assertDoesNotExist()
         compose.onNodeWithContentDescription("운전자 이름").assertTextContains("운전자3")
         assertEquals(emptyList<Long>(), starts)
+    }
+
+    @Test fun recentTripsButtonOpensRecordsAndHidesWhileManaging() {
+        var opened = 0
+        compose.setContent {
+            DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _, _ -> }, { true }, {}, onOpenRecords = { opened++ })
+        }
+        compose.onNodeWithText("최근 운행").assertIsDisplayed().performClick()
+        assertEquals(1, opened)
+        compose.onNodeWithText("프로필 관리").performClick()
+        compose.onNodeWithText("최근 운행").assertDoesNotExist()
     }
 
     @Test fun closingStartDialogDoesNotStart() {

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -96,6 +97,7 @@ internal fun DriverSelectionScreen(
     onSave: suspend (Long?, String, Int, Int, Boolean) -> Unit,
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
+    onOpenRecords: () -> Unit = onOpenVehicle,
     footer: @Composable () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
@@ -146,6 +148,8 @@ internal fun DriverSelectionScreen(
                     DriverProfileCard(profile, avatarSize, managing, { select(profile) }, { openEditor(profile.driver.id) }, { error = null; deletingId = profile.driver.id })
                 }
                 var topBarHeight by remember { mutableIntStateOf(0) }
+                var footerHeight by remember { mutableIntStateOf(0) }
+                val footerPx = if (managing) 0 else footerHeight
                 Column(Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().onSizeChanged { topBarHeight = it.height }.padding(top = 24.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
@@ -158,7 +162,14 @@ internal fun DriverSelectionScreen(
                                 contentColor = if (managing) SelectionColors.surface else SelectionColors.onSurface,
                             ),
                         ) { Text(if (managing) "완료" else "프로필 관리", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
-
+                        Spacer(Modifier.weight(1f))
+                        if (!managing) OutlinedButton(
+                            onClick = { keyboard?.hide(); onOpenRecords() }, shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.widthIn(min = 180.dp).heightIn(min = 72.dp),
+                            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 16.dp),
+                            border = BorderStroke(1.dp, SelectionColors.outline),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
+                        ) { Text("최근 운행", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
                     }
                     LazyColumn(
                         Modifier.weight(1f).fillMaxWidth(), state = listState, horizontalAlignment = Alignment.CenterHorizontally,
@@ -170,7 +181,9 @@ internal fun DriverSelectionScreen(
                                     Modifier.fillMaxWidth().layout { measurable, constraints ->
                                         val group = measurable.measure(constraints)
                                         // 탑바 높이를 제외해 기존 화면 중앙을 유지하고, 목록만 탑바 아래에서 스크롤한다.
-                                        val top = ((viewportHeight.roundToPx() - group.height) / 2 - topBarHeight).coerceAtLeast(0)
+                                        val centered = (viewportHeight.roundToPx() - group.height) / 2 - topBarHeight
+                                        val available = viewportHeight.roundToPx() - topBarHeight - footerPx - group.height
+                                        val top = minOf(centered, available).coerceAtLeast(0)
                                         layout(group.width, top + group.height) { group.placeRelative(0, top) }
                                     },
                                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -221,11 +234,11 @@ internal fun DriverSelectionScreen(
                                 colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
                             ) { Text("접기", fontSize = 20.sp) }
                         }
-                        // 차량 연결은 운전자 선택 화면 맨 아래에 둔다. 연결 안내창의 `차량 연결하기`가 여기로 스크롤한다.
-                        if (!managing) item(key = "vehicle-link") {
-                            Box(Modifier.padding(top = 240.dp).widthIn(max = 960.dp).fillMaxWidth()) { footer() }
-                        }
                     }
+                    if (!managing) Box(
+                        Modifier.fillMaxWidth().onSizeChanged { footerHeight = it.height }.padding(top = 16.dp, bottom = 24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { Box(Modifier.widthIn(max = 960.dp).fillMaxWidth()) { footer() } }
                 }
             }
         }
@@ -254,8 +267,8 @@ internal fun DriverSelectionScreen(
         )
         if (parked && deletingId != null) AlertDialog(
             onDismissRequest = { if (!busy) deletingId = null },
-            title = { Text("프로필을 삭제할까요?") },
-            text = { Text(error ?: "${profiles.find { it.driver.id == deletingId }?.displayName.orEmpty()} 프로필을 목록에서 삭제합니다. 기존 운행 기록은 유지됩니다.") },
+            title = { Text("프로필을 삭제할까요?", fontSize = 28.sp) },
+            text = { Text(error ?: "${profiles.find { it.driver.id == deletingId }?.displayName.orEmpty()} 프로필을 목록에서 삭제합니다. 기존 운행 기록은 유지됩니다.", fontSize = 22.sp, lineHeight = 32.sp) },
             confirmButton = { TextButton(enabled = !busy, onClick = {
                 val id = deletingId ?: return@TextButton
                 scope.launch {
@@ -265,8 +278,8 @@ internal fun DriverSelectionScreen(
                     catch (_: Exception) { error = "삭제하지 못했습니다. 다시 시도해 주세요." }
                     finally { busy = false }
                 }
-            }, modifier = Modifier.heightIn(min = 56.dp)) { Text("삭제") } },
-            dismissButton = { TextButton(onClick = { deletingId = null }, enabled = !busy, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소") } },
+            }, modifier = Modifier.heightIn(min = 56.dp)) { Text("삭제", fontSize = 20.sp) } },
+            dismissButton = { TextButton(onClick = { deletingId = null }, enabled = !busy, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소", fontSize = 20.sp) } },
         )
         val selected = profiles.find { it.driver.id == selectedId }
         if (parked && selected != null) StartTripDialog(
@@ -281,9 +294,8 @@ internal fun DriverSelectionScreen(
             confirmButton = { TextButton(onClick = {
                 blocked = false
                 if (linked) onOpenVehicle()
-                else scope.launch { listState.animateScrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)) }
             }, modifier = Modifier.heightIn(min = 56.dp)) { Text(if (!linked) "차량 연결하기" else "차량 상태 확인", fontSize = 20.sp) } },
-            dismissButton = { TextButton(onClick = { blocked = false }, modifier = Modifier.heightIn(min = 56.dp)) { Text("닫기") } },
+            dismissButton = { TextButton(onClick = { blocked = false }, modifier = Modifier.heightIn(min = 56.dp)) { Text("닫기", fontSize = 20.sp) } },
         )
     }
 }
@@ -310,7 +322,7 @@ private fun DriverProfileCard(profile: DriverProfile, size: Dp, managing: Boolea
         }
         Text(profile.displayName, Modifier.padding(top = 18.dp), fontSize = 22.sp, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (profile.driver.status == DriverStatus.PENDING) {
-            Text("승인 대기", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("승인 대기", Modifier.padding(top = 4.dp), fontSize = VehicleUi.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -376,7 +388,7 @@ private fun StartTripDialog(profile: DriverProfile, onStart: () -> Unit, onEdit:
                 }
                 Text(profile.displayName, Modifier.padding(top = 20.dp), fontSize = 32.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (profile.driver.status == DriverStatus.PENDING) {
-                    Text("승인 대기 · 관리자 승인 후 운행 확인이 전송돼요.", Modifier.padding(top = 6.dp), fontSize = 18.sp, color = SelectionColors.onSurfaceVariant, textAlign = TextAlign.Center)
+                    Text("승인 대기 · 관리자 승인 후 운행 확인이 전송돼요.", Modifier.padding(top = 6.dp), fontSize = VehicleUi.Caption, color = SelectionColors.onSurfaceVariant, textAlign = TextAlign.Center)
                 }
                 Button(
                     onClick = onStart, modifier = Modifier.padding(top = 28.dp).fillMaxWidth().heightIn(min = 64.dp), shape = RoundedCornerShape(16.dp),
@@ -388,7 +400,7 @@ private fun StartTripDialog(profile: DriverProfile, onStart: () -> Unit, onEdit:
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
                 ) { Text("프로필 수정", fontSize = 20.sp) }
                 TextButton(onClick = onDismiss, modifier = Modifier.padding(top = 4.dp).heightIn(min = 56.dp)) {
-                    Text("닫기", fontSize = 18.sp, color = SelectionColors.onSurfaceVariant)
+                    Text("닫기", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
                 }
             }
         }

@@ -169,7 +169,7 @@ internal fun DriverSearchDialog(
                             }
                         } else LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             item {
-                                Text(if (query.isBlank()) "전체 운전자" else "검색 결과 ${results.size}명", fontSize = 18.sp, color = Color(0xFFB9BEC8))
+                                Text(if (query.isBlank()) "전체 운전자" else "검색 결과 ${results.size}명", fontSize = 20.sp, color = Color(0xFFB9BEC8))
                             }
                             items(results, key = { it.driver.id }) { profile ->
                                 Surface(
@@ -182,7 +182,7 @@ internal fun DriverSearchDialog(
                                             Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f), expression = profile.expression) }
                                         }
                                         Text(profile.displayName, Modifier.weight(1f), fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        if (managing) Text("수정", fontSize = 18.sp, color = Color(0xFFB9BEC8))
+                                        if (managing) Text("수정", fontSize = 20.sp, color = Color(0xFFB9BEC8))
                                     }
                                 }
                             }

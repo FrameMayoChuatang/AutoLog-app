@@ -83,34 +83,34 @@ internal fun DriverProfileEditor(
                                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(28.dp)) {
                                     Text(if (profile == null) "프로필 생성" else "프로필 수정", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
                                     Spacer(Modifier.height(28.dp))
-                                    Text("이름", color = Color(0xFF626269), fontSize = 16.sp)
+                                    Text("이름", color = Color(0xFF626269), fontSize = 20.sp)
                                     Spacer(Modifier.height(8.dp))
                                     OutlinedTextField(
                                         value = name, onValueChange = { name = it.take(40) }, enabled = !busy,
                                         modifier = Modifier.fillMaxWidth().semantics { contentDescription = "운전자 이름" },
-                                        placeholder = { Text("이름을 입력하세요") }, singleLine = true,
+                                        placeholder = { Text("이름을 입력하세요", fontSize = 20.sp) }, singleLine = true,
                                         textStyle = TextStyle(fontSize = 20.sp), shape = RoundedCornerShape(12.dp),
                                     )
                                     Spacer(Modifier.height(24.dp))
-                                    Text("색상", color = Color(0xFF626269), fontSize = 16.sp)
+                                    Text("색상", color = Color(0xFF626269), fontSize = 20.sp)
                                     Spacer(Modifier.height(12.dp))
                                     ProfileColorPicker(color, enabled = !busy, onColor = { color = it })
                                     Spacer(Modifier.height(24.dp))
-                                    Text("표정", color = Color(0xFF626269), fontSize = 16.sp)
+                                    Text("표정", color = Color(0xFF626269), fontSize = 20.sp)
                                     Spacer(Modifier.height(12.dp))
                                     ProfileExpressionPicker(expression, enabled = !busy, onExpression = { expression = it })
                                     Spacer(Modifier.height(24.dp))
-                                    Text("캐릭터", color = Color(0xFF626269), fontSize = 16.sp)
+                                    Text("캐릭터", color = Color(0xFF626269), fontSize = 20.sp)
                                     Spacer(Modifier.height(12.dp))
                                     ProfilePresetPicker(color, expression, enabled = !busy) { preset ->
                                         expression = preset
                                         color = ProfileExpressions[preset].presetColor
                                     }
-                                    error?.let { Text(it, color = Color(0xFFA52C2C), fontSize = 16.sp, modifier = Modifier.padding(top = 12.dp)) }
+                                    error?.let { Text(it, color = Color(0xFFA52C2C), fontSize = 20.sp, modifier = Modifier.padding(top = 12.dp)) }
                                 }
                                 HorizontalDivider(color = Color(0xFFEFEFF1))
                                 Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = if (short) 8.dp else 16.dp)) {
-                                    Text("위치정보 수집 동의", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("위치정보 수집 동의", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                                     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
                                         .toggleable(value = locationConsent, enabled = !busy, role = Role.Checkbox,
                                             onValueChange = { locationConsent = it })
@@ -118,10 +118,10 @@ internal fun DriverProfileEditor(
                                         verticalAlignment = Alignment.CenterVertically) {
                                         Checkbox(checked = locationConsent, onCheckedChange = null, enabled = !busy)
                                         Text(if (profile == null) "업무 운행의 도착 위치 저장에 동의합니다." else "업무 운행의 도착 위치를 저장합니다.",
-                                            fontSize = 16.sp, modifier = Modifier.padding(start = 8.dp))
+                                            fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp))
                                     }
                                     Text(if (profile == null) "동의에 체크해야 프로필을 생성할 수 있습니다." else "체크 해제 후 저장하면 수집을 중단하고 기기의 도착 위치를 삭제합니다.",
-                                        fontSize = 14.sp, color = Color(0xFF626269))
+                                        fontSize = 20.sp, color = Color(0xFF626269))
                                 }
                             }
                         }
@@ -133,7 +133,7 @@ internal fun DriverProfileEditor(
                                 Button(onClick = { onSave(name.trim(), color, expression, locationConsent) },
                                     enabled = name.isNotBlank() && !busy && (profile != null || locationConsent),
                                     modifier = Modifier.heightIn(min = 56.dp), shape = CircleShape) {
-                                    Text(if (busy) "저장 중…" else "저장", fontSize = 18.sp)
+                                    Text(if (busy) "저장 중…" else "저장", fontSize = 20.sp)
                                 }
                             } else {
                                 Column(
@@ -148,7 +148,7 @@ internal fun DriverProfileEditor(
                                         onClick = { onSave(name.trim(), color, expression, locationConsent) }, enabled = name.isNotBlank() && !busy && (profile != null || locationConsent),
                                         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = CircleShape,
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF141416), contentColor = Color.White),
-                                    ) { Text(if (busy) "저장 중…" else "저장", fontSize = 18.sp) }
+                                    ) { Text(if (busy) "저장 중…" else "저장", fontSize = 20.sp) }
                                 }
                             }
                         }
@@ -199,7 +199,7 @@ private fun ProfileExpressionPicker(expression: Int, enabled: Boolean, onExpress
             ) {
                 Column(Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     DriverAvatar(face.presetColor, Modifier.fillMaxWidth().weight(1f), expression = index, faceOnly = true)
-                    Text(face.name, fontSize = 14.sp)
+                    Text(face.name, fontSize = 20.sp, lineHeight = 22.sp, maxLines = 1)
                 }
             }
         }
