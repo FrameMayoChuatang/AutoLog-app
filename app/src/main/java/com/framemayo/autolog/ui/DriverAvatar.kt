@@ -92,10 +92,9 @@ internal fun DriverAvatar(color: Int, modifier: Modifier = Modifier, blinking: B
         if (canBlink && shader != null) lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             blink.snapTo(0f)
             while (true) {
-                delay(Random.nextLong(2800, 5000))
-                blink.animateTo(1f, tween(90))
-                delay(25)
-                blink.animateTo(0f, tween(170))
+                delay(Random.nextLong(1800, 3200))
+                blink.animateTo(1f, tween(60))
+                blink.animateTo(0f, tween(100))
             }
         }
     }
