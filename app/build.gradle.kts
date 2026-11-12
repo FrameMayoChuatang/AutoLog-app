@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "com.framemayo.autolog"
     compileSdk = 34
+    useLibrary("android.car", false)
 
     defaultConfig {
         applicationId = "com.framemayo.autolog"

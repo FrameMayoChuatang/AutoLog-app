@@ -200,5 +200,5 @@ curl -X PUT "http://127.0.0.1:8088/vehicle/ev-battery?field=charge_port_open&val
 - Trip 거리·시간 API (에뮬레이터 미지원)
 - 주행에 따른 누적거리 자동 증가, 시동·PowerState 연계 자동 시작·종료
 - 헤드업 알림, VIN 자동 식별
-- 실차 GNSS 정확도, CarUxRestrictions 연동
+- 실차 GNSS 정확도, 실차·지역별 CarUxRestrictions 정책 검증 (현재 Pleos 에뮬레이터의 P/D 전환 연동은 검증)
 - 주유(연료량) 감지 (에뮬레이터 차량이 전기차라 콘솔에 연료 항목 없음)

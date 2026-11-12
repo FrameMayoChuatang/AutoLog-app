@@ -58,24 +58,46 @@ import java.time.format.DateTimeFormatter
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private var drivingUx by mutableStateOf(DrivingUxState())
+    private val uxObserver by lazy { CarUxObserver(this) { drivingUx = it } }
+    private var notificationPermissionRequested = false
     private val locationPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { /* 거부돼도 위치만 수집 안 함 */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
         TripRecorderService.start(this)
 
         setContent {
             AutoLogTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val state by viewModel.state.collectAsStateWithLifecycle()
-                    MainScreen(state, viewModel) {
-                        locationPermission.launch(arrayOf(FusedLocationSource.PERMISSION, Manifest.permission.ACCESS_FINE_LOCATION))
+                    DrivingRestrictionGate(state, drivingUx) {
+                        LaunchedEffect(Unit) {
+                            if (Build.VERSION.SDK_INT >= 33 && !notificationPermissionRequested) {
+                                notificationPermissionRequested = true
+                                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
+                            }
+                        }
+                        MainScreen(state, viewModel) {
+                            if (canUseParkedControls(viewModel.state.value.vehicle, drivingUx)) {
+                                locationPermission.launch(arrayOf(FusedLocationSource.PERMISSION, Manifest.permission.ACCESS_FINE_LOCATION))
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        uxObserver.start()
+    }
+
+    override fun onStop() {
+        uxObserver.stop()
+        super.onStop()
     }
 }
 
@@ -83,8 +105,7 @@ class MainActivity : ComponentActivity() {
 private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPermission: () -> Unit) {
     val v = state.vehicle
     val linked = state.linked
-    // TODO: android.car를 제공하는 이미지에서 CarUxRestrictions를 연동한다.
-    // 현재 Pleos v2.1은 해당 API가 없어 OS 차단을 유지하고, P 확인 전에는 이 UI를 잠근다.
+    // DrivingRestrictionGate에서 플랫폼 제한과 P 기어를 모두 확인한 후 진입한다.
     val parked = v.gear == VehicleGear.GEAR_PARK
     var showVehicle by rememberSaveable { mutableStateOf(false) }
     var showTripDetail by rememberSaveable { mutableStateOf(false) }
