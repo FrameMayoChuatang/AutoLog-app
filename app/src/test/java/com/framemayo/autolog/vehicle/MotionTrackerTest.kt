@@ -2,7 +2,6 @@ package com.framemayo.autolog.vehicle
 
 import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import com.framemayo.autolog.service.MotionState
-import com.framemayo.autolog.vehicle.MotionAction.AutoEnd
 import com.framemayo.autolog.vehicle.MotionAction.CloseStop
 import com.framemayo.autolog.vehicle.MotionAction.OpenStop
 import org.junit.Assert.assertEquals
@@ -97,28 +96,25 @@ class MotionTrackerTest {
         val actions = tracker.onActiveTrip(null, 7 * min)
         assertEquals(listOf(CloseStop(7L, 7 * min)), actions)
         assertFalse(tracker.status.endCandidate)
-        // 운행이 없으니 이후 자동 종료도 없다.
+        // 운행이 없으니 이후 아무 동작도 없다.
         assertTrue(tickRange(7 * min, 40 * min).isEmpty())
     }
 
     @Test
-    fun `auto end at 30 minutes uses park start km and time`() {
+    fun `long park never ends the trip and keeps only the end hint`() {
+        // 기능 명세(정차 판단): 정차 후보 표시일 뿐 자동 종료 판단이 아니다.
         driving()
         tracker.onOdometer(112.5f, 2 * min)
         tracker.onGear(VehicleGear.GEAR_PARK, 3 * min)
-        assertTrue(tracker.onTick(3 * min + 30 * min - 1).isEmpty())
-        val actions = tracker.onTick(3 * min + 30 * min)
-        assertEquals(listOf(CloseStop(7L, 3 * min), AutoEnd(7L, 112.5f, 3 * min)), actions)
-        assertFalse(tracker.status.endCandidate)
+        assertTrue(tickRange(3 * min, 10 * 60 * min).isEmpty())
+        assertTrue(tracker.status.endCandidate)
         assertEquals(MotionState.PARKED, tracker.status.motion)
-        // 한 번만 나온다. 운행 흐름이 같은 운행을 다시 보내거나 null로 바뀌어도 조용하다.
-        assertTrue(tracker.onTick(40 * min).isEmpty())
-        assertTrue(tracker.onActiveTrip(trip, 41 * min).isEmpty())
-        assertTrue(tracker.onActiveTrip(null, 42 * min).isEmpty())
+        // 운전자가 종료하면 그때 정차 구간을 닫는다.
+        assertEquals(listOf(CloseStop(7L, 10 * 60 * min + 1)), tracker.onActiveTrip(null, 10 * 60 * min + 1))
     }
 
     @Test
-    fun `odometer change while in P resets timers and auto end uses last measured point`() {
+    fun `odometer change while in P resets the end hint timer`() {
         driving()
         tracker.onGear(VehicleGear.GEAR_PARK, 1 * min)
         tracker.onTick(6 * min)
@@ -126,10 +122,9 @@ class MotionTrackerTest {
         // P인데 누적거리가 바뀜(잘못된 데이터): 타이머 기준을 다시 잡는다.
         assertTrue(tracker.onOdometer(100.4f, 20 * min).isEmpty())
         assertFalse(tracker.status.endCandidate)
-        assertTrue(tracker.onTick(1 * min + 30 * min).isEmpty())
+        assertFalse(tracker.statusAt(24 * min).endCandidate)
         assertTrue(tracker.statusAt(25 * min).endCandidate)
-        val actions = tracker.onTick(50 * min)
-        assertEquals(listOf(CloseStop(7L, 20 * min), AutoEnd(7L, 100.4f, 20 * min)), actions)
+        assertTrue(tracker.onTick(50 * min).isEmpty())
     }
 
     @Test
@@ -210,13 +205,13 @@ class MotionTrackerTest {
     }
 
     @Test
-    fun `resumed open stop keeps its start for auto end after restart`() {
+    fun `resumed open stop keeps its start for the end hint after restart`() {
         val resumed = ActiveTrip(id = 7L, startedAt = 0L, resumedStop = ResumedStop(startedAt = 5 * min, odometerKm = 120f))
         assertTrue(tracker.onActiveTrip(resumed, 20 * min).isEmpty())
         assertTrue(tracker.onGear(VehicleGear.GEAR_PARK, 20 * min).isEmpty())
         assertTrue(tracker.onOdometer(120f, 20 * min).isEmpty())
         assertTrue(tracker.status.endCandidate)
-        assertEquals(listOf(CloseStop(7L, 5 * min), AutoEnd(7L, 120f, 5 * min)), tracker.onTick(35 * min))
+        assertTrue(tracker.onTick(35 * min).isEmpty())
     }
 
     @Test
@@ -235,13 +230,13 @@ class MotionTrackerTest {
 
     @Test
     fun `thresholds are configurable`() {
-        val fast = MotionTracker(idleThresholdMs = 5 * s, endCandidateMs = 10 * s, autoEndMs = 20 * s)
+        val fast = MotionTracker(idleThresholdMs = 5 * s, endCandidateMs = 10 * s)
         fast.onActiveTrip(trip, 0L)
         fast.onOdometer(1f, 0L)
         fast.onGear(VehicleGear.GEAR_DRIVE, 0L)
         assertEquals(MotionState.IDLE, fast.statusAt(5 * s).motion)
         fast.onGear(VehicleGear.GEAR_PARK, 6 * s)
+        assertFalse(fast.statusAt(15 * s).endCandidate)
         assertTrue(fast.statusAt(16 * s).endCandidate)
-        assertEquals(listOf(CloseStop(7L, 6 * s), AutoEnd(7L, 1f, 6 * s)), fast.onTick(26 * s))
     }
 }

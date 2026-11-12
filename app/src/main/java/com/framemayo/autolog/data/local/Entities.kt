@@ -45,7 +45,7 @@ enum class SyncState { PENDING, SYNCED, FAILED }
 enum class TripTrigger { MANUAL, AUTO }
 
 /** 운행이 끝난 방식. RECOVERED는 강제 종료 후 실측 종료값을 확보해 완료한 운행. */
-enum class TripEndReason { MANUAL, AUTO_PARKED, RECOVERED }
+enum class TripEndReason { MANUAL, RECOVERED }
 
 @Entity(tableName = "purposes")
 data class PurposeEntity(

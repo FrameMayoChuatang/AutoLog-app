@@ -12,8 +12,6 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.framemayo.autolog.R
 import com.framemayo.autolog.container
-import com.framemayo.autolog.data.local.EnergyLevels
-import com.framemayo.autolog.data.local.TripEndReason
 import com.framemayo.autolog.vehicle.ActiveTrip
 import com.framemayo.autolog.vehicle.DetectedEnergyEvent
 import com.framemayo.autolog.vehicle.EnergyEventDetector
@@ -35,7 +33,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 앱 A 수집 서비스: 누적거리·기어·연료/배터리 수집, 1초 저장, 강제 종료 복구(#40), SDK 재시도(#89),
- * 정차 판단·중간 정차·장시간 주차 자동 종료(#90), 이동 감지 자동 시작(#91), 주유·충전 감지(#92).
+ * 정차 판단·중간 정차·종료 안내(#90), 이동 감지 자동 시작(#91), 주유·충전 감지(#92).
  */
 class TripRecorderService : LifecycleService() {
 
@@ -51,8 +49,6 @@ class TripRecorderService : LifecycleService() {
         )
     }
 
-    /** 주차 시작 시점의 연료·배터리. 장시간 주차 자동 종료는 주차 시작 시각으로 끝나므로 그때 값을 쓴다. */
-    @Volatile private var parkEnergy: EnergyLevels? = null
     @Volatile private var batteryCapacityKwh: Float? = null
 
     override fun onCreate() {
@@ -186,12 +182,7 @@ class TripRecorderService : LifecycleService() {
     private suspend fun feedMotion(now: Long, block: MotionTracker.() -> List<MotionAction>) {
         val (actions, status) = motionLock.withLock { motion.block() to motion.status }
         for (action in actions) when (action) {
-            is MotionAction.OpenStop -> {
-                parkEnergy = RecorderState.snapshot.value.energyLevels()
-                container.stops.apply(action)
-            }
-            is MotionAction.CloseStop -> container.stops.apply(action)
-            is MotionAction.AutoEnd -> autoEnd(action)
+            is MotionAction.OpenStop, is MotionAction.CloseStop -> container.stops.apply(action)
         }
         RecorderState.update {
             it.copy(
@@ -203,16 +194,6 @@ class TripRecorderService : LifecycleService() {
         }
         val stationary = status.motion == MotionState.PARKED || status.motion == MotionState.IDLE
         recordEnergy(energyDetector.onMotion(stationary, now, RecorderState.snapshot.value.odometerKm))
-    }
-
-    /** 장시간 주차: 주차 시작 시점의 실측 시각·누적거리로 종료한다. 그 사이 다른 운행으로 바뀌었으면 건드리지 않는다. */
-    private suspend fun autoEnd(action: MotionAction.AutoEnd) {
-        val trips = container.trips
-        if (trips.active.first()?.id != action.tripId) return
-        container.stops.close(action.tripId, action.endedAt)
-        val ended = trips.end(action.odometerKm, action.endedAt, TripEndReason.AUTO_PARKED, parkEnergy) ?: return
-        Log.i(TAG, "trip ${ended.id} auto-ended after long park at ${action.odometerKm}km")
-        autoStart.onTripEnded(ended)
     }
 
     /** 감지한 주유·충전을 그 시각에 진행 중이던 운행, 없으면 직전 운행에 연결한다. */

@@ -10,9 +10,6 @@ sealed interface MotionAction {
 
     /** 열린 P 구간 종료. */
     data class CloseStop(val tripId: Long, val endedAt: Long) : MotionAction
-
-    /** P 상태로 누적거리 변화 없이 오래 머물러 운행을 자동 종료. 값은 주차 시작 시점의 실측치. */
-    data class AutoEnd(val tripId: Long, val odometerKm: Float, val endedAt: Long) : MotionAction
 }
 
 /** 추적기가 알아야 하는 진행 중 운행. [resumedStop]은 DB에 이미 열려 있던 P 구간(서비스 재시작 시). */
@@ -38,25 +35,24 @@ data class MotionStatus(
  *
  * 기어 null·[VehicleGear.GEAR_UNKNOWN]은 "정보 없음"으로 보고 마지막으로 알던 기어를 유지한다.
  * [com.framemayo.autolog.service.VehicleSnapshot.isParked]는 null을 P로 취급하지만(운전자 전환 등 안전한 기본값),
- * 여기서는 명시적인 P만 PARKED로 판단해 P 구간 기록·종료 후보·자동 종료가 실제 P에서만 일어나게 한다.
+ * 여기서는 명시적인 P만 PARKED로 판단해 P 구간 기록·종료 후보가 실제 P에서만 일어나게 한다.
  * 기어를 끝내 모르면 누적거리만으로 DRIVING/IDLE을 판단한다.
  *
- * P 구간은 운행이 시작된 뒤 시작된 것만 기록한다. P 상태에서 운행을 시작하면(출발 전 대기) 기록·종료 안내·
- * 자동 종료 대상이 아니며, P를 풀었다가 다시 넣어야 한다. 누적거리를 모르는 채 P가 되면 첫 누적거리가
+ * P 구간은 운행이 시작된 뒤 시작된 것만 기록한다. P 상태에서 운행을 시작하면(출발 전 대기) 기록·종료 안내
+ * 대상이 아니며, P를 풀었다가 다시 넣어야 한다. 누적거리를 모르는 채 P가 되면 첫 누적거리가
  * 들어올 때 P 시각으로 구간을 연다.
  *
- * P 중 누적거리가 바뀌면(잘못된 데이터 또는 실제 이동) 종료 안내·자동 종료 타이머의 기준을 그 시각·값으로
+ * P 중 누적거리가 바뀌면(잘못된 데이터 또는 실제 이동) 종료 안내 타이머의 기준을 그 시각·값으로
  * 다시 잡는다. 이미 연 구간 행의 시작값은 바꾸지 않는다.
  *
- * 자동 종료 시 열린 구간은 운행 종료 시각(= 마지막 실측 기준 시각)으로 닫는다([MotionAction.CloseStop]이
- * [MotionAction.AutoEnd]보다 먼저 나온다). 정상적인 경우 길이 0인 구간이 남는다.
+ * 기능 명세(정차 판단 P1): 정차는 후보 표시일 뿐 확정 정차·자동 종료 판단이 아니다. 운행은 종료 버튼으로만
+ * 끝나며, 오래 주차하면 [MotionStatus.endCandidate]로 종료 안내만 한다.
  *
  * 스레드 안전하지 않다. 한 코루틴(또는 Mutex) 안에서만 호출한다.
  */
 class MotionTracker(
     private val idleThresholdMs: Long = 45_000L,
     private val endCandidateMs: Long = 5 * 60_000L,
-    private val autoEndMs: Long = 30 * 60_000L,
 ) {
     private var gear: VehicleGear? = null
     private var lastKm: Float? = null
@@ -64,17 +60,15 @@ class MotionTracker(
     private var leftParkAt: Long = 0L
 
     private var tripId: Long? = null
-    private var autoEndedTripId: Long? = null
 
     /** 현재 P 구간을 처음 본 시각. P가 아니면 null. */
     private var parkStartedAt: Long? = null
     /** 이 P 구간이 운행 중 구간으로 기록·판단 대상인지. */
     private var parkCounts = false
     private var stopOpen = false
-    /** 종료 안내·자동 종료 타이머 기준(주차 시작 또는 P 중 마지막 누적거리 변화). */
+    /** 종료 안내 타이머 기준(주차 시작 또는 P 중 마지막 누적거리 변화). */
     private var anchorAt: Long = 0L
     private var anchorKm: Float? = null
-    private var autoEnded = false
 
     private var now: Long = 0L
 
@@ -93,12 +87,10 @@ class MotionTracker(
     fun onActiveTrip(trip: ActiveTrip?, now: Long): List<MotionAction> {
         this.now = now
         if (trip?.id == tripId) return emptyList()
-        if (trip != null && trip.id == autoEndedTripId) return emptyList()
         val actions = mutableListOf<MotionAction>()
         closeOpenStop(now, actions)
         tripId = trip?.id
         parkCounts = false
-        autoEnded = false
         if (trip == null) return actions
 
         val resumed = trip.resumedStop
@@ -122,7 +114,6 @@ class MotionTracker(
                 maybeOpenStop(actions)
             }
         }
-        evaluate(now, actions)
         return actions
     }
 
@@ -139,7 +130,6 @@ class MotionTracker(
                 anchorAt = now
                 anchorKm = lastKm
                 parkCounts = tripId != null
-                autoEnded = false
                 maybeOpenStop(actions)
             }
             // parkStartedAt이 이미 있으면 재시작 때 이어받은 구간이 기어 확인을 기다리던 중이다.
@@ -150,7 +140,6 @@ class MotionTracker(
             anchorKm = null
             leftParkAt = now
         }
-        evaluate(now, actions)
         return actions
     }
 
@@ -173,15 +162,13 @@ class MotionTracker(
                 anchorKm = km
             }
         }
-        evaluate(now, actions)
         return actions
     }
 
+    /** 시간 경과만 반영한다(IDLE·종료 안내 판단용). 부수 효과는 없다. */
     fun onTick(now: Long): List<MotionAction> {
         this.now = now
-        val actions = mutableListOf<MotionAction>()
-        evaluate(now, actions)
-        return actions
+        return emptyList()
     }
 
     private fun isParkedGear() = gear == VehicleGear.GEAR_PARK
@@ -194,7 +181,7 @@ class MotionTracker(
     }
 
     private fun endCandidateAt(at: Long): Boolean =
-        isParkedGear() && parkCounts && tripId != null && !autoEnded && anchorKm != null &&
+        isParkedGear() && parkCounts && tripId != null && anchorKm != null &&
             at - anchorAt >= endCandidateMs
 
     private fun maybeOpenStop(actions: MutableList<MotionAction>) {
@@ -210,19 +197,5 @@ class MotionTracker(
         val id = tripId
         if (stopOpen && id != null) actions += MotionAction.CloseStop(id, at.coerceAtLeast(parkStartedAt ?: at))
         stopOpen = false
-    }
-
-    private fun evaluate(at: Long, actions: MutableList<MotionAction>) {
-        val id = tripId ?: return
-        val km = anchorKm ?: return
-        if (!isParkedGear() || !parkCounts || autoEnded) return
-        if (at - anchorAt < autoEndMs) return
-        if (stopOpen) actions += MotionAction.CloseStop(id, anchorAt)
-        stopOpen = false
-        actions += MotionAction.AutoEnd(id, km, anchorAt)
-        autoEnded = true
-        autoEndedTripId = id
-        tripId = null
-        parkCounts = false
     }
 }

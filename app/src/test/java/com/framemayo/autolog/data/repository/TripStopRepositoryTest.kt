@@ -73,6 +73,7 @@ class TripStopRepositoryTest {
         actions += tracker.onOdometer(12f, 300_000L)
         actions += tracker.onGear(VehicleGear.GEAR_PARK, 400_000L)
         actions += tracker.onTick(400_000L + 30 * 60_000L)
+        actions += tracker.onActiveTrip(null, 2_500_000L)
         actions.forEach { repo.apply(it) }
         // 같은 동작을 다시 적용해도 행이 늘지 않는다.
         actions.forEach { repo.apply(it) }
@@ -80,10 +81,9 @@ class TripStopRepositoryTest {
         assertEquals(
             listOf(
                 TripStopEntity(1L, 5L, 60_000L, 120_000L, 10f),
-                TripStopEntity(2L, 5L, 400_000L, 400_000L, 12f),
+                TripStopEntity(2L, 5L, 400_000L, 2_500_000L, 12f),
             ),
             dao.forTrip(5L),
         )
-        assertEquals(MotionAction.AutoEnd(5L, 12f, 400_000L), actions.last())
     }
 }

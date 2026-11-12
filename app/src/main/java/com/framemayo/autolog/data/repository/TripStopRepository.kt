@@ -8,12 +8,11 @@ import kotlinx.coroutines.flow.Flow
 /** 운행 중 P 구간 저장. 열기·닫기는 멱등이라 같은 동작을 두 번 적용해도 행이 늘지 않는다. */
 class TripStopRepository(private val dao: TripStopDao) {
 
-    /** [MotionAction.OpenStop]·[MotionAction.CloseStop]을 반영한다. [MotionAction.AutoEnd]는 운행 저장소 몫이라 무시. */
+    /** [MotionAction.OpenStop]·[MotionAction.CloseStop]을 반영한다. */
     suspend fun apply(action: MotionAction) {
         when (action) {
             is MotionAction.OpenStop -> open(action.tripId, action.startedAt, action.odometerKm)
             is MotionAction.CloseStop -> close(action.tripId, action.endedAt)
-            is MotionAction.AutoEnd -> Unit
         }
     }
 
