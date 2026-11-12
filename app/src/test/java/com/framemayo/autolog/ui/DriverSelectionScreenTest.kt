@@ -63,10 +63,11 @@ class DriverSelectionScreenTest {
             val search = compose.onNodeWithContentDescription("운전자 검색 열기").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             val lastName = compose.onNodeWithText("운전자5").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             val more = compose.onNodeWithText("더보기").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-            // 버튼의 24dp 외부 여백을 경계로, 프로필 묶음 위·아래의 빈 공간이 균형을 이루어야 한다.
+            // 더보기 위치와 무관하게, 버튼 예약 공간을 제외한 목록 영역 중앙을 유지한다.
             val before = search.top - list.top
-            val after = more.top - 24f - lastName.bottom
+            val after = list.bottom - 104f - lastName.bottom
             assertEquals(before, after, 2f)
+            assertEquals(24f, more.top - lastName.bottom, 2f)
         }
         assertBalancedSpace()
         val withFooter = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot.top
