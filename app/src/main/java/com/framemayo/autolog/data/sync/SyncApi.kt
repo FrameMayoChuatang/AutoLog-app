@@ -1,6 +1,7 @@
 package com.framemayo.autolog.data.sync
 
 import com.framemayo.autolog.data.local.TripEntity
+import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.local.TripStatus
 
 data class TripPayload(
@@ -31,7 +32,7 @@ sealed interface SyncResult {
 }
 
 sealed interface FetchResult {
-    data class Found(val serverVersion: Long, val sourceRevision: Long, val locked: Boolean) : FetchResult
+    data class Found(val serverVersion: Long, val sourceRevision: Long, val locked: Boolean, val approved: Boolean) : FetchResult
 
     data object NotFound : FetchResult
 
@@ -40,8 +41,20 @@ sealed interface FetchResult {
     data object Retry : FetchResult
 }
 
+data class ConfirmPayload(
+    val uuid: String,
+    val expectedVersion: Long,
+    val driverId: String,
+    val classification: String,
+    val purposeText: String?,
+    val note: String?,
+    val reason: String,
+)
+
 interface SyncApi {
     suspend fun upload(trip: TripPayload): SyncResult
+
+    suspend fun confirm(confirm: ConfirmPayload): SyncResult
 
     suspend fun fetch(uuid: String): FetchResult
 }
@@ -78,3 +91,23 @@ fun TripEntity.toPayload(driverRemoteId: String?): TripPayload {
         )
     }
 }
+
+fun TripEntity.toConfirmPayload(driverRemoteId: String, firstTime: Boolean): ConfirmPayload? {
+    val classification = when (purpose) {
+        TripPurpose.BUSINESS_COMMUTE -> "COMMUTE"
+        TripPurpose.BUSINESS_GENERAL -> "BUSINESS"
+        TripPurpose.PERSONAL -> "PERSONAL"
+        TripPurpose.UNCONFIRMED -> return null
+    }
+    return ConfirmPayload(
+        uuid = uuid,
+        expectedVersion = serverVersion,
+        driverId = driverRemoteId,
+        classification = classification,
+        purposeText = if (classification == "BUSINESS") DEFAULT_BUSINESS_PURPOSE else null,
+        note = memo?.trim()?.takeIf { it.isNotEmpty() }?.take(1000),
+        reason = if (firstTime) "차량에서 운전자 확인" else "차량에서 목적 변경",
+    )
+}
+
+const val DEFAULT_BUSINESS_PURPOSE = "일반 업무"
