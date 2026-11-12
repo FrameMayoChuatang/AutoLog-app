@@ -30,7 +30,7 @@ class LocationConsentTest {
         val saved = mutableMapOf<Long, Pair<Boolean, Long>>()
         val dao = Proxy.newProxyInstance(DriverDao::class.java.classLoader, arrayOf(DriverDao::class.java)) { _, m, a ->
             when (m.name) {
-                "observeAll", "observeProfiles" -> flowOf(emptyList<Any>())
+                "observeAll", "observeProfiles", "observeProfileSettings" -> flowOf(emptyList<Any>())
                 "setConsent" -> { saved[a[0] as Long] = (a[1] as Boolean) to (a[2] as Long); Unit }
                 else -> error(m.name)
             }

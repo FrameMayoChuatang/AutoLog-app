@@ -20,6 +20,9 @@ interface DriverDao {
     """)
     fun observeProfiles(): Flow<List<DriverProfile>>
 
+    @Query("SELECT * FROM driver_profiles")
+    fun observeProfileSettings(): Flow<List<DriverProfileEntity>>
+
     @Upsert
     suspend fun saveProfile(profile: DriverProfileEntity)
 

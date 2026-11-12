@@ -25,6 +25,21 @@ class DriverProfileTest {
 
     @After fun close() { db.close(); context.deleteDatabase("profiles-migration.db") }
 
+    @Test fun hiddenProfileNameRemainsAvailableForHistoricalTripsOnly() = runBlocking {
+        val id = repo.addProfile("서버 등록 이름", 0)
+        repo.editProfile(id, "표시 이름", 2)
+        repo.hideProfile(id)
+        val settings = repo.profileSettings.first()
+        val state = com.framemayo.autolog.ui.MainUiState(
+            drivers = repo.all.first(), profiles = repo.profiles.first(),
+            profileNames = settings.mapNotNull { p -> p.displayName?.let { p.driverId to it } }.toMap(),
+        )
+        assertEquals("표시 이름", state.driverName(id))
+        assertTrue(state.profiles.isEmpty())
+        assertEquals("서버 등록 이름", repo.find(id)?.name)
+        assertEquals("운전자 없음", state.driverName(null))
+    }
+
     @Test fun localAppearanceSurvivesRemoteRefreshAndHidingPreservesIdentity() = runBlocking {
         repo.upsertRemote(listOf(RemoteDriver("server-driver", "서버 이름", "영업", DriverStatus.ACTIVE)))
         val id = repo.all.first().single().id

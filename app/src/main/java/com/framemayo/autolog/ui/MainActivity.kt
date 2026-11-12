@@ -83,7 +83,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
         if (state.activeTrip != null) showVehicle = true
     }
     if (parked) {
-        state.consentPrompt?.let { ConsentDialog(it.name, vm, requestLocationPermission) }
+        state.consentPrompt?.let { ConsentDialog(state.driverName(it.id), vm, requestLocationPermission) }
     }
     if (state.activeTrip == null && (!showVehicle || !parked)) {
         DriverSelectionScreen(
@@ -124,7 +124,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             item {
                 Card {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val driver = state.drivers.find { it.id == active.driverId }?.name ?: "미확인"
+                        val driver = state.driverName(active.driverId)
                         Text("운행 중 · $driver", style = MaterialTheme.typography.titleMedium)
                         Text("%.2f km · %d분".format(active.distanceKm(), active.durationMs() / 60_000))
                         Button(onClick = vm::endTrip, enabled = v.isParked && v.odometerKm != null) {
@@ -138,7 +138,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
         item { LocationConsentCard(state, vm, requestLocationPermission) }
 
         item { Text("최근 운행", style = MaterialTheme.typography.titleMedium) }
-        items(state.recentTrips, key = { it.id }) { trip -> TripRow(trip, state.drivers, vm) }
+        items(state.recentTrips, key = { it.id }) { trip -> TripRow(trip, state, vm) }
     }
 }
 
@@ -146,10 +146,10 @@ private val KST = ZoneId.of("Asia/Seoul")
 private val TIME = DateTimeFormatter.ofPattern("MM/dd HH:mm").withZone(KST)
 
 @Composable
-private fun TripRow(trip: TripEntity, drivers: List<DriverEntity>, vm: MainViewModel) {
+private fun TripRow(trip: TripEntity, state: MainUiState, vm: MainViewModel) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val driverName = drivers.find { it.id == trip.driverId }?.name ?: "운전자 없음"
+            val driverName = state.driverName(trip.driverId)
             Text(
                 "${TIME.format(Instant.ofEpochMilli(trip.startedAt))} · ${"%.2f".format(trip.distanceKm())} km · " +
                     "${trip.status} · ${trip.purpose} · $driverName",
@@ -157,8 +157,8 @@ private fun TripRow(trip: TripEntity, drivers: List<DriverEntity>, vm: MainViewM
             if (trip.driverId == null && trip.endedAt != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("운전자 지정:")
-                    drivers.filter { it.status != DriverStatus.INACTIVE }.forEach { d ->
-                        PurposeButton(d.name) { vm.assignDriver(trip.id, d.id) }
+                    state.profiles.forEach { profile ->
+                        PurposeButton(profile.displayName) { vm.assignDriver(trip.id, profile.driver.id) }
                     }
                 }
             }

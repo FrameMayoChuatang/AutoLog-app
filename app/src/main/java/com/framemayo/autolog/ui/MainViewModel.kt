@@ -32,7 +32,13 @@ data class MainUiState(
     val profiles: List<DriverProfile> = emptyList(),
     val syncStatus: Map<Long, TripSyncStatus> = emptyMap(),
     val linked: Boolean = false,
-)
+    val profileNames: Map<Long, String> = emptyMap(),
+) {
+    fun driverName(id: Long?): String = profileNames[id]
+        ?: profiles.find { it.driver.id == id }?.displayName
+        ?: drivers.find { it.id == id }?.name
+        ?: "운전자 없음"
+}
 
 data class LinkUiState(
     val link: VehicleLink? = null,
@@ -49,14 +55,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val consentPrompt = MutableStateFlow<DriverEntity?>(null)
 
-    private val driverLists = combine(drivers.all, drivers.profiles) { all, profiles -> all to profiles }
+    private val driverLists = combine(drivers.all, drivers.profiles, drivers.profileSettings) { all, profiles, settings ->
+        Triple(all, profiles, settings.mapNotNull { p -> p.displayName?.let { p.driverId to it } }.toMap())
+    }
     private var startingTrip = false
     private val vehicleLink = app.container.vehicleLink
 
     val state: StateFlow<MainUiState> = combine(
         RecorderState.snapshot, driverLists, trips.active, trips.recent, consentPrompt,
     ) { vehicle, driverList, active, recent, prompt ->
-        MainUiState(vehicle, driverList.first, active, recent, prompt, driverList.second)
+        MainUiState(vehicle, driverList.first, active, recent, prompt, driverList.second, profileNames = driverList.third)
     }.combine(vehicleLink.link) { ui, link ->
         val byId = ui.drivers.associateBy { it.id }
         ui.copy(

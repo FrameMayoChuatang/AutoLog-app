@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface DriverRepository {
     val all: Flow<List<DriverEntity>>
+    val profileSettings: Flow<List<DriverProfileEntity>>
     val profiles: Flow<List<DriverProfile>>
     suspend fun addProfile(name: String, color: Int, expression: Int = 0): Long
     suspend fun editProfile(id: Long, name: String, color: Int, expression: Int = 0)
@@ -43,6 +44,7 @@ class DriverRepositoryImpl(
     private val clock: () -> Long = System::currentTimeMillis,
     private val onPending: () -> Unit = {},
 ) : DriverRepository {
+    override val profileSettings = dao.observeProfileSettings()
     override val profiles: Flow<List<DriverProfile>> = dao.observeProfiles()
 
     override suspend fun addProfile(name: String, color: Int, expression: Int): Long {
