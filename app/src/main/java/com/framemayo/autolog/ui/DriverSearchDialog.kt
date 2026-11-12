@@ -80,7 +80,10 @@ internal fun DriverSearchDialog(
     val keyboard = LocalSoftwareKeyboardController.current
     var inputFocused by remember { mutableStateOf(false) }
     var targetBounds by remember { mutableStateOf(Rect.Zero) }
-    val results = profiles.filter { it.displayName.contains(query.trim(), ignoreCase = true) }
+    val results = remember(profiles, query) {
+        val searchText = query.trim()
+        profiles.filter { it.displayName.contains(searchText, ignoreCase = true) }
+    }
     // 배경과 어울리는 단색 톤을 쓰되 눈과 플러그를 알아볼 수 있는 명암은 남긴다.
     val emptyArtworkFilter = remember {
         ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
