@@ -405,6 +405,7 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("기본 구름 캐릭터").performScrollTo().assertIsNotSelected()
         compose.onNodeWithText("홍길동", substring = false).assertExists()
         screenshot("editor-native")
+        compose.onNodeWithContentDescription("위치정보 수집 동의").performClick()
         compose.onNodeWithText("저장").performClick()
         compose.waitForIdle()
         assertEquals(listOf("홍길동" to 2), saved)
@@ -439,12 +440,13 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("미소 구름 캐릭터").performScrollTo().assertIsNotSelected()
         compose.onNodeWithContentDescription("윙크 표정").performScrollTo().performClick()
         compose.onNodeWithContentDescription("초록").performScrollTo().assertIsSelected()
+        compose.onNodeWithContentDescription("위치정보 수집 동의").performClick()
         compose.onNodeWithText("저장").performClick()
         compose.waitForIdle()
         assertEquals(listOf(Triple("미소 운전자", 4, 2)), saved)
     }
 
-    @Test fun profileEditorOmitsLocationConsentForEveryConsentState() {
+    @Test fun profileEditorShowsConsentForEveryConsentState() {
         val consent = mutableStateOf<Boolean?>(null)
         val saved = mutableListOf<String>()
         compose.setContent {
@@ -453,7 +455,7 @@ class DriverSelectionScreenTest {
         }
         listOf(null, false, true).forEach { state ->
             compose.runOnIdle { consent.value = state }
-            compose.onNodeWithText("위치정보 수집").assertDoesNotExist()
+            compose.onNodeWithContentDescription("위치정보 수집 동의").assertIsDisplayed()
             compose.onNodeWithText("동의 철회").assertDoesNotExist()
             compose.onNodeWithText("동의 안 함 · 운행을 시작할 때 다시 동의할 수 있어요.").assertDoesNotExist()
             compose.onNodeWithContentDescription("운전자 이름").performScrollTo().assertIsDisplayed()
@@ -495,6 +497,7 @@ class DriverSelectionScreenTest {
         compose.setContent { DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _, _ -> error("storage unavailable") }, { true }, {}) }
         compose.onNodeWithContentDescription("운전자 추가").performClick()
         compose.onNodeWithContentDescription("운전자 이름").performTextInput("이름")
+        compose.onNodeWithContentDescription("위치정보 수집 동의").performClick()
         compose.onNodeWithText("저장").performClick()
         compose.onNodeWithText("저장하지 못했습니다. 다시 시도해 주세요.").assertExists()
         compose.onNodeWithText("저장").assertIsEnabled()
@@ -506,6 +509,7 @@ class DriverSelectionScreenTest {
         show()
         compose.onNodeWithContentDescription("운전자 추가").performScrollTo().performClick()
         compose.onNodeWithContentDescription("운전자 이름").performTextInput("분할 화면")
+        compose.onNodeWithContentDescription("위치정보 수집 동의").performClick()
         compose.onNodeWithText("저장").assertIsDisplayed().assertIsEnabled()
         screenshot("editor-split")
     }
