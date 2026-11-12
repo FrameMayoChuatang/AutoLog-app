@@ -39,6 +39,16 @@ class DriverProfileTest {
         assertEquals(1, repo.all.first().size)
     }
 
+    @Test fun inactiveServerDriverIsNotSelectableAndProfileSurvivesReactivation() = runBlocking {
+        repo.upsertRemote(listOf(RemoteDriver("remote", "운전자", "영업", DriverStatus.ACTIVE)))
+        val id = repo.all.first().single().id
+        repo.editProfile(id, "별명", 2)
+        repo.upsertRemote(listOf(RemoteDriver("remote", "운전자", "영업", DriverStatus.INACTIVE)))
+        assertTrue(repo.profiles.first().isEmpty())
+        repo.upsertRemote(listOf(RemoteDriver("remote", "운전자", "영업", DriverStatus.ACTIVE)))
+        assertEquals("별명", repo.profiles.first().single().displayName)
+    }
+
     @Test fun activeDriverCannotBeHiddenAndCompletedTripIsKept() = runBlocking {
         val id = repo.addProfile("운전자", 1)
         val trip = TripEntity(driverId = id, startedAt = 1, startOdometerKm = 10f, lastOdometerKm = 10f, lastSavedAt = 1)
