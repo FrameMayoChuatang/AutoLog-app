@@ -53,37 +53,36 @@ private val ProfileHues = listOf(197f, 264f, 331f, 47f, 146f, 356f, 240f)
 private val ProfileSaturations = listOf(.64f, .32f, .28f, .50f, .40f, .65f, .08f)
 private val avatarArtworkLoader = AvatarArtworkLoader()
 
-/** 원본 표정을 유지하며 몸통 색상만 변경한다. 눈을 뜬 기본·윙크·버럭 표정은 편집 중 깜박인다. */
+/** 몸체·색상은 공통 이미지를 사용하고, 표정은 투명한 눈 레이어만 교체한다. */
 @Composable
 internal fun DriverAvatar(color: Int, modifier: Modifier = Modifier, blinking: Boolean = false, expression: Int = 0, faceOnly: Boolean = false) {
     val face = ProfileExpressions.getOrElse(expression) { ProfileExpressions.first() }
     val chosenColor = color.takeIf { it in ProfileColors.indices } ?: 0
     val canBlink = blinking && expression in listOf(0, 2, 3)
-    val cropOrigin = if (faceOnly) IntOffset(445, 495) else IntOffset(200, 310)
-    val cropSize = if (faceOnly) IntSize(360, 230) else IntSize(860, 645)
-    val resources = LocalContext.current.applicationContext.resources
     val density = LocalDensity.current.density
     val sampleSize = if (blinking) 1 else if (faceOnly || density > 1.5f) 2 else 4
-    val loaded by key(face.artwork, sampleSize) {
-        produceState<Bitmap?>(avatarArtworkLoader.cached(face.artwork, sampleSize), resources) {
-            value = avatarArtworkLoader.load(resources, face.artwork, sampleSize)
-        }
-    }
-    val bitmap = loaded
-    if (bitmap == null) {
+    val eyes = rememberAvatarBitmap(face.artwork, sampleSize, eyesOnly = true)
+    val bitmap = if (faceOnly) null else rememberAvatarBitmap(R.drawable.driver_cloud_body, sampleSize)
+    if (eyes == null || (!faceOnly && bitmap == null)) {
         Box(modifier)
         return
     }
-    val artworkScale = bitmap.width / 1254f
-    val image = remember(bitmap) { bitmap.asImageBitmap() }
+    val eyeImage = remember(eyes) { eyes.asImageBitmap() }
+    if (faceOnly) {
+        Canvas(modifier) { drawImage(eyeImage, dstSize = IntSize(size.width.toInt(), size.height.toInt())) }
+        return
+    }
+    val body = requireNotNull(bitmap)
+    val artworkScale = body.width / 1254f
+    val image = remember(body) { body.asImageBitmap() }
     val paint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
-    val needsShader = canBlink || chosenColor != face.presetColor
-    val shader = remember(bitmap, needsShader) {
+    val needsShader = canBlink || chosenColor != 0
+    val shader = remember(body, eyes, needsShader) {
         if (Build.VERSION.SDK_INT >= 33 && needsShader) RuntimeShader(AvatarShader).apply {
-            setInputShader("artwork", BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
-                // 눈·표정 좌표는 원본 기준으로 유지하고 작은 목록 이미지만 축소 디코딩한다.
+            setInputShader("artwork", BitmapShader(body, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
                 setLocalMatrix(Matrix().apply { setScale(1f / artworkScale, 1f / artworkScale) })
             })
+            setInputShader("eyes", BitmapShader(eyes, Shader.TileMode.DECAL, Shader.TileMode.DECAL))
         } else null
     }
     val blink = remember { Animatable(0f) }
@@ -105,32 +104,45 @@ internal fun DriverAvatar(color: Int, modifier: Modifier = Modifier, blinking: B
         drawIntoCanvas { hardwareCanvas = it.nativeCanvas.isHardwareAccelerated }
         if (Build.VERSION.SDK_INT >= 33 && shader != null && hardwareCanvas) {
             shader.setFloatUniform("viewport", size.width, size.height)
-            shader.setFloatUniform("origin", cropOrigin.x.toFloat(), cropOrigin.y.toFloat())
-            shader.setFloatUniform("cropSize", cropSize.width.toFloat(), cropSize.height.toFloat())
-            shader.setFloatUniform("recolor", if (chosenColor == face.presetColor) 0f else 1f)
-            shader.setFloatUniform("sourceHue", ProfileHues[face.presetColor] / 360f)
+            shader.setFloatUniform("eyeScale", eyes.width / 360f, eyes.height / 230f)
+            shader.setFloatUniform("recolor", if (chosenColor == 0) 0f else 1f)
+            shader.setFloatUniform("sourceHue", ProfileHues[0] / 360f)
             shader.setFloatUniform("targetHue", ProfileHues[chosenColor] / 360f)
-            shader.setFloatUniform("saturationScale", ProfileSaturations[chosenColor] / ProfileSaturations[face.presetColor])
+            shader.setFloatUniform("saturationScale", ProfileSaturations[chosenColor] / ProfileSaturations[0])
             shader.setFloatUniform("blink", if (canBlink) blink.value else 0f)
             shader.setFloatUniform("leftEye", if (expression == 0) 566f else 556f, if (expression == 3) 625f else 605f)
             shader.setFloatUniform("rightEye", if (expression == 2) -1000f else 714f, if (expression == 3) 630f else 616f)
             paint.shader = shader
             drawIntoCanvas { it.nativeCanvas.drawRect(0f, 0f, size.width, size.height, paint) }
         } else {
-            // API 28–32 또는 소프트웨어 캔버스는 원본 정적 캐릭터로 표시한다. Pleos의 하드웨어 렌더링에서는 색상과 깜박임을 지원한다.
+            // 원본 기준 좌표를 공유하므로 표정 변경 시 몸체의 위치·크기는 변하지 않는다.
             drawImage(image,
-                IntOffset((cropOrigin.x * artworkScale).toInt(), (cropOrigin.y * artworkScale).toInt()),
-                IntSize((cropSize.width * artworkScale).toInt(), (cropSize.height * artworkScale).toInt()),
+                IntOffset((200 * artworkScale).toInt(), (310 * artworkScale).toInt()),
+                IntSize((860 * artworkScale).toInt(), (645 * artworkScale).toInt()),
                 dstSize = IntSize(size.width.toInt(), size.height.toInt()))
+            drawImage(eyeImage,
+                dstOffset = IntOffset((245f / 860f * size.width).toInt(), (185f / 645f * size.height).toInt()),
+                dstSize = IntSize((360f / 860f * size.width).toInt(), (230f / 645f * size.height).toInt()))
         }
     }
 }
 
+@Composable
+private fun rememberAvatarBitmap(resourceId: Int, sampleSize: Int, eyesOnly: Boolean = false): Bitmap? {
+    val resources = LocalContext.current.applicationContext.resources
+    val bitmap by key(resourceId, sampleSize, eyesOnly) {
+        produceState<Bitmap?>(avatarArtworkLoader.cached(resourceId, sampleSize, eyesOnly), resources) {
+            value = avatarArtworkLoader.load(resources, resourceId, sampleSize, eyesOnly)
+        }
+    }
+    return bitmap
+}
+
 private const val AvatarShader = """
 uniform shader artwork;
+uniform shader eyes;
 uniform float2 viewport;
-uniform float2 origin;
-uniform float2 cropSize;
+uniform float2 eyeScale;
 uniform float recolor;
 uniform float sourceHue;
 uniform float targetHue;
@@ -161,8 +173,7 @@ float2 blinkEye(float2 pixel,float2 center) {
     return center+float2(.961*local.x-.276*local.y,.276*local.x+.961*local.y);
 }
 half4 main(float2 position) {
-    float2 pixel=origin+position/viewport*cropSize;
-    if(blink>0.) { pixel=blinkEye(pixel,leftEye);pixel=blinkEye(pixel,rightEye); }
+    float2 pixel=float2(200.,310.)+position/viewport*float2(860.,645.);
     float3 color=artwork.eval(pixel).rgb;
     if(recolor>0.) {
         float3 hsv=rgb2hsv(color);
@@ -173,6 +184,9 @@ half4 main(float2 position) {
         hsv.y=clamp(hsv.y*saturationScale,0.,1.);
         color=mix(color,hsv2rgb(hsv),body);
     }
-    return half4(color,1.);
+    float2 eyePixel=pixel;
+    if(blink>0.) { eyePixel=blinkEye(eyePixel,leftEye);eyePixel=blinkEye(eyePixel,rightEye); }
+    half4 eyeColor=eyes.eval((eyePixel-float2(445.,495.))*eyeScale);
+    return half4(color*(1.-eyeColor.a)+eyeColor.rgb,1.);
 }
 """
