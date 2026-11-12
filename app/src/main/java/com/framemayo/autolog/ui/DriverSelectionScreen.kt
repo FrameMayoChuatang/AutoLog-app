@@ -194,11 +194,10 @@ internal fun DriverSelectionScreen(
                                 Column(
                                     Modifier.fillMaxWidth().layout { measurable, constraints ->
                                         val group = measurable.measure(constraints)
-                                        // 탑바 높이를 제외해 기존 화면 중앙을 유지하고, 목록만 탑바 아래에서 스크롤한다.
-                                        val centered = (viewportHeight.roundToPx() - group.height) / 2 - topBarHeight
+                                        // 고정 탑바·차량 카드와 더보기 공간을 제외한 실제 목록 영역 안에서 중앙을 맞춘다.
                                         val buttonSpace = if (others.isNotEmpty()) 104.dp.roundToPx() else 0
                                         val available = viewportHeight.roundToPx() - topBarHeight - footerPx - group.height - buttonSpace
-                                        val top = minOf(centered, available).coerceAtLeast(0)
+                                        val top = (available / 2).coerceAtLeast(0)
                                         layout(group.width, top + group.height) { group.placeRelative(0, top) }
                                     },
                                     horizontalAlignment = Alignment.CenterHorizontally,
