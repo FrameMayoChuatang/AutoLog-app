@@ -136,6 +136,18 @@ interface TripLocationDao {
     @Upsert
     suspend fun upsert(location: TripLocationEntity)
 
+    // 위치 조회 중 철회/개인 목적 변경이 발생해도 오래된 동의로 위치가 다시 생기지 않게 한다.
+    @Query("""
+        INSERT OR REPLACE INTO trip_locations (tripId, latitude, longitude, accuracyM, capturedAt)
+        SELECT :tripId, :latitude, :longitude, :accuracyM, :capturedAt
+        WHERE EXISTS (
+            SELECT 1 FROM trips t JOIN drivers d ON d.id = t.driverId
+            WHERE t.id = :tripId AND t.driverId = :driverId
+              AND d.locationConsent = 1 AND t.purpose != 'PERSONAL'
+        )
+    """)
+    suspend fun upsertIfConsented(tripId: Long, driverId: Long, latitude: Double, longitude: Double, accuracyM: Float?, capturedAt: Long): Long
+
     @Query("SELECT * FROM trip_locations WHERE tripId = :tripId")
     suspend fun get(tripId: Long): TripLocationEntity?
 

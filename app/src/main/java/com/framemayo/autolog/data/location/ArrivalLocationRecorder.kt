@@ -20,10 +20,11 @@ class ArrivalLocationRecorder(
 ) {
     suspend fun recordArrival(trip: TripEntity, consent: Boolean?): ArrivalResult {
         if (!LocationPolicy.canCapture(consent)) return ArrivalResult.NO_CONSENT
+        val driverId = trip.driverId ?: return ArrivalResult.NO_CONSENT
         if (!source.isAvailable()) return ArrivalResult.UNAVAILABLE
         val fix = source.currentFix() ?: return ArrivalResult.NO_FIX
-        dao.upsert(TripLocationEntity(trip.id, fix.latitude, fix.longitude, fix.accuracyM, fix.capturedAt))
-        return ArrivalResult.SAVED
+        val stored = dao.upsertIfConsented(trip.id, driverId, fix.latitude, fix.longitude, fix.accuracyM, fix.capturedAt)
+        return if (stored != -1L) ArrivalResult.SAVED else ArrivalResult.NO_CONSENT
     }
 
     suspend fun settle(tripId: Long, consent: Boolean?, purpose: TripPurpose) {
