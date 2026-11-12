@@ -2,6 +2,7 @@ package com.framemayo.autolog.data.retention
 
 import com.framemayo.autolog.data.fakeTripDao
 import com.framemayo.autolog.data.local.SyncState
+import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.repository.TripRepositoryImpl
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -14,6 +15,13 @@ class RetentionTest {
     private val repo = TripRepositoryImpl(dao, clock = { now })
 
     private suspend fun finishedAt(t: Long, km: Float): com.framemayo.autolog.data.local.TripEntity {
+        now = t; repo.start(1, km)
+        val ended = repo.end(km + 1)!!
+        repo.setPurpose(ended.id, TripPurpose.PERSONAL)
+        return dao.get(ended.id)!!
+    }
+
+    private suspend fun unconfirmedAt(t: Long, km: Float): com.framemayo.autolog.data.local.TripEntity {
         now = t; repo.start(1, km); return repo.end(km + 1)!!
     }
 
@@ -63,6 +71,19 @@ class RetentionTest {
         assertEquals(1, repo.purgeSynced(days))
         assertEquals(null, dao.get(synced.id))
         assertEquals(SyncState.PENDING, dao.get(pending.id)!!.syncState)
+    }
+
+    @Test fun unconfirmedSyncedTripsAreKeptUntilPurposeIsChosen() = runBlocking {
+        val unconfirmed = unconfirmedAt(0, 100f); repo.markSynced(unconfirmed)
+        now = 365 * day
+        assertEquals(0, repo.purgeSynced(30))
+        assertEquals(0, repo.purgeSynced(RetentionScheduler.retentionDaysFor(0)))
+        assertEquals(SyncState.SYNCED, dao.get(unconfirmed.id)!!.syncState)
+
+        repo.setPurpose(unconfirmed.id, TripPurpose.BUSINESS_COMMUTE)
+        repo.markSynced(dao.get(unconfirmed.id)!!)
+        now += 31 * day
+        assertEquals(1, repo.purgeSynced(30))
     }
 
     @Test fun enoughStorageKeepsNormalRetention() {

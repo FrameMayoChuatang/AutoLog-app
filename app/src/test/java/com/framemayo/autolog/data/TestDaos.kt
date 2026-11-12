@@ -3,6 +3,7 @@ package com.framemayo.autolog.data
 import com.framemayo.autolog.data.local.SyncState
 import com.framemayo.autolog.data.local.TripDao
 import com.framemayo.autolog.data.local.TripEntity
+import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.local.TripStatus
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.flow.flowOf
@@ -22,7 +23,7 @@ internal fun fakeTripDao(): TripDao {
             "pendingSync" -> rows.filter { it.syncState == SyncState.PENDING }.sortedBy { it.startedAt }
             "deleteSyncedBefore" -> {
                 val n = rows.size
-                rows.removeAll { it.syncState == SyncState.SYNCED && it.status != TripStatus.ACTIVE && (it.syncedAt ?: Long.MAX_VALUE) < (a[0] as Long) }
+                rows.removeAll { it.syncState == SyncState.SYNCED && it.status != TripStatus.ACTIVE && it.purpose != TripPurpose.UNCONFIRMED && (it.syncedAt ?: Long.MAX_VALUE) < (a[0] as Long) }
                 n - rows.size
             }
             "markSynced" -> {
