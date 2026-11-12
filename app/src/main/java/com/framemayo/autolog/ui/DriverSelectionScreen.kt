@@ -83,7 +83,7 @@ private val SelectionColors = darkColorScheme(
     onSurfaceVariant = Color(0xFFB9BEC8), outline = Color(0xFF696B75),
 )
 
-/** 프로필 순서는 저장소가 실제 운행 시각으로 정렬한다. 검색 결과는 최근 5명과 별도로 표시한다. */
+/** 프로필 순서는 저장소가 실제 운행 시각으로 정렬한다. 검색은 모달 안의 결과에만 적용한다. */
 @Composable
 internal fun DriverSelectionScreen(
     profiles: List<DriverProfile>,
@@ -109,7 +109,7 @@ internal fun DriverSelectionScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     val haptic = LocalHapticFeedback.current
     val recent = profiles.take(5)
-    val others = if (query.isBlank()) profiles.drop(5) else profiles.filter { it.displayName.contains(query.trim(), ignoreCase = true) }
+    val others = profiles.drop(5)
     LaunchedEffect(parked) {
         if (!parked) { searching = false; editing = false; deletingId = null; blocked = false; managing = false; query = ""; keyboard?.hide() }
     }
@@ -180,9 +180,7 @@ internal fun DriverSelectionScreen(
                             }
                         }
                         item {
-                            Box(Modifier.fillMaxWidth().padding(top = 72.dp), contentAlignment = Alignment.Center) {
-                                if (query.isNotBlank() && others.isEmpty()) Text("검색 결과가 없습니다.", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
-                            }
+                            Box(Modifier.fillMaxWidth().padding(top = 72.dp))
                         }
                         items(others.chunked(columns), key = { row -> "others-${row.first().driver.id}" }) { row ->
                             Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.Top) { row.forEach { card(it) } }
@@ -194,9 +192,10 @@ internal fun DriverSelectionScreen(
         if (parked && searching) DriverSearchDialog(
             query = query, onQuery = { query = it }, profiles = profiles,
             sourceBounds = searchBounds, managing = managing,
-            onDismiss = { searching = false },
+            onDismiss = { searching = false; query = "" },
             onSelect = { profile ->
                 searching = false
+                query = ""
                 if (managing) { editingId = profile.driver.id; error = null; editing = true }
                 else select(profile)
             },
