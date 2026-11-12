@@ -33,13 +33,12 @@ interface DriverDao {
         return id
     }
 
-    /** 프로필과 동의 상태를 한 번에 공개하여 동의 없는 신규 프로필의 부분 저장을 막는다. */
+    /** 프로필과 선택한 동의 상태를 함께 저장하여 부분 저장을 막는다. */
     @Transaction
     suspend fun saveProfileWithConsent(id: Long?, name: String, color: Int, expression: Int, consent: Boolean, at: Long): Long {
         if (id == null) {
-            require(consent) { "위치정보 수집 동의가 필요합니다." }
             val created = addProfile(name, color, expression)
-            setConsent(created, true, at)
+            setConsent(created, consent, at)
             return created
         }
         val driver = requireNotNull(byId(id)) { "프로필을 찾을 수 없습니다." }
