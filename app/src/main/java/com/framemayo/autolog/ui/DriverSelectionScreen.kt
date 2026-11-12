@@ -2,6 +2,8 @@ package com.framemayo.autolog.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -87,6 +90,7 @@ private val SelectionColors = darkColorScheme(
 )
 
 /** 프로필 순서는 저장소가 실제 운행 시각으로 정렬한다. 검색은 모달 안의 결과에만 적용한다. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun DriverSelectionScreen(
     profiles: List<DriverProfile>,
@@ -171,6 +175,8 @@ internal fun DriverSelectionScreen(
                             colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
                         ) { Text("최근 운행", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
                     }
+                    // 경계에서 화면이 늘어났다 복귀하는 효과만 끄고 목록의 드래그·플링은 유지한다.
+                    CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
                     LazyColumn(
                         Modifier.weight(1f).fillMaxWidth(), state = listState, horizontalAlignment = Alignment.CenterHorizontally,
                         contentPadding = PaddingValues(bottom = 40.dp),
@@ -234,6 +240,7 @@ internal fun DriverSelectionScreen(
                                 colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
                             ) { Text("접기", fontSize = 20.sp) }
                         }
+                    }
                     }
                     if (!managing) Box(
                         Modifier.fillMaxWidth().onSizeChanged { footerHeight = it.height }.padding(top = 16.dp, bottom = 24.dp),
