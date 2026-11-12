@@ -189,7 +189,7 @@ internal fun DriverSelectionScreen(
                             // 첫 화면 안에 더보기를 두고, 펼친 목록은 실제 스크롤 영역 아래에서 시작한다.
                             Column(Modifier.fillMaxWidth().heightIn(min = firstPageHeight),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.SpaceBetween) {
+                                verticalArrangement = Arrangement.Top) {
                             Box(Modifier.fillMaxWidth()) {
                                 Column(
                                     Modifier.fillMaxWidth().layout { measurable, constraints ->
