@@ -29,7 +29,7 @@ class TripReviewCardTest {
 
     @Test fun confirmedPurposeCanBeChangedAndCancelledWithoutSaving() {
         val saved = mutableListOf<TripPurpose>()
-        compose.setContent { AutoLogTheme { TripReviewCard(trip.copy(purpose = TripPurpose.PERSONAL), state, true, {}, { saved += it }) } }
+        compose.setContent { AutoLogTheme { TripReviewCard(trip.copy(purpose = TripPurpose.PERSONAL), state, true, {}, { purpose, _ -> saved += purpose }) } }
         compose.onNodeWithText("COMPLETED", substring = true).assertDoesNotExist()
         compose.onNodeWithText("완료").assertIsDisplayed()
         compose.onNodeWithText("확인 및 수정").performClick()
@@ -44,7 +44,7 @@ class TripReviewCardTest {
 
     @Test fun driverAssignmentSearchesAllProfilesAndRequiresConfirmation() {
         val assigned = mutableListOf<Long>()
-        compose.setContent { AutoLogTheme { TripReviewCard(trip, state, true, { assigned += it }, {}) } }
+        compose.setContent { AutoLogTheme { TripReviewCard(trip, state, true, { assigned += it }, { _, _ -> }) } }
         compose.onNodeWithText("운행 확인").performClick()
         compose.onNodeWithText("목적 저장").assertIsNotEnabled()
         compose.onNodeWithText("운전자 지정").performClick()
@@ -57,7 +57,7 @@ class TripReviewCardTest {
 
     @Test fun assignedDriverCannotBeReassignedAndDrivingClosesReview() {
         val parked = mutableStateOf(true)
-        compose.setContent { AutoLogTheme { TripReviewCard(trip.copy(driverId = 1), state, parked.value, {}, {}) } }
+        compose.setContent { AutoLogTheme { TripReviewCard(trip.copy(driverId = 1), state, parked.value, {}, { _, _ -> }) } }
         compose.onNodeWithText("운전자1").assertIsDisplayed()
         compose.onNodeWithText("운행 확인").performClick()
         compose.onNodeWithText("운전자 지정").assertDoesNotExist()
@@ -65,6 +65,33 @@ class TripReviewCardTest {
         compose.runOnIdle { parked.value = false }
         compose.onNodeWithText("목적 저장").assertDoesNotExist()
         compose.onNodeWithText("운행 확인").assertIsNotEnabled()
+    }
+
+    @Test fun businessRequiresTextAndSavesCatalogChoiceSeparately() {
+        var saved: Pair<TripPurpose, String?>? = null
+        compose.setContent { AutoLogTheme { TripReviewCard(
+            trip, state, true, {}, { p, text -> saved = p to text },
+            { listOf(PurposeEntity("visit", "거래처 방문")) },
+        ) } }
+        compose.onNodeWithText("운행 확인").performClick()
+        compose.onNodeWithText("업무", substring = false).performClick()
+        compose.onNodeWithText("목적 저장").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("거래처 방문", substring = false).performScrollTo().performClick()
+        compose.onNodeWithText("목적 저장").performScrollTo().performClick()
+        assertEquals(TripPurpose.BUSINESS_GENERAL to "거래처 방문", saved)
+    }
+
+    @Test fun offlineCatalogAllowsDirectInputAndSaveFailureKeepsDraft() {
+        compose.setContent { AutoLogTheme { TripReviewCard(
+            trip, state, true, {}, { _, _ -> error("disk failure") }, { null },
+        ) } }
+        compose.onNodeWithText("운행 확인").performClick()
+        compose.onNodeWithText("업무", substring = false).performClick()
+        compose.onNodeWithText("업무 목적", substring = false).performScrollTo().performTextInput("직접 입력")
+        compose.onNodeWithText("목록을 불러오지 못했어요", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("목적 저장").performScrollTo().performClick()
+        compose.onNodeWithText("저장하지 못했어요", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("업무 목적", substring = false).performScrollTo().assertTextContains("직접 입력")
     }
 
     private fun screenshot(name: String) {

@@ -107,10 +107,11 @@ class DriverProfileTest {
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
             it.execSQL("DROP TABLE driver_profiles")
             it.execSQL("DROP TABLE room_master_table")
+            removePurposeTextColumn(it)
             it.version = 9
         }
         fun open() = Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
-            .addMigrations(AutoLogDatabase.MIGRATION_9_10).allowMainThreadQueries().build()
+            .addMigrations(AutoLogDatabase.MIGRATION_9_10, AutoLogDatabase.MIGRATION_10_11).allowMainThreadQueries().build()
         val migrated = open()
         try {
             val repository = DriverRepositoryImpl(migrated.driverDao())
@@ -146,10 +147,11 @@ class DriverProfileTest {
             it.execSQL("DROP TABLE driver_profiles")
             it.execSQL("ALTER TABLE driver_profiles_v8 RENAME TO driver_profiles")
             it.execSQL("DROP TABLE room_master_table")
+            removePurposeTextColumn(it)
             it.version = 8
         }
         val migrated = Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
-            .addMigrations(AutoLogDatabase.MIGRATION_8_10).allowMainThreadQueries().build()
+            .addMigrations(AutoLogDatabase.MIGRATION_8_10, AutoLogDatabase.MIGRATION_10_11).allowMainThreadQueries().build()
         try {
             val profile = migrated.driverDao().observeProfiles().first().single()
             assertEquals(id, profile.driver.id)

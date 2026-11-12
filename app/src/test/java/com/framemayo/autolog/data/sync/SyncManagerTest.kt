@@ -197,6 +197,23 @@ class SyncManagerTest {
         return t
     }
 
+    @Test fun customPurposeSurvivesOfflineAndReconfirmationWithoutChangingMeasurements() = runBlocking {
+        val trip = finishedTrip()
+        repo.setPurpose(trip.id, TripPurpose.BUSINESS_GENERAL, memo = "메모 유지", purposeText = "거래처 방문")
+        api.online = false
+        assertFalse(sync.syncPending())
+        api.online = true
+        assertTrue(sync.syncPending())
+        assertEquals("거래처 방문", api.confirms.last().purposeText)
+        assertEquals("메모 유지", api.confirms.last().note)
+        val uploads = api.uploads.size
+        repo.setPurpose(trip.id, TripPurpose.BUSINESS_GENERAL, purposeText = "물품 수령")
+        assertTrue(sync.syncPending())
+        assertEquals("물품 수령", api.confirms.last().purposeText)
+        assertEquals("차량에서 목적 변경", api.confirms.last().reason)
+        assertEquals(uploads, api.uploads.size)
+    }
+
     @Test fun chosenPurposeIsConfirmedAfterMeasurementAndBecomesSynced() = runBlocking {
         val t = finishedWithPurpose(TripPurpose.BUSINESS_GENERAL, "계약 미팅")
         assertTrue(sync.syncPending())
