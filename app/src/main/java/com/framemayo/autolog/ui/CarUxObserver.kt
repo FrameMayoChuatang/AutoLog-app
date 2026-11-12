@@ -6,12 +6,17 @@ import android.car.drivingstate.CarUxRestrictionsManager
 import android.content.Context
 import android.util.Log
 
+internal enum class DrivingUxFailure {
+    WAITING, DISCONNECTED, READ_FAILED, API_UNAVAILABLE,
+}
+
 /** 제한 상태를 받기 전이나 연결이 끊긴 동안에는 입력을 허용하지 않는다. */
 internal data class DrivingUxState(
     val ready: Boolean = false,
     val requiresOptimization: Boolean = true,
     val activeRestrictions: Int = 0,
     val maxStringLength: Int = 20,
+    val failure: DrivingUxFailure = DrivingUxFailure.WAITING,
 ) {
     val allowsInput: Boolean get() = ready && !requiresOptimization && activeRestrictions == 0
 }
@@ -28,7 +33,7 @@ internal class CarUxObserver(private val context: Context, private val onChanged
         try {
             car = Car.createCar(context, null, Car.CAR_WAIT_TIMEOUT_DO_NOT_WAIT) { connectedCar, ready ->
                 if (session != generation) return@createCar
-                onChanged(DrivingUxState())
+                onChanged(DrivingUxState(failure = DrivingUxFailure.DISCONNECTED))
                 manager = null
                 if (ready) {
                     try {
@@ -39,14 +44,19 @@ internal class CarUxObserver(private val context: Context, private val onChanged
                         }
                         publish(restrictions.currentCarUxRestrictions)
                     } catch (error: RuntimeException) {
-                        onChanged(DrivingUxState())
+                        onChanged(DrivingUxState(failure = DrivingUxFailure.READ_FAILED))
                         Log.w(TAG, "주행 제한 상태를 읽을 수 없어 입력을 잠급니다", error)
+                    } catch (error: LinkageError) {
+                        onChanged(DrivingUxState(failure = DrivingUxFailure.API_UNAVAILABLE))
+                        Log.w(TAG, "차량 제한 API를 사용할 수 없습니다", error)
                     }
                 }
             }
         } catch (error: RuntimeException) {
+            onChanged(DrivingUxState(failure = DrivingUxFailure.DISCONNECTED))
             Log.w(TAG, "차량 제한 서비스 연결 실패", error)
         } catch (error: LinkageError) {
+            onChanged(DrivingUxState(failure = DrivingUxFailure.API_UNAVAILABLE))
             // 표준 API가 없는 이미지에서도 운행 현황은 표시하되 입력은 잠근다.
             Log.w(TAG, "차량 제한 API를 사용할 수 없습니다", error)
         }
@@ -55,7 +65,7 @@ internal class CarUxObserver(private val context: Context, private val onChanged
     private fun publish(value: CarUxRestrictions?) {
         onChanged(value?.let {
             DrivingUxState(true, it.isRequiresDistractionOptimization, it.activeRestrictions, it.maxRestrictedStringLength)
-        } ?: DrivingUxState())
+        } ?: DrivingUxState(failure = DrivingUxFailure.READ_FAILED))
     }
 
     fun stop() {
@@ -65,12 +75,16 @@ internal class CarUxObserver(private val context: Context, private val onChanged
             manager?.unregisterListener()
         } catch (error: RuntimeException) {
             Log.w(TAG, "주행 제한 구독 해제 실패", error)
+        } catch (error: LinkageError) {
+            Log.w(TAG, "주행 제한 구독 해제 API 미지원", error)
         } finally {
             manager = null
             try {
                 car?.disconnect()
             } catch (error: RuntimeException) {
                 Log.w(TAG, "차량 제한 연결 해제 실패", error)
+            } catch (error: LinkageError) {
+                Log.w(TAG, "차량 제한 연결 해제 API 미지원", error)
             }
             car = null
         }

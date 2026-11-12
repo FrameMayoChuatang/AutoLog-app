@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
             AutoLogTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val state by viewModel.state.collectAsStateWithLifecycle()
-                    DrivingRestrictionGate(state, drivingUx) {
+                    DrivingRestrictionGate(state, drivingUx, onRetryRestrictions = uxObserver::start) {
                         LaunchedEffect(Unit) {
                             if (Build.VERSION.SDK_INT >= 33 && !notificationPermissionRequested) {
                                 notificationPermissionRequested = true

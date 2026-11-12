@@ -32,9 +32,9 @@ class DrivingRestrictionTest {
     private val state = mutableStateOf(MainUiState(vehicle = parked, profiles = listOf(profile), linked = true))
     private val ux = mutableStateOf(clearUx)
 
-    private fun show() = compose.setContent {
+    private fun show(onRetry: () -> Unit = {}) = compose.setContent {
         AutoLogTheme {
-            DrivingRestrictionGate(state.value, ux.value) {
+            DrivingRestrictionGate(state.value, ux.value, onRetryRestrictions = onRetry) {
                 DriverSelectionScreen(state.value.profiles, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {})
             }
         }
@@ -104,6 +104,44 @@ class DrivingRestrictionTest {
         compose.onNodeWithText("25분").assertIsDisplayed()
         compose.onNodeWithText("운행 종료").assertDoesNotExist()
         compose.onAllNodes(hasClickAction()).assertCountEquals(0)
+    }
+
+    @Test fun restrictionFailureExplainsLockAndRetryDoesNotUnlockBeforeConfirmedState() {
+        ux.value = DrivingUxState(failure = DrivingUxFailure.READ_FAILED)
+        var retries = 0
+        show { retries++ }
+        compose.onNodeWithText("주행 제한 정보를 읽을 수 없음 · 입력 잠금").assertIsDisplayed()
+        compose.onNodeWithText("제한 정보 다시 연결").performClick()
+        compose.runOnIdle { assertEquals(1, retries) }
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertDoesNotExist()
+        compose.runOnIdle { ux.value = clearUx }
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertIsDisplayed()
+        compose.onNodeWithText("제한 정보 다시 연결").assertDoesNotExist()
+    }
+
+    @Test fun unavailableApiAndDisconnectedServiceHaveDistinctReasonsAndNoDrivingAction() {
+        ux.value = DrivingUxState(failure = DrivingUxFailure.API_UNAVAILABLE)
+        show()
+        compose.onNodeWithText("주행 제한 API 미지원 · 입력 잠금").assertIsDisplayed()
+        compose.runOnIdle {
+            ux.value = DrivingUxState(failure = DrivingUxFailure.DISCONNECTED)
+            state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE))
+        }
+        compose.onNodeWithText("주행 제한 서비스 연결 끊김 · 입력 잠금").assertIsDisplayed()
+        compose.onAllNodes(hasClickAction()).assertCountEquals(0)
+    }
+
+    @Test
+    @Config(qualifiers = "w640dp-h360dp-land-night-mdpi")
+    fun compactRestrictionFailureKeepsRetryAndTripValuesVisible() {
+        ux.value = DrivingUxState(failure = DrivingUxFailure.READ_FAILED)
+        state.value = state.value.copy(activeTrip = TripEntity(id = 1, driverId = 1,
+            startedAt = 0, startOdometerKm = 100f, lastOdometerKm = 101f, lastSavedAt = 60_000L))
+        show()
+        compose.onNodeWithText("제한 정보 다시 연결").assertIsDisplayed()
+        compose.onNodeWithText("주행 제한 정보를 읽을 수 없음 · 입력 잠금").assertIsDisplayed()
+        compose.onNodeWithText("1.0 km").assertIsDisplayed()
+        compose.onNodeWithText("1분").assertIsDisplayed()
     }
 
     @Test
