@@ -1,7 +1,8 @@
 package com.framemayo.autolog.ui
 
-import android.graphics.BitmapFactory
+import android.graphics.Bitmap
 import android.graphics.BitmapShader
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RuntimeShader
 import android.graphics.Shader
@@ -9,15 +10,20 @@ import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.Lifecycle
@@ -45,6 +51,7 @@ internal val ProfileExpressions = listOf(
 )
 private val ProfileHues = listOf(197f, 264f, 331f, 47f, 146f, 356f, 240f)
 private val ProfileSaturations = listOf(.64f, .32f, .28f, .50f, .40f, .65f, .08f)
+private val avatarArtworkLoader = AvatarArtworkLoader()
 
 /** 원본 표정을 유지하며 몸통 색상만 변경한다. 눈을 뜬 기본·윙크·버럭 표정은 편집 중 깜박인다. */
 @Composable
@@ -54,13 +61,29 @@ internal fun DriverAvatar(color: Int, modifier: Modifier = Modifier, blinking: B
     val canBlink = blinking && expression in listOf(0, 2, 3)
     val cropOrigin = if (faceOnly) IntOffset(445, 495) else IntOffset(200, 310)
     val cropSize = if (faceOnly) IntSize(360, 230) else IntSize(860, 645)
-    val resources = LocalContext.current.resources
-    val bitmap = remember(resources, face.artwork) { BitmapFactory.decodeResource(resources, face.artwork) }
+    val resources = LocalContext.current.applicationContext.resources
+    val density = LocalDensity.current.density
+    val sampleSize = if (blinking) 1 else if (faceOnly || density > 1.5f) 2 else 4
+    val loaded by key(face.artwork, sampleSize) {
+        produceState<Bitmap?>(avatarArtworkLoader.cached(face.artwork, sampleSize), resources) {
+            value = avatarArtworkLoader.load(resources, face.artwork, sampleSize)
+        }
+    }
+    val bitmap = loaded
+    if (bitmap == null) {
+        Box(modifier)
+        return
+    }
+    val artworkScale = bitmap.width / 1254f
     val image = remember(bitmap) { bitmap.asImageBitmap() }
     val paint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
-    val shader = remember(bitmap) {
-        if (Build.VERSION.SDK_INT >= 33) RuntimeShader(AvatarShader).apply {
-            setInputShader("artwork", BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP))
+    val needsShader = canBlink || chosenColor != face.presetColor
+    val shader = remember(bitmap, needsShader) {
+        if (Build.VERSION.SDK_INT >= 33 && needsShader) RuntimeShader(AvatarShader).apply {
+            setInputShader("artwork", BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
+                // 눈·표정 좌표는 원본 기준으로 유지하고 작은 목록 이미지만 축소 디코딩한다.
+                setLocalMatrix(Matrix().apply { setScale(1f / artworkScale, 1f / artworkScale) })
+            })
         } else null
     }
     val blink = remember { Animatable(0f) }
@@ -95,7 +118,10 @@ internal fun DriverAvatar(color: Int, modifier: Modifier = Modifier, blinking: B
             drawIntoCanvas { it.nativeCanvas.drawRect(0f, 0f, size.width, size.height, paint) }
         } else {
             // API 28–32 또는 소프트웨어 캔버스는 원본 정적 캐릭터로 표시한다. Pleos의 하드웨어 렌더링에서는 색상과 깜박임을 지원한다.
-            drawImage(image, cropOrigin, cropSize, dstSize = IntSize(size.width.toInt(), size.height.toInt()))
+            drawImage(image,
+                IntOffset((cropOrigin.x * artworkScale).toInt(), (cropOrigin.y * artworkScale).toInt()),
+                IntSize((cropSize.width * artworkScale).toInt(), (cropSize.height * artworkScale).toInt()),
+                dstSize = IntSize(size.width.toInt(), size.height.toInt()))
         }
     }
 }

@@ -46,7 +46,7 @@ class DriverSelectionScreenTest {
         screenshot("selection-native")
     }
 
-    @Test fun moreButtonRevealsExtraProfilesAndCanCollapseThem() {
+    @Test fun moreButtonDisappearsAfterRevealingExtraProfiles() {
         val starts = mutableListOf<Long>()
         show(onStart = { starts.add(it) })
         compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").assertIsDisplayed()
@@ -54,9 +54,9 @@ class DriverSelectionScreenTest {
         compose.onNodeWithText("더보기").assertIsDisplayed().performClick()
         compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").performScrollTo().assertIsDisplayed().performClick()
         assertEquals(listOf(6L), starts)
-        compose.onNodeWithText("접기").performScrollTo().performClick()
-        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertDoesNotExist()
-        compose.onNodeWithText("더보기").assertIsDisplayed()
+        compose.onNodeWithText("접기").assertDoesNotExist()
+        compose.onNodeWithText("더보기").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertExists()
         compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").performScrollTo().assertIsDisplayed()
     }
 
