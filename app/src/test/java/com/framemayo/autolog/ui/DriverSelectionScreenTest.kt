@@ -196,8 +196,38 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자6 프로필 선택").performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("운전자 검색 열기").performScrollTo().performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").assertTextContains("").performTextReplacement("없는이름")
-        compose.onNodeWithText("검색 결과 0명").assertIsDisplayed()
+        compose.onNodeWithText("검색 결과가 없습니다.").assertIsDisplayed()
+        compose.onNodeWithText("검색 결과 0명").assertDoesNotExist()
+        val message = compose.onNodeWithText("검색 결과가 없습니다.").fetchSemanticsNode().boundsInRoot
+        val close = compose.onNodeWithContentDescription("검색 닫기").fetchSemanticsNode().boundsInRoot
+        assertEquals(close.center.x, message.center.x, 1f)
+        org.junit.Assert.assertTrue(message.bottom < close.top)
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextReplacement("7")
+        compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertIsDisplayed()
+        compose.onNodeWithText("검색 결과가 없습니다.").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextReplacement("없는이름")
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w540dp-h420dp-land-night-mdpi")
+    fun emptySearchKeepsMessageAndCloseVisibleWithKeyboard() {
+        compose.setContent { DriverSearchDialog("", {}, emptyList(), androidx.compose.ui.geometry.Rect.Zero, false, {}, {}) }
+        compose.onNodeWithText("검색할 프로필이 없습니다.").assertIsDisplayed()
+        compose.runOnIdle {
+            val decor = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(
+                decor,
+                androidx.core.view.WindowInsetsCompat.Builder()
+                    .setInsets(androidx.core.view.WindowInsetsCompat.Type.ime(), androidx.core.graphics.Insets.of(0, 0, 0, 180))
+                    .setVisible(androidx.core.view.WindowInsetsCompat.Type.ime(), true)
+                    .build(),
+            )
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("검색할 프로필이 없습니다.").assertIsDisplayed()
+        val close = compose.onNodeWithContentDescription("검색 닫기").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue(close.bottom <= 240f)
     }
 
     @Test fun backdropFirstEndsInputThenClosesDialogAndClearsQuery() {
