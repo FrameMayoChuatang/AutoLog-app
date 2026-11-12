@@ -3,6 +3,7 @@ package com.framemayo.autolog.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -43,6 +44,9 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import com.framemayo.autolog.R
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.layout.boundsInWindow
@@ -126,11 +130,32 @@ internal fun DriverSearchDialog(
                 ) {
                     Column(Modifier.padding(horizontal = horizontalPadding, vertical = verticalPadding)) {
                         Spacer(Modifier.height(if (compactHeight) 80.dp else 88.dp))
-                        LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (results.isEmpty()) {
+                            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                                val artworkHeight = (maxHeight - 64.dp).coerceIn(0.dp, 240.dp)
+                                Column(
+                                    Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                ) {
+                                    if (artworkHeight > 0.dp) {
+                                        Image(
+                                            painterResource(R.drawable.driver_search_empty), contentDescription = null,
+                                            modifier = Modifier.fillMaxWidth().height(artworkHeight),
+                                        )
+                                        Spacer(Modifier.height(12.dp))
+                                    }
+                                    Text(
+                                        if (query.isBlank()) "검색할 프로필이 없습니다." else "검색 결과가 없습니다.",
+                                        Modifier.fillMaxWidth(), color = Color(0xFFB7D9E8), fontSize = 22.sp,
+                                        lineHeight = 28.sp, textAlign = TextAlign.Center,
+                                    )
+                                }
+                            }
+                        } else LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             item {
                                 Text(if (query.isBlank()) "전체 운전자" else "검색 결과 ${results.size}명", fontSize = 18.sp, color = Color(0xFFB9BEC8))
                             }
-                            if (results.isEmpty()) item { Text(if (query.isBlank()) "검색할 프로필이 없습니다." else "검색 결과가 없습니다.", Modifier.padding(vertical = 20.dp), fontSize = 20.sp) }
                             items(results, key = { it.driver.id }) { profile ->
                                 Surface(
                                     onClick = { keyboard?.hide(); onSelect(profile) },
@@ -148,8 +173,8 @@ internal fun DriverSearchDialog(
                             }
                             if (compactHeight) item { closeButton() }
                         }
-                        if (!compactHeight) {
-                            Spacer(Modifier.height(24.dp))
+                        if (!compactHeight || results.isEmpty()) {
+                            Spacer(Modifier.height(if (compactHeight) 8.dp else 24.dp))
                             closeButton()
                         }
                     }
