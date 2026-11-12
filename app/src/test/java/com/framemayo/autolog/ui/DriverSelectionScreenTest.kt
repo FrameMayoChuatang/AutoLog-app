@@ -100,7 +100,7 @@ class DriverSelectionScreenTest {
     @Test fun recentTripsButtonOpensRecordsAndHidesWhileManaging() {
         var opened = 0
         compose.setContent {
-            DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _, _ -> }, { true }, {}, onOpenRecords = { opened++ })
+            DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {}, onOpenRecords = { opened++ })
         }
         compose.onNodeWithText("최근 운행").assertIsDisplayed().performClick()
         assertEquals(1, opened)
