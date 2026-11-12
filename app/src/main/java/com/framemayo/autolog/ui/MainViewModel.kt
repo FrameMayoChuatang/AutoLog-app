@@ -10,6 +10,8 @@ import com.framemayo.autolog.data.local.DriverEntity
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.sync.SyncScheduler
+import com.framemayo.autolog.data.sync.TripSyncStatus
+import com.framemayo.autolog.data.sync.syncStatus
 import com.framemayo.autolog.service.RecorderState
 import com.framemayo.autolog.service.VehicleSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +27,8 @@ data class MainUiState(
     val activeTrip: TripEntity? = null,
     val recentTrips: List<TripEntity> = emptyList(),
     val consentPrompt: DriverEntity? = null,
+    val syncStatus: Map<Long, TripSyncStatus> = emptyMap(),
+    val linked: Boolean = false,
 )
 
 data class LinkUiState(
@@ -42,13 +46,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val consentPrompt = MutableStateFlow<DriverEntity?>(null)
 
+    private val vehicleLink = app.container.vehicleLink
+
     val state: StateFlow<MainUiState> = combine(
         RecorderState.snapshot, drivers.all, trips.active, trips.recent, consentPrompt,
     ) { vehicle, driverList, active, recent, prompt ->
         MainUiState(vehicle, driverList, active, recent, prompt)
+    }.combine(vehicleLink.link) { ui, link ->
+        val byId = ui.drivers.associateBy { it.id }
+        ui.copy(
+            syncStatus = ui.recentTrips.associate { it.id to it.syncStatus(it.driverId?.let(byId::get), link != null) },
+            linked = link != null,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
-    private val vehicleLink = app.container.vehicleLink
     private val linkForm = MutableStateFlow(LinkUiState())
 
     val linkState: StateFlow<LinkUiState> = combine(vehicleLink.link, linkForm) { link, form -> form.copy(link = link) }
@@ -72,7 +83,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun disconnectVehicle() = vehicleLink.disconnect()
+    fun disconnectVehicle() {
+        vehicleLink.disconnect()
+        viewModelScope.launch {
+            drivers.clearServerLinks()
+            trips.clearServerState()
+        }
+    }
 
     fun addDriver(name: String, department: String) {
         if (name.isBlank()) return
@@ -120,6 +137,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val ended = trips.end(km) ?: return@launch
             arrival.recordArrival(ended, consentOf(ended.driverId))
         }
+    }
+
+    fun assignDriver(tripId: Long, driverId: Long) {
+        viewModelScope.launch { trips.setDriver(tripId, driverId) }
     }
 
     fun setPurpose(tripId: Long, purpose: TripPurpose) {
