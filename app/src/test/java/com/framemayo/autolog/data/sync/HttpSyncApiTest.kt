@@ -74,6 +74,11 @@ class HttpSyncApiTest {
         assertEquals("SAMPLING_INTERRUPTED", json.getJSONArray("collectionIssues").getString(0))
     }
 
+    @Test fun emptyIssuesAreSentAsEmptyArray() = runBlocking {
+        api().upload(completed.copy(collectionIssues = emptyList()))
+        assertEquals(0, JSONObject(sent).getJSONArray("collectionIssues").length())
+    }
+
     @Test fun statusCodesMapToResults() = runBlocking {
         val expected = mapOf(
             409 to SyncResult.Conflict, 401 to SyncResult.Unauthorized, 400 to SyncResult.Rejected, 404 to SyncResult.Rejected,

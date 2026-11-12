@@ -178,6 +178,27 @@ class SyncManagerTest {
         assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
     }
 
+    @Test fun recoveredTripClearsInterruptedIssueOnServer() = runBlocking {
+        val t = repo.start(1, 100f)
+        repo.heartbeat(104.5f)
+        val interrupted = repo.recoverInterrupted()!!
+        sync.syncPending()
+        repo.completeInterrupted(interrupted.id, 104.5f, interrupted.lastSavedAt)
+
+        assertTrue(sync.syncPending())
+        val sent = api.uploads.last()
+        assertEquals("COMPLETED", sent.state)
+        assertEquals(104.5f, sent.endOdometerKm)
+        assertEquals(emptyList<String>(), sent.collectionIssues)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
+    @Test fun normallyCompletedTripOmitsCollectionIssues() = runBlocking {
+        finishedTrip()
+        assertTrue(sync.syncPending())
+        assertNull(api.uploads.single().collectionIssues)
+    }
+
     @Test fun oldestTripIsSentFirstAndOneOfflineStopsTheRest() = runBlocking {
         val a = finishedTrip(100f)
         val b = finishedTrip(200f)
