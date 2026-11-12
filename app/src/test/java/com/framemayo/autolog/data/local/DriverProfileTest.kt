@@ -25,6 +25,50 @@ class DriverProfileTest {
 
     @After fun close() { db.close(); context.deleteDatabase("profiles-migration.db") }
 
+    @Test fun profileCreationRequiresConsentAndPersistsItWithAppearance() = runBlocking {
+        assertTrue(runCatching { repo.saveProfileWithConsent(null, "새 운전자", 1, 2, false) }.isFailure)
+        assertTrue(repo.all.first().isEmpty())
+        val id = repo.saveProfileWithConsent(null, " 새 운전자 ", 1, 2, true)
+        val stored = repo.profiles.first().single()
+        assertEquals(id, stored.driver.id)
+        assertEquals("새 운전자", stored.displayName)
+        assertEquals(1, stored.color)
+        assertEquals(2, stored.expression)
+        assertEquals(true, repo.consentOf(id))
+        assertNotNull(repo.find(id)?.consentUpdatedAt)
+    }
+
+    @Test fun consentFailureRollsBackCreationAndProfileEdits() = runBlocking {
+        db.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_consent BEFORE UPDATE OF locationConsent ON drivers BEGIN SELECT RAISE(ABORT, 'fail'); END")
+        assertTrue(runCatching { repo.saveProfileWithConsent(null, "실패", 1, 0, true) }.isFailure)
+        assertTrue(repo.all.first().isEmpty())
+        db.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_consent")
+        val id = repo.saveProfileWithConsent(null, "원래 이름", 1, 0, true)
+        db.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_consent BEFORE UPDATE OF locationConsent ON drivers BEGIN SELECT RAISE(ABORT, 'fail'); END")
+        assertTrue(runCatching { repo.saveProfileWithConsent(id, "변경 이름", 2, 3, false) }.isFailure)
+        assertEquals("원래 이름", repo.profiles.first().single().displayName)
+        assertEquals(1, repo.profiles.first().single().color)
+        assertEquals(true, repo.consentOf(id))
+    }
+
+    @Test fun editingCanWithdrawAndReconsentWithoutChangingServerIdentity() = runBlocking {
+        var now = 10L
+        val repository = DriverRepositoryImpl(db.driverDao(), clock = { now })
+        val id = repository.saveProfileWithConsent(null, "운전자", 0, 0, true)
+        repository.link(id, RemoteDriver("remote", "서버 이름", "", DriverStatus.ACTIVE))
+        now = 20L
+        repository.saveProfileWithConsent(id, "별명", 2, 1, false)
+        assertEquals(false, repository.consentOf(id))
+        assertEquals(20L, repository.find(id)?.consentUpdatedAt)
+        now = 30L
+        repository.saveProfileWithConsent(id, "별명2", 3, 2, false)
+        assertEquals(20L, repository.find(id)?.consentUpdatedAt)
+        repository.saveProfileWithConsent(id, "별명2", 3, 2, true)
+        assertEquals(true, repository.consentOf(id))
+        assertEquals(30L, repository.find(id)?.consentUpdatedAt)
+        assertEquals("remote", repository.remoteIdOf(id))
+    }
+
     @Test fun hiddenProfileNameRemainsAvailableForHistoricalTripsOnly() = runBlocking {
         val id = repo.addProfile("서버 등록 이름", 0)
         repo.editProfile(id, "표시 이름", 2)

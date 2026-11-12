@@ -35,7 +35,7 @@ class DrivingRestrictionTest {
     private fun show() = compose.setContent {
         AutoLogTheme {
             DrivingRestrictionGate(state.value, ux.value) {
-                DriverSelectionScreen(state.value.profiles, true, true, true, {}, { _, _, _, _ -> }, { true }, {})
+                DriverSelectionScreen(state.value.profiles, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {})
             }
         }
     }
