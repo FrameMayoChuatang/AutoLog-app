@@ -120,7 +120,7 @@ internal fun DriverProfileEditor(
                                         Text(if (profile == null) "업무 운행의 도착 위치 저장에 동의합니다." else "업무 운행의 도착 위치를 저장합니다.",
                                             fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp))
                                     }
-                                    Text(if (profile == null) "동의하지 않아도 프로필 생성과 운행 기록은 가능합니다." else "체크 해제 후 저장하면 수집을 중단하고 기기의 도착 위치를 삭제합니다.",
+                                    if (profile != null) Text("체크 해제 후 저장하면 수집을 중단하고 기기의 도착 위치를 삭제합니다.",
                                         fontSize = 20.sp, color = Color(0xFF626269))
                                 }
                             }
