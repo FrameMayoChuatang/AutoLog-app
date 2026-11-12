@@ -5,6 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.framemayo.autolog.data.local.*
@@ -26,6 +30,22 @@ class TripReviewCardTest {
     private val trip = TripEntity(id = 1, driverId = null, startedAt = 1000, endedAt = 61000, startOdometerKm = 100f, endOdometerKm = 112f, lastOdometerKm = 112f, lastSavedAt = 61000, status = TripStatus.COMPLETED)
     private val profiles = (1L..30).map { DriverProfile(DriverEntity(id = it, name = "원래 이름$it", department = "개발"), "운전자$it", 0) }
     private val state = MainUiState(profiles = profiles, drivers = profiles.map { it.driver }, linked = true)
+
+    @Test fun wideCardPlacesReviewBesideSummary() {
+        compose.setContent { AutoLogTheme { TripReviewCard(trip, state, true, {}, { _, _ -> }) } }
+        val metric = compose.onNodeWithText("12.00 km · 1분").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val action = compose.onNodeWithText("운행 확인").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue(action.left > metric.right)
+        screenshot("trip-card-wide")
+    }
+
+    @Test fun narrowCardKeepsSummaryAndReviewVisible() {
+        compose.setContent { AutoLogTheme { Box(Modifier.width(380.dp)) { TripReviewCard(trip, state, true, {}, { _, _ -> }) } } }
+        val metric = compose.onNodeWithText("12.00 km · 1분").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val action = compose.onNodeWithText("운행 확인").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue(action.top > metric.bottom)
+        screenshot("trip-card-narrow")
+    }
 
     @Test fun confirmedPurposeCanBeChangedAndCancelledWithoutSaving() {
         val saved = mutableListOf<TripPurpose>()
