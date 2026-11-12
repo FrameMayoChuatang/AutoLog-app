@@ -25,6 +25,7 @@ class ArrivalLocationRecorderTest {
     private val driverOf = mapOf(1L to 10L, 2L to 20L)   // tripId -> driverId
     private val dao = Proxy.newProxyInstance(TripLocationDao::class.java.classLoader, arrayOf(TripLocationDao::class.java)) { _, m, a ->
         when (m.name) {
+            "upsertIfConsented" -> { val l = TripLocationEntity(a[0] as Long, a[2] as Double, a[3] as Double, a[4] as Float?, a[5] as Long); rows[l.tripId] = l; l.tripId }
             "upsert" -> { val l = a[0] as TripLocationEntity; rows[l.tripId] = l; Unit }
             "get" -> rows[a[0] as Long]
             "delete" -> { rows.remove(a[0] as Long); Unit }

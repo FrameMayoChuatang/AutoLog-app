@@ -126,7 +126,10 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             linked = linked,
             odometerReady = v.odometerKm?.let { it.isFinite() && it > 0f } == true,
             onStart = vm::startTrip,
-            onSave = vm::saveProfile,
+            onSave = { id, name, color, expression, consent ->
+                vm.saveProfile(id, name, color, expression, consent)
+                if (consent) requestLocationPermission()
+            },
             onDelete = vm::deleteProfile,
             onOpenVehicle = { showVehicle = true },
             footer = { VehicleLinkCard(vm) },

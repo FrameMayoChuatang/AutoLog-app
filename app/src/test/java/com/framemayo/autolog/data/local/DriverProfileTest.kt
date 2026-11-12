@@ -9,6 +9,9 @@ import com.framemayo.autolog.data.repository.DriverRepositoryImpl
 import com.framemayo.autolog.data.repository.RemoteDriver
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CompletableDeferred
+import com.framemayo.autolog.data.location.*
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
@@ -24,6 +27,99 @@ class DriverProfileTest {
     private val repo = DriverRepositoryImpl(db.driverDao())
 
     @After fun close() { db.close(); context.deleteDatabase("profiles-migration.db") }
+
+    @Test fun withdrawalWhileLocationIsLoadingDoesNotRecreateLocation() = verifyDelayedLocation(false)
+    @Test fun personalPurposeWhileLocationIsLoadingDoesNotRecreateLocation() = verifyDelayedLocation(true)
+
+    @Test fun locationSavedBeforeWithdrawalIsPurgedAndCannotBeReinserted() = runBlocking {
+        val id = repo.saveProfileWithConsent(null, "운전자", 0, 0, true)
+        val original = TripEntity(driverId = id, startedAt = 1, startOdometerKm = 1f, lastOdometerKm = 2f, lastSavedAt = 2)
+        val trip = original.copy(id = db.tripDao().insert(original))
+        val recorder = ArrivalLocationRecorder(db.tripLocationDao(), object : LocationSource {
+            override fun isAvailable() = true
+            override suspend fun currentFix() = LocationFix(37.5, 127.0, 5f, 3L)
+        })
+        assertEquals(ArrivalResult.SAVED, recorder.recordArrival(trip, true))
+        assertEquals(37.5, db.tripLocationDao().get(trip.id)!!.latitude, 0.0)
+        repo.saveProfileWithConsent(id, "운전자", 0, 0, false)
+        recorder.purgeDriver(id)
+        assertNull(db.tripLocationDao().get(trip.id))
+        assertEquals(ArrivalResult.NO_CONSENT, recorder.recordArrival(trip, true))
+        assertNull(db.tripLocationDao().get(trip.id))
+    }
+
+    private fun verifyDelayedLocation(personal: Boolean) = runBlocking {
+        val driverId = repo.saveProfileWithConsent(null, "운전자", 0, 0, true)
+        val original = TripEntity(driverId = driverId, startedAt = 1, startOdometerKm = 10f,
+            lastOdometerKm = 11f, lastSavedAt = 2, endedAt = 2, status = TripStatus.COMPLETED)
+        val trip = original.copy(id = db.tripDao().insert(original))
+        val requested = CompletableDeferred<Unit>()
+        val ready = CompletableDeferred<Unit>()
+        val recorder = ArrivalLocationRecorder(db.tripLocationDao(), object : LocationSource {
+            override fun isAvailable() = true
+            override suspend fun currentFix(): LocationFix {
+                requested.complete(Unit)
+                ready.await()
+                return LocationFix(37.5, 127.0, 5f, 3L)
+            }
+        })
+        val pending = async { recorder.recordArrival(trip, true) }
+        requested.await()
+        if (personal) {
+            db.tripDao().update(trip.copy(purpose = TripPurpose.PERSONAL))
+            recorder.settle(trip.id, true, TripPurpose.PERSONAL)
+        } else {
+            repo.saveProfileWithConsent(driverId, "운전자", 0, 0, false)
+            recorder.purgeDriver(driverId)
+        }
+        ready.complete(Unit)
+        assertEquals(ArrivalResult.NO_CONSENT, pending.await())
+        assertNull(db.tripLocationDao().get(trip.id))
+    }
+
+    @Test fun profileCreationPersistsOptionalConsentWithAppearance() = runBlocking {
+        val declined = repo.saveProfileWithConsent(null, "미동의 운전자", 1, 2, false)
+        assertEquals(false, repo.consentOf(declined))
+        val id = repo.saveProfileWithConsent(null, " 새 운전자 ", 1, 2, true)
+        val stored = repo.profiles.first().single { it.driver.id == id }
+        assertEquals(id, stored.driver.id)
+        assertEquals("새 운전자", stored.displayName)
+        assertEquals(1, stored.color)
+        assertEquals(2, stored.expression)
+        assertEquals(true, repo.consentOf(id))
+        assertNotNull(repo.find(id)?.consentUpdatedAt)
+    }
+
+    @Test fun consentFailureRollsBackCreationAndProfileEdits() = runBlocking {
+        db.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_consent BEFORE UPDATE OF locationConsent ON drivers BEGIN SELECT RAISE(ABORT, 'fail'); END")
+        assertTrue(runCatching { repo.saveProfileWithConsent(null, "실패", 1, 0, true) }.isFailure)
+        assertTrue(repo.all.first().isEmpty())
+        db.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_consent")
+        val id = repo.saveProfileWithConsent(null, "원래 이름", 1, 0, true)
+        db.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_consent BEFORE UPDATE OF locationConsent ON drivers BEGIN SELECT RAISE(ABORT, 'fail'); END")
+        assertTrue(runCatching { repo.saveProfileWithConsent(id, "변경 이름", 2, 3, false) }.isFailure)
+        assertEquals("원래 이름", repo.profiles.first().single().displayName)
+        assertEquals(1, repo.profiles.first().single().color)
+        assertEquals(true, repo.consentOf(id))
+    }
+
+    @Test fun editingCanWithdrawAndReconsentWithoutChangingServerIdentity() = runBlocking {
+        var now = 10L
+        val repository = DriverRepositoryImpl(db.driverDao(), clock = { now })
+        val id = repository.saveProfileWithConsent(null, "운전자", 0, 0, true)
+        repository.link(id, RemoteDriver("remote", "서버 이름", "", DriverStatus.ACTIVE))
+        now = 20L
+        repository.saveProfileWithConsent(id, "별명", 2, 1, false)
+        assertEquals(false, repository.consentOf(id))
+        assertEquals(20L, repository.find(id)?.consentUpdatedAt)
+        now = 30L
+        repository.saveProfileWithConsent(id, "별명2", 3, 2, false)
+        assertEquals(20L, repository.find(id)?.consentUpdatedAt)
+        repository.saveProfileWithConsent(id, "별명2", 3, 2, true)
+        assertEquals(true, repository.consentOf(id))
+        assertEquals(30L, repository.find(id)?.consentUpdatedAt)
+        assertEquals("remote", repository.remoteIdOf(id))
+    }
 
     @Test fun hiddenProfileNameRemainsAvailableForHistoricalTripsOnly() = runBlocking {
         val id = repo.addProfile("서버 등록 이름", 0)

@@ -33,6 +33,21 @@ interface DriverDao {
         return id
     }
 
+    /** 프로필과 선택한 동의 상태를 함께 저장하여 부분 저장을 막는다. */
+    @Transaction
+    suspend fun saveProfileWithConsent(id: Long?, name: String, color: Int, expression: Int, consent: Boolean, at: Long): Long {
+        if (id == null) {
+            val created = addProfile(name, color, expression)
+            setConsent(created, consent, at)
+            return created
+        }
+        val driver = requireNotNull(byId(id)) { "프로필을 찾을 수 없습니다." }
+        val previous = profile(id)
+        saveProfile(DriverProfileEntity(id, name, color, previous?.hidden ?: false, expression))
+        if (driver.locationConsent != consent) setConsent(id, consent, at)
+        return id
+    }
+
     @Query("SELECT * FROM driver_profiles WHERE driverId = :id")
     suspend fun profile(id: Long): DriverProfileEntity?
 
@@ -120,6 +135,18 @@ abstract class PurposeDao {
 interface TripLocationDao {
     @Upsert
     suspend fun upsert(location: TripLocationEntity)
+
+    // 위치 조회 중 철회/개인 목적 변경이 발생해도 오래된 동의로 위치가 다시 생기지 않게 한다.
+    @Query("""
+        INSERT OR REPLACE INTO trip_locations (tripId, latitude, longitude, accuracyM, capturedAt)
+        SELECT :tripId, :latitude, :longitude, :accuracyM, :capturedAt
+        WHERE EXISTS (
+            SELECT 1 FROM trips t JOIN drivers d ON d.id = t.driverId
+            WHERE t.id = :tripId AND t.driverId = :driverId
+              AND d.locationConsent = 1 AND t.purpose != 'PERSONAL'
+        )
+    """)
+    suspend fun upsertIfConsented(tripId: Long, driverId: Long, latitude: Double, longitude: Double, accuracyM: Float?, capturedAt: Long): Long
 
     @Query("SELECT * FROM trip_locations WHERE tripId = :tripId")
     suspend fun get(tripId: Long): TripLocationEntity?

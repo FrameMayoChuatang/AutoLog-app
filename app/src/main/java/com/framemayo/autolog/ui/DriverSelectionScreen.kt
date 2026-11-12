@@ -94,7 +94,7 @@ internal fun DriverSelectionScreen(
     linked: Boolean,
     odometerReady: Boolean,
     onStart: (Long) -> Unit,
-    onSave: suspend (Long?, String, Int, Int) -> Unit,
+    onSave: suspend (Long?, String, Int, Int, Boolean) -> Unit,
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
     onOpenRecords: () -> Unit = onOpenVehicle,
@@ -255,10 +255,10 @@ internal fun DriverSelectionScreen(
         )
         if (parked && editing) DriverProfileEditor(
             profiles.find { it.driver.id == editingId }, busy, error, { editing = false },
-            onSave = { name, color, expression ->
+            onSave = { name, color, expression, consent ->
                 if (!busy) scope.launch {
                     busy = true; error = null
-                    try { onSave(editingId, name, color, expression); editing = false }
+                    try { onSave(editingId, name, color, expression, consent); editing = false }
                     catch (e: CancellationException) { throw e }
                     catch (_: Exception) { error = "저장하지 못했습니다. 다시 시도해 주세요." }
                     finally { busy = false }

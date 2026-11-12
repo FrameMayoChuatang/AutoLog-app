@@ -112,10 +112,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { drivers.add(name, department) }
     }
 
-    suspend fun saveProfile(id: Long?, name: String, color: Int, expression: Int) {
+    // 목적 저장과 동일하게 화면 수명보다 길게 유지해, 주행 전환으로 모달이 닫혀도 철회 정리를 마친다.
+    suspend fun saveProfile(id: Long?, name: String, color: Int, expression: Int, consent: Boolean) = viewModelScope.async {
         check(RecorderState.snapshot.value.gear == VehicleGear.GEAR_PARK) { "Profile editing requires Park" }
-        if (id == null) drivers.addProfile(name, color, expression) else drivers.editProfile(id, name, color, expression)
-    }
+        val savedId = drivers.saveProfileWithConsent(id, name, color, expression, consent)
+        // 삭제 실패도 화면에 전달한다. 재저장 시 동의가 false여도 삭제를 재시도한다.
+        if (!consent) arrival.purgeDriver(savedId)
+    }.await()
 
     suspend fun deleteProfile(id: Long): Boolean {
         check(RecorderState.snapshot.value.gear == VehicleGear.GEAR_PARK) { "Profile deletion requires Park" }
