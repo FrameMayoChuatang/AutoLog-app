@@ -67,7 +67,7 @@ class DriverSelectionScreenTest {
             val before = search.top - list.top
             val after = list.bottom - 104f - lastName.bottom
             assertEquals(before, after, 2f)
-            assertEquals(24f, more.top - lastName.bottom, 2f)
+            assertEquals(72f, more.top - lastName.bottom, 2f)
         }
         assertBalancedSpace()
         val withFooter = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot.top
