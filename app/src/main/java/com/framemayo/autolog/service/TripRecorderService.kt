@@ -19,6 +19,7 @@ import com.framemayo.autolog.vehicle.MotionAction
 import com.framemayo.autolog.vehicle.MotionTracker
 import com.framemayo.autolog.vehicle.OdometerValidator
 import com.framemayo.autolog.vehicle.ResumedStop
+import com.framemayo.autolog.vehicle.gearWithCatchUp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -145,7 +146,8 @@ class TripRecorderService : LifecycleService() {
     }
 
     private suspend fun collectGear() {
-        container.vehicle.gear().resubscribing(
+        val vehicle = container.vehicle
+        gearWithCatchUp(vehicle.gear(), read = { vehicle.currentGear() }).resubscribing(
             onFailure = { n, e, ms ->
                 Log.w(TAG, "gear resubscribe #$n in ${ms}ms", e)
                 setCollector(CollectorStatus.RETRYING)
@@ -153,6 +155,7 @@ class TripRecorderService : LifecycleService() {
             onRecovered = { setCollector(CollectorStatus.RUNNING) },
         ).collect { gear ->
             val now = now()
+            if (RecorderState.snapshot.value.gear != gear) Log.i(TAG, "gear: $gear")
             RecorderState.update { it.copy(gear = gear) }
             feedMotion(now) { onGear(gear, now) }
             autoStart.onGear(gear, now)
