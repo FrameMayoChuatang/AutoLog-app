@@ -71,6 +71,7 @@ class TripReviewCardTest {
         compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("30")
         compose.onNodeWithContentDescription("운전자30 검색 결과 선택").performClick()
         assertEquals(emptyList<Long>(), assigned)
+        screenshot("assign-confirm")
         compose.onNodeWithText("지정").performClick()
         assertEquals(listOf(30L), assigned)
     }
