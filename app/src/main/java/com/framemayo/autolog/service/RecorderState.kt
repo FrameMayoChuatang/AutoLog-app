@@ -1,6 +1,7 @@
 package com.framemayo.autolog.service
 
 import ai.pleos.playground.vehicle.constant.control.VehicleGear
+import com.framemayo.autolog.data.local.EnergyLevels
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +29,9 @@ data class VehicleSnapshot(
     val collector: CollectorStatus = CollectorStatus.STOPPED,
 ) {
     val isParked: Boolean get() = gear == null || gear == VehicleGear.GEAR_PARK
+
+    fun energyLevels(): EnergyLevels? =
+        if (fuelPercent == null && batteryPercent == null) null else EnergyLevels(fuelPercent, batteryPercent)
 }
 
 object RecorderState {

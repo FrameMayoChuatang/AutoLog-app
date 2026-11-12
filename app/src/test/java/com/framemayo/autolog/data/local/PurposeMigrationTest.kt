@@ -14,22 +14,35 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-// SQLite 테스트 엔진에 DROP COLUMN이 없어 원래 인덱스와 제약을 유지해 v10 구조를 재현한다.
-internal fun removePurposeTextColumn(db: SQLiteDatabase) {
+// SQLite 테스트 엔진에 DROP COLUMN이 없어 원래 인덱스와 제약을 유지해 이전 trips 구조를 재현한다.
+internal fun removeTripColumns(db: SQLiteDatabase, names: Set<String>) {
     val schema = db.rawQuery("SELECT sql FROM sqlite_master WHERE type='table' AND name='trips'", null).use { it.moveToFirst(); it.getString(0) }
     val indexes = db.rawQuery("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='trips' AND sql IS NOT NULL", null).use {
         buildList { while (it.moveToNext()) add(it.getString(0)) }
     }
     val columns = db.rawQuery("PRAGMA table_info(trips)", null).use {
-        buildList { while (it.moveToNext()) if (it.getString(1) != "purposeText") add("`${it.getString(1)}`") }
+        buildList { while (it.moveToNext()) if (it.getString(1) !in names) add("`${it.getString(1)}`") }
     }.joinToString(",")
+    // 자식 테이블의 외래 키가 trips를 참조하므로 재생성 동안 끈다.
+    db.execSQL("PRAGMA foreign_keys = OFF")
     db.execSQL("CREATE TEMP TABLE old_trips AS SELECT $columns FROM trips")
     db.execSQL("DROP TABLE trips")
-    db.execSQL(schema.replace(Regex(",\\s*`?purposeText`?\\s+[^,)]*"), ""))
+    db.execSQL(names.fold(schema) { sql, name -> sql.replace(Regex(",\\s*`?$name`?\\s+[^,)]*"), "") })
     db.execSQL("INSERT INTO trips ($columns) SELECT $columns FROM old_trips")
     db.execSQL("DROP TABLE old_trips")
     indexes.forEach(db::execSQL)
 }
+
+internal fun removePurposeTextColumn(db: SQLiteDatabase) = removeTripColumns(db, setOf("purposeText"))
+
+/** v12에서 추가한 앱 A 열과 테이블을 제거해 v11 구조로 되돌린다. */
+internal fun rewindToV11(db: SQLiteDatabase) {
+    db.execSQL("DROP TABLE IF EXISTS trip_stops")
+    db.execSQL("DROP TABLE IF EXISTS energy_events")
+    removeTripColumns(db, V12_TRIP_COLUMNS)
+}
+
+internal val V12_TRIP_COLUMNS = setOf("startedBy", "endedBy", "startFuelPercent", "endFuelPercent", "startBatteryPercent", "endBatteryPercent")
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
@@ -39,7 +52,7 @@ class PurposeMigrationTest {
         val name = "purpose-v10.db"
         context.deleteDatabase(name)
         fun open() = Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
-            .addMigrations(AutoLogDatabase.MIGRATION_10_11).allowMainThreadQueries().build()
+            .addMigrations(AutoLogDatabase.MIGRATION_10_11, AutoLogDatabase.MIGRATION_11_12).allowMainThreadQueries().build()
         val original = TripEntity(id = 1, uuid = "original-uuid", driverId = 1, startedAt = 1, endedAt = 2,
             startOdometerKm = 100f, endOdometerKm = 110f, lastOdometerKm = 110f, lastSavedAt = 2,
             status = TripStatus.COMPLETED, purpose = TripPurpose.BUSINESS_GENERAL, memo = "기존 메모",
@@ -52,12 +65,14 @@ class PurposeMigrationTest {
                 db.close()
             }
             SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                rewindToV11(it)
                 removePurposeTextColumn(it)
                 it.execSQL("DROP TABLE room_master_table")
                 it.version = 10
             }
             open().let { db ->
-                assertEquals(original, db.tripDao().get(1))
+                // 기존 완료 운행은 v12 이전 기록이므로 수동 종료로 표시된다.
+                assertEquals(original.copy(endedBy = TripEndReason.MANUAL), db.tripDao().get(1))
                 assertEquals("일반 업무", db.tripDao().get(1)!!.toConfirmPayload("server-driver", false)!!.purposeText)
                 TripRepositoryImpl(db.tripDao()).setPurpose(1, TripPurpose.BUSINESS_GENERAL, purposeText = "거래처 방문")
                 db.close()
