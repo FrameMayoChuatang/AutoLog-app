@@ -212,7 +212,7 @@ internal fun DriverSelectionScreen(
                         }
                         // 차량 연결은 운전자 선택 화면 맨 아래에 둔다. 연결 안내창의 `차량 연결하기`가 여기로 스크롤한다.
                         if (!managing) item(key = "vehicle-link") {
-                            Box(Modifier.padding(top = 48.dp).widthIn(max = 960.dp).fillMaxWidth()) { footer() }
+                            Box(Modifier.padding(top = 240.dp).widthIn(max = 960.dp).fillMaxWidth()) { footer() }
                         }
                     }
                 }
