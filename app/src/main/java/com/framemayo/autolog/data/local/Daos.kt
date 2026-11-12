@@ -207,7 +207,7 @@ interface TripDao {
     @Query("UPDATE trips SET serverVersion = :serverVersion, sourceRevision = MAX(sourceRevision + 1, :serverRevision + 1) WHERE id = :id")
     suspend fun rebase(id: Long, serverVersion: Long, serverRevision: Long)
 
-    @Query("DELETE FROM trips WHERE syncState = 'SYNCED' AND status != 'ACTIVE' AND syncedAt < :cutoff")
+    @Query("DELETE FROM trips WHERE syncState = 'SYNCED' AND status != 'ACTIVE' AND purpose != 'UNCONFIRMED' AND syncedAt < :cutoff")
     suspend fun deleteSyncedBefore(cutoff: Long): Int
 
     @Query("UPDATE trips SET syncState = 'SYNCED', syncedAt = :at WHERE id = :id AND updatedAt = :updatedAt")
