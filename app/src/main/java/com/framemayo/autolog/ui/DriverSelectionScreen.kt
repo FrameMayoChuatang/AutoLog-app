@@ -97,7 +97,6 @@ internal fun DriverSelectionScreen(
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
     footer: @Composable () -> Unit = {},
-    onWithdrawConsent: (Long) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     var managing by rememberSaveable { mutableStateOf(false) }
@@ -241,7 +240,6 @@ internal fun DriverSelectionScreen(
                     finally { busy = false }
                 }
             },
-            onWithdrawConsent = { editingId?.let(onWithdrawConsent) },
         )
         if (parked && deletingId != null) AlertDialog(
             onDismissRequest = { if (!busy) deletingId = null },
