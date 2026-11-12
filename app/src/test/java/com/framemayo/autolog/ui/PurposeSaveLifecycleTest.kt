@@ -47,6 +47,7 @@ class PurposeSaveLifecycleTest {
             }
         }
         val dao = object : TripLocationDao {
+            override suspend fun upsertIfConsented(tripId: Long, driverId: Long, latitude: Double, longitude: Double, accuracyM: Float?, capturedAt: Long) = -1L
             override suspend fun upsert(location: TripLocationEntity) = Unit
             override suspend fun get(tripId: Long): TripLocationEntity? = null
             override suspend fun deleteByDriver(driverId: Long) = Unit
