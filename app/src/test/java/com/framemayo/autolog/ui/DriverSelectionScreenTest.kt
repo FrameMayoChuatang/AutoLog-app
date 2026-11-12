@@ -196,8 +196,38 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자6 프로필 선택").performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("운전자 검색 열기").performScrollTo().performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").assertTextContains("").performTextReplacement("없는이름")
-        compose.onNodeWithText("검색 결과 0명").assertIsDisplayed()
+        compose.onNodeWithText("검색 결과가 없습니다.").assertIsDisplayed()
+        compose.onNodeWithText("검색 결과 0명").assertDoesNotExist()
+        val message = compose.onNodeWithText("검색 결과가 없습니다.").fetchSemanticsNode().boundsInRoot
+        val close = compose.onNodeWithContentDescription("검색 닫기").fetchSemanticsNode().boundsInRoot
+        assertEquals(close.center.x, message.center.x, 1f)
+        org.junit.Assert.assertTrue(message.bottom < close.top)
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextReplacement("7")
+        compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertIsDisplayed()
+        compose.onNodeWithText("검색 결과가 없습니다.").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextReplacement("없는이름")
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w540dp-h420dp-land-night-mdpi")
+    fun emptySearchKeepsMessageAndCloseVisibleWithKeyboard() {
+        compose.setContent { DriverSearchDialog("", {}, emptyList(), androidx.compose.ui.geometry.Rect.Zero, false, {}, {}) }
+        compose.onNodeWithText("검색할 프로필이 없습니다.").assertIsDisplayed()
+        compose.runOnIdle {
+            val decor = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(
+                decor,
+                androidx.core.view.WindowInsetsCompat.Builder()
+                    .setInsets(androidx.core.view.WindowInsetsCompat.Type.ime(), androidx.core.graphics.Insets.of(0, 0, 0, 180))
+                    .setVisible(androidx.core.view.WindowInsetsCompat.Type.ime(), true)
+                    .build(),
+            )
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("검색할 프로필이 없습니다.").assertIsDisplayed()
+        val close = compose.onNodeWithContentDescription("검색 닫기").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue(close.bottom <= 240f)
     }
 
     @Test fun backdropFirstEndsInputThenClosesDialogAndClearsQuery() {
@@ -387,28 +417,24 @@ class DriverSelectionScreenTest {
         assertEquals(listOf(Triple("미소 운전자", 4, 2)), saved)
     }
 
-    @Test fun consentedProfileCanWithdrawAfterConfirmation() {
-        var withdrawn = 0
-        val profile = profiles.first().let { it.copy(driver = it.driver.copy(locationConsent = true)) }
-        compose.setContent { DriverProfileEditor(profile, false, null, {}, { _, _, _ -> }, onWithdrawConsent = { withdrawn++ }) }
-        compose.onNodeWithText("동의 철회").performScrollTo().performClick()
-        assertEquals(0, withdrawn)
-        compose.onNodeWithText("철회하면 저장된 도착 위치도 삭제됩니다.").assertIsDisplayed()
-        compose.onNodeWithText("철회").performClick()
-        assertEquals(1, withdrawn)
-    }
-
-    @Test fun withdrawIsHiddenForUnansweredAndDeclinedProfiles() {
-        var consent by mutableStateOf<Boolean?>(null)
+    @Test fun profileEditorOmitsLocationConsentForEveryConsentState() {
+        val consent = mutableStateOf<Boolean?>(null)
+        val saved = mutableListOf<String>()
         compose.setContent {
-            val p = profiles.first().let { it.copy(driver = it.driver.copy(locationConsent = consent)) }
-            DriverProfileEditor(p, false, null, {}, { _, _, _ -> })
+            val profile = profiles.first().let { it.copy(driver = it.driver.copy(locationConsent = consent.value)) }
+            DriverProfileEditor(profile, false, null, {}, { name, _, _ -> saved.add(name) })
         }
-        compose.onNodeWithText("동의 철회").assertDoesNotExist()
-        compose.onNodeWithText("위치정보 수집").assertDoesNotExist()
-        consent = false
-        compose.onNodeWithText("동의 안 함 · 운행을 시작할 때 다시 동의할 수 있어요.").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("동의 철회").assertDoesNotExist()
+        listOf(null, false, true).forEach { state ->
+            compose.runOnIdle { consent.value = state }
+            compose.onNodeWithText("위치정보 수집").assertDoesNotExist()
+            compose.onNodeWithText("동의 철회").assertDoesNotExist()
+            compose.onNodeWithText("동의 안 함 · 운행을 시작할 때 다시 동의할 수 있어요.").assertDoesNotExist()
+            compose.onNodeWithContentDescription("운전자 이름").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("저장").assertIsEnabled()
+        }
+        compose.onNodeWithContentDescription("운전자 이름").performTextReplacement("수정한 이름")
+        compose.onNodeWithText("저장").performClick()
+        assertEquals(listOf("수정한 이름"), saved)
     }
 
     @Test fun editingRestoresExpressionAndEveryPresetSetsItsOriginalCombination() {

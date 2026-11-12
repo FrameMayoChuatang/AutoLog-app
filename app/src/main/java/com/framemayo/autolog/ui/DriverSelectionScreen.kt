@@ -97,7 +97,6 @@ internal fun DriverSelectionScreen(
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
     footer: @Composable () -> Unit = {},
-    onWithdrawConsent: (Long) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     var managing by rememberSaveable { mutableStateOf(false) }
@@ -213,7 +212,7 @@ internal fun DriverSelectionScreen(
                         }
                         // 차량 연결은 운전자 선택 화면 맨 아래에 둔다. 연결 안내창의 `차량 연결하기`가 여기로 스크롤한다.
                         if (!managing) item(key = "vehicle-link") {
-                            Box(Modifier.padding(top = 48.dp).widthIn(max = 960.dp).fillMaxWidth()) { footer() }
+                            Box(Modifier.padding(top = 240.dp).widthIn(max = 960.dp).fillMaxWidth()) { footer() }
                         }
                     }
                 }
@@ -241,7 +240,6 @@ internal fun DriverSelectionScreen(
                     finally { busy = false }
                 }
             },
-            onWithdrawConsent = { editingId?.let(onWithdrawConsent) },
         )
         if (parked && deletingId != null) AlertDialog(
             onDismissRequest = { if (!busy) deletingId = null },
