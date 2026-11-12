@@ -16,13 +16,13 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("boolean", "USE_CONSOLE_ODOMETER", "false")
+        resValue("bool", "use_console_odometer", "false")
         resValue("string", "server_url", "\"${project.findProperty("serverUrl") ?: "http://10.0.2.2:8080"}\"")
     }
 
     buildTypes {
         debug {
-            buildConfigField("boolean", "USE_CONSOLE_ODOMETER",
+            resValue("bool", "use_console_odometer",
                 (project.findProperty("consoleOdometer")?.toString()?.toBooleanStrict() ?: false).toString())
         }
         release {
@@ -37,7 +37,6 @@ android {
         jvmTarget = "17"
     }
     buildFeatures {
-        buildConfig = true
         compose = true
     }
     testOptions {
