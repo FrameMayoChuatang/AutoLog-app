@@ -31,6 +31,19 @@ class DriverSelectionScreenTest {
         compose.setContent { DriverSelectionScreen(profiles, parked, linked, ready, onStart, { _, _, _, _ -> }, { true }, {}) }
     }
 
+    @Test fun unlinkedVehicleOnlyOffersPairingAfterProfileSelection() {
+        var opened = 0
+        var started = false
+        compose.setContent { DriverSelectionScreen(profiles, true, false, true, { started = true }, { _, _, _, _ -> }, { true }, { opened++ }) }
+        compose.onNodeWithText("차량 연결하기").assertDoesNotExist()
+        compose.onNodeWithText("운행 기록 · 차량").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").performClick()
+        compose.onNodeWithText("차량 연결이 필요합니다").assertIsDisplayed()
+        compose.onNodeWithText("차량 연결하기").performClick()
+        assertEquals(1, opened)
+        assertEquals(false, started)
+    }
+
     @Test fun pendingServerDriverKeepsApprovalLabel() {
         val pending = profiles.take(1).map { it.copy(driver = it.driver.copy(status = com.framemayo.autolog.data.local.DriverStatus.PENDING)) }
         compose.setContent { DriverSelectionScreen(pending, true, true, true, {}, { _, _, _, _ -> }, { true }, {}) }

@@ -239,9 +239,9 @@ internal fun DriverSelectionScreen(
             dismissButton = { TextButton(onClick = { deletingId = null }, enabled = !busy, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소") } },
         )
         if (parked && blocked) AlertDialog(
-            onDismissRequest = { blocked = false }, title = { Text(if (!linked) "차량 연결이 필요합니다" else "주행거리 수신 대기") },
-            text = { Text(if (!linked) "차량을 연결한 후 운행을 시작할 수 있습니다." else "차량의 유효한 주행거리 정보를 받은 후 다시 선택해 주세요.") },
-            confirmButton = { TextButton(onClick = { blocked = false; onOpenVehicle() }, modifier = Modifier.heightIn(min = 56.dp)) { Text("차량 상태 확인") } },
+            onDismissRequest = { blocked = false }, title = { Text(if (!linked) "차량 연결이 필요합니다" else "주행거리 수신 대기", fontSize = 28.sp) },
+            text = { Text(if (!linked) "관리자가 발급한 8자리 페어링 코드를 입력해 차량을 연결해 주세요. 연결 후 운행을 시작할 수 있습니다." else "차량의 유효한 주행거리 정보를 받은 후 다시 선택해 주세요.", fontSize = 22.sp, lineHeight = 32.sp) },
+            confirmButton = { TextButton(onClick = { blocked = false; onOpenVehicle() }, modifier = Modifier.heightIn(min = 56.dp)) { Text(if (!linked) "차량 연결하기" else "차량 상태 확인", fontSize = 20.sp) } },
             dismissButton = { TextButton(onClick = { blocked = false }, modifier = Modifier.heightIn(min = 56.dp)) { Text("닫기") } },
         )
     }
