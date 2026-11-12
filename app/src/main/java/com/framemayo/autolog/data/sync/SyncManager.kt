@@ -74,6 +74,7 @@ class SyncManager(
 
     private suspend fun settle(measured: TripEntity): Outcome {
         val trip = trips.get(measured.id) ?: return Outcome.DONE
+        if (trip.sourceRevision > trip.ackedRevision) return Outcome.LATER
         if (trip.purpose == TripPurpose.UNCONFIRMED || trip.confirmSentAt == trip.updatedAt) {
             trips.markSynced(trip)
             return Outcome.DONE

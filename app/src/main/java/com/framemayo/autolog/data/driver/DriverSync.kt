@@ -31,7 +31,8 @@ class HttpDriverApi(private val server: ServerApi) : DriverApi {
         !is ApiResult.Http -> ApiOutcome.Retry
         else -> r.outcome { http ->
             val array = http.array ?: return@outcome ApiOutcome.Retry
-            ApiOutcome.Ok((0 until array.length()).mapNotNull { array.optJSONObject(it)?.toRemoteDriver() })
+            val drivers = (0 until array.length()).map { array.optJSONObject(it)?.toRemoteDriver() ?: return@outcome ApiOutcome.Retry }
+            ApiOutcome.Ok(drivers)
         }
     }
 
@@ -63,9 +64,12 @@ class HttpDriverApi(private val server: ServerApi) : DriverApi {
             remoteId = getString("id"),
             name = getString("name"),
             department = optString("department"),
-            status = DriverStatus.valueOf(getString("status")),
+            status = parseStatus(optString("status")),
         )
     }.getOrNull()
+
+    private fun parseStatus(value: String): DriverStatus =
+        runCatching { DriverStatus.valueOf(value) }.getOrDefault(DriverStatus.PENDING)
 }
 
 class DriverSyncManager(
