@@ -26,17 +26,27 @@ class DriverProfileTest {
     @After fun close() { db.close(); context.deleteDatabase("profiles-migration.db") }
 
     @Test fun localAppearanceSurvivesRemoteRefreshAndHidingPreservesIdentity() = runBlocking {
-        repo.upsertRemote(listOf(RemoteDriver("server-driver", "서버 이름", "영업")))
+        repo.upsertRemote(listOf(RemoteDriver("server-driver", "서버 이름", "영업", DriverStatus.ACTIVE)))
         val id = repo.all.first().single().id
         repo.editProfile(id, "내 이름", 2)
-        repo.upsertRemote(listOf(RemoteDriver("server-driver", "변경된 서버 이름", "개발")))
+        repo.upsertRemote(listOf(RemoteDriver("server-driver", "변경된 서버 이름", "개발", DriverStatus.ACTIVE)))
         assertEquals("내 이름", repo.profiles.first().single().displayName)
         assertEquals(2, repo.profiles.first().single().color)
         assertTrue(repo.hideProfile(id))
-        repo.upsertRemote(listOf(RemoteDriver("server-driver", "다시 동기화", "개발")))
+        repo.upsertRemote(listOf(RemoteDriver("server-driver", "다시 동기화", "개발", DriverStatus.ACTIVE)))
         assertTrue(repo.profiles.first().isEmpty())
         assertEquals("server-driver", repo.remoteIdOf(id))
         assertEquals(1, repo.all.first().size)
+    }
+
+    @Test fun inactiveServerDriverIsNotSelectableAndProfileSurvivesReactivation() = runBlocking {
+        repo.upsertRemote(listOf(RemoteDriver("remote", "운전자", "영업", DriverStatus.ACTIVE)))
+        val id = repo.all.first().single().id
+        repo.editProfile(id, "별명", 2)
+        repo.upsertRemote(listOf(RemoteDriver("remote", "운전자", "영업", DriverStatus.INACTIVE)))
+        assertTrue(repo.profiles.first().isEmpty())
+        repo.upsertRemote(listOf(RemoteDriver("remote", "운전자", "영업", DriverStatus.ACTIVE)))
+        assertEquals("별명", repo.profiles.first().single().displayName)
     }
 
     @Test fun activeDriverCannotBeHiddenAndCompletedTripIsKept() = runBlocking {
@@ -75,14 +85,14 @@ class DriverProfileTest {
         val id = initial.driverDao().insert(DriverEntity(name = "기존 운전자", department = "영업", remoteId = "remote", locationConsent = true))
         val tripId = initial.tripDao().insert(TripEntity(driverId = id, startedAt = 1, startOdometerKm = 50f, lastOdometerKm = 55f, lastSavedAt = 2))
         initial.close()
-        // v8에서 추가한 테이블만 제거하면 기존 테이블 구조는 v7과 동일하다.
+        // main v9 구조에서 프로필 테이블을 추가하는 경로를 검증한다.
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
             it.execSQL("DROP TABLE driver_profiles")
             it.execSQL("DROP TABLE room_master_table")
-            it.version = 7
+            it.version = 9
         }
         fun open() = Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
-            .addMigrations(AutoLogDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
+            .addMigrations(AutoLogDatabase.MIGRATION_9_10).allowMainThreadQueries().build()
         val migrated = open()
         try {
             val repository = DriverRepositoryImpl(migrated.driverDao())

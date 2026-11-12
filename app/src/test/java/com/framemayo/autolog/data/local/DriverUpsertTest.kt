@@ -29,8 +29,8 @@ class DriverUpsertTest {
 
     @Test
     fun insertsNewAndUpdatesExisting() = runBlocking {
-        repo.upsertRemote(listOf(RemoteDriver(A, "Kim", "영업")))
-        repo.upsertRemote(listOf(RemoteDriver(A, "Kim", "개발"), RemoteDriver(B, "Lee", "인사")))
+        repo.upsertRemote(listOf(RemoteDriver(A, "Kim", "영업", DriverStatus.ACTIVE)))
+        repo.upsertRemote(listOf(RemoteDriver(A, "Kim", "개발", DriverStatus.ACTIVE), RemoteDriver(B, "Lee", "인사", DriverStatus.PENDING)))
         val all = repo.all.first().associateBy { it.remoteId }
         assertEquals(2, all.size)
         assertEquals("개발", all[A]?.department)
@@ -41,7 +41,7 @@ class DriverUpsertTest {
         db.openHelper.writableDatabase.execSQL(
             "CREATE TRIGGER boom BEFORE INSERT ON drivers WHEN NEW.name = 'BOOM' BEGIN SELECT RAISE(ABORT, 'boom'); END",
         )
-        val result = runCatching { repo.upsertRemote(listOf(RemoteDriver(A, "Kim", "영업"), RemoteDriver(B, "BOOM", "x"))) }
+        val result = runCatching { repo.upsertRemote(listOf(RemoteDriver(A, "Kim", "영업", DriverStatus.ACTIVE), RemoteDriver(B, "BOOM", "x", DriverStatus.ACTIVE))) }
         assertTrue(result.isFailure)
         assertEquals(0, repo.all.first().size)
     }

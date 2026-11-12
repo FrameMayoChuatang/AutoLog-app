@@ -15,6 +15,8 @@ interface TripRepository {
     suspend fun heartbeat(odometerKm: Float)
     suspend fun end(odometerKm: Float): TripEntity?
     suspend fun setPurpose(tripId: Long, purpose: TripPurpose, memo: String? = null)
+
+    suspend fun setDriver(tripId: Long, driverId: Long): Boolean
     suspend fun recoverInterrupted(): TripEntity?
 
     suspend fun pendingSync(): List<TripEntity>
@@ -22,6 +24,12 @@ interface TripRepository {
     suspend fun recordAck(trip: TripEntity, serverVersion: Long)
 
     suspend fun rebase(trip: TripEntity, serverVersion: Long, serverRevision: Long)
+
+    suspend fun recordConfirm(trip: TripEntity, serverVersion: Long)
+
+    suspend fun updateServerVersion(trip: TripEntity, serverVersion: Long)
+
+    suspend fun clearServerState()
 
     suspend fun markSynced(trip: TripEntity)
     suspend fun markSyncFailed(trip: TripEntity)
