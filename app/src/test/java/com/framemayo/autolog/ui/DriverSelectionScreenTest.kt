@@ -46,31 +46,97 @@ class DriverSelectionScreenTest {
         screenshot("selection-native")
     }
 
-    @Test fun recentFiveStayAboveSearchAndOthersStayBelow() {
+    @Test fun searchStaysAtTopRightAndOtherProfilesStayBelowRecent() {
         show()
         val recent = compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").fetchSemanticsNode().boundsInRoot
-        val search = compose.onNodeWithContentDescription("운전자 이름 검색").fetchSemanticsNode().boundsInRoot
+        val search = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot
         val other = compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").fetchSemanticsNode().boundsInRoot
-        org.junit.Assert.assertTrue(recent.bottom < search.top)
-        org.junit.Assert.assertTrue(other.top > search.bottom)
+        val manage = compose.onNodeWithText("프로필 관리").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue(search.bottom < recent.top)
+        org.junit.Assert.assertTrue(search.left > manage.right)
+        org.junit.Assert.assertTrue(manage.center.y in search.top..search.bottom)
+        org.junit.Assert.assertTrue(other.top > recent.bottom)
     }
 
-    @Test fun searchFiltersLowerListAndKeepsRecentProfiles() {
+    @Test fun searchDialogFiltersResultsAndSharesQueryWithTopBar() {
         show()
-        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
-        compose.onNodeWithContentDescription("운전자7 프로필로 운행 시작").assertExists()
-        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed().performTextInput("7")
+        compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자6 검색 결과 선택").assertDoesNotExist()
+        compose.onNodeWithContentDescription("검색 닫기").performClick()
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("7")
         compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").assertExists()
-        compose.onNodeWithContentDescription("운전자 이름 검색").performTextReplacement("없는이름")
-        compose.onNodeWithText("검색 결과가 없습니다.").assertExists()
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertTextContains("7").performTextReplacement("없는이름")
+        compose.onNodeWithText("검색 결과 0명").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertDoesNotExist()
+    }
+
+    @Test fun backdropFirstEndsInputThenClosesDialogAndKeepsQuery() {
+        val starts = mutableListOf<Long>()
+        show(onStart = { starts.add(it) })
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
+        compose.onNodeWithContentDescription("검색 모달 배경").performTouchInput { click(androidx.compose.ui.geometry.Offset(4f, 4f)) }
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed().assertIsNotFocused().assertTextContains("7")
+        compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertIsDisplayed()
+        compose.onNodeWithContentDescription("검색 모달 배경").performTouchInput { click(androidx.compose.ui.geometry.Offset(4f, 4f)) }
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("7")
+        assertEquals(emptyList<Long>(), starts)
+    }
+
+    @Test fun tappingDialogBodyClearsFocusWithoutClosingSearch() {
+        show()
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertIsFocused()
+        compose.onNodeWithText("검색 결과 1명", substring = false).performTouchInput { click() }
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed().assertIsNotFocused().assertTextContains("7")
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTouchInput { click() }
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertIsFocused()
+        compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertIsDisplayed()
+    }
+
+    @Test fun choosingSearchResultStartsSelectedDriver() {
+        val starts = mutableListOf<Long>()
+        show(onStart = { starts.add(it) })
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
+        compose.onNodeWithContentDescription("운전자7 검색 결과 선택").performClick()
+        assertEquals(listOf(7L), starts)
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertDoesNotExist()
+    }
+
+    @Test fun leavingParkClosesSearchDialog() {
+        val parked = mutableStateOf(true)
+        compose.setContent { DriverSelectionScreen(profiles, parked.value, true, true, {}, { _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
+        compose.runOnIdle { parked.value = false }
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertDoesNotExist()
+        compose.onNodeWithText("주차 후 이용해 주세요").assertIsDisplayed()
+    }
+
+    @Test fun searchResultInManagementOpensEditor() {
+        show()
+        compose.onNodeWithText("프로필 관리", useUnmergedTree = true).performClick()
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
+        compose.onNodeWithContentDescription("운전자7 검색 결과 선택").performClick()
+        compose.onNodeWithContentDescription("운전자 이름").assertTextContains("운전자7")
     }
 
     @Test fun queryAndManagementModeSurviveRecreation() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _ -> }, { true }, {}) }
         compose.onNodeWithText("프로필 관리", useUnmergedTree = true).performClick()
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
         restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertTextContains("7")
+        compose.onNodeWithContentDescription("검색 닫기").performClick()
         compose.onNodeWithText("완료").assertExists()
         compose.onNodeWithContentDescription("운전자7 프로필 수정").assertExists()
         compose.onNodeWithContentDescription("운전자6 프로필 수정").assertDoesNotExist()
@@ -167,6 +233,49 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자 이름").performTextInput("분할 화면")
         compose.onNodeWithText("저장").assertIsDisplayed().assertIsEnabled()
         screenshot("editor-split")
+    }
+
+    @Test
+    @Config(qualifiers = "w540dp-h420dp-land-night-mdpi")
+    fun compactSearchDialogKeepsInputAndResultsAccessible() {
+        show()
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed().performTextInput("7")
+        compose.onNodeWithContentDescription("운전자7 검색 결과 선택").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("운전자 검색", substring = false).assertDoesNotExist()
+        compose.onNodeWithText("×", substring = false).assertDoesNotExist()
+        val result = compose.onNodeWithContentDescription("운전자7 검색 결과 선택").fetchSemanticsNode().boundsInRoot
+        val close = compose.onNodeWithContentDescription("검색 닫기").assertIsDisplayed().assertTextContains("닫기").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue(close.top > result.bottom)
+        compose.onNodeWithContentDescription("검색 닫기").performClick()
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("7")
+    }
+
+    @Test
+    @Config(qualifiers = "w540dp-h420dp-land-night-mdpi")
+    fun keyboardInsetsKeepMatchingDriverAndCloseReachable() {
+        val starts = mutableListOf<Long>()
+        show(onStart = { starts.add(it) })
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
+        compose.runOnIdle {
+            val decor = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(
+                decor,
+                androidx.core.view.WindowInsetsCompat.Builder()
+                    .setInsets(androidx.core.view.WindowInsetsCompat.Type.ime(), androidx.core.graphics.Insets.of(0, 0, 0, 180))
+                    .setVisible(androidx.core.view.WindowInsetsCompat.Type.ime(), true)
+                    .build(),
+            )
+        }
+        compose.waitForIdle()
+        val result = compose.onNodeWithContentDescription("운전자7 검색 결과 선택")
+        result.performScrollTo().assertIsDisplayed()
+        // 실제 IME insets가 전달되어 키보드 위 영역 안에 결과가 배치되었는지 검증한다.
+        org.junit.Assert.assertTrue(result.fetchSemanticsNode().boundsInRoot.bottom <= 240f)
+        compose.onNodeWithContentDescription("검색 닫기").performScrollTo().assertIsDisplayed()
+        result.performScrollTo().performClick()
+        assertEquals(listOf(7L), starts)
     }
 
     private fun screenshot(name: String) {
