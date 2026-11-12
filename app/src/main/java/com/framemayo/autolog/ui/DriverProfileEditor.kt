@@ -3,6 +3,7 @@ package com.framemayo.autolog.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -63,6 +66,7 @@ internal fun DriverProfileEditor(
     var name by rememberSaveable(profile?.driver?.id) { mutableStateOf(profile?.displayName.orEmpty()) }
     var color by rememberSaveable(profile?.driver?.id) { mutableIntStateOf(profile?.color ?: 0) }
     var expression by rememberSaveable(profile?.driver?.id) { mutableIntStateOf(profile?.expression ?: 0) }
+    var locationConsent by rememberSaveable(profile?.driver?.id) { mutableStateOf(profile?.driver?.locationConsent == true) }
     Dialog(
         onDismissRequest = { if (!busy) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !busy, dismissOnClickOutside = !busy),
@@ -70,59 +74,88 @@ internal fun DriverProfileEditor(
         MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF141416))) {
             BoxWithConstraints(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                 val stacked = maxWidth < 640.dp
-                val dialogHeight = minOf(maxHeight, if (stacked) 640.dp else 600.dp)
+                val dialogHeight = minOf(maxHeight, 840.dp)
+                val short = dialogHeight < 500.dp
                 Surface(Modifier.widthIn(max = 1200.dp).fillMaxWidth().height(dialogHeight), shape = RoundedCornerShape(24.dp), color = Color.White) {
                     Box {
                         val editor: @Composable (Modifier) -> Unit = { modifier ->
-                            Column(modifier.verticalScroll(rememberScrollState()).padding(28.dp)) {
-                                Text(if (profile == null) "프로필 생성" else "프로필 수정", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-                                Spacer(Modifier.height(28.dp))
-                                Text("이름", color = Color(0xFF626269), fontSize = 16.sp)
-                                Spacer(Modifier.height(8.dp))
-                                OutlinedTextField(
-                                    value = name, onValueChange = { name = it.take(40) }, enabled = !busy,
-                                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "운전자 이름" },
-                                    placeholder = { Text("이름을 입력하세요") }, singleLine = true,
-                                    textStyle = TextStyle(fontSize = 20.sp), shape = RoundedCornerShape(12.dp),
-                                )
-                                Spacer(Modifier.height(24.dp))
-                                Text("색상", color = Color(0xFF626269), fontSize = 16.sp)
-                                Spacer(Modifier.height(12.dp))
-                                ProfileColorPicker(color, enabled = !busy, onColor = { color = it })
-                                Spacer(Modifier.height(24.dp))
-                                Text("표정", color = Color(0xFF626269), fontSize = 16.sp)
-                                Spacer(Modifier.height(12.dp))
-                                ProfileExpressionPicker(expression, enabled = !busy, onExpression = { expression = it })
-                                Spacer(Modifier.height(24.dp))
-                                Text("캐릭터", color = Color(0xFF626269), fontSize = 16.sp)
-                                Spacer(Modifier.height(12.dp))
-                                ProfilePresetPicker(color, expression, enabled = !busy) { preset ->
-                                    expression = preset
-                                    color = ProfileExpressions[preset].presetColor
+                            Column(modifier) {
+                                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(28.dp)) {
+                                    Text(if (profile == null) "프로필 생성" else "프로필 수정", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+                                    Spacer(Modifier.height(28.dp))
+                                    Text("이름", color = Color(0xFF626269), fontSize = 16.sp)
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(
+                                        value = name, onValueChange = { name = it.take(40) }, enabled = !busy,
+                                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "운전자 이름" },
+                                        placeholder = { Text("이름을 입력하세요") }, singleLine = true,
+                                        textStyle = TextStyle(fontSize = 20.sp), shape = RoundedCornerShape(12.dp),
+                                    )
+                                    Spacer(Modifier.height(24.dp))
+                                    Text("색상", color = Color(0xFF626269), fontSize = 16.sp)
+                                    Spacer(Modifier.height(12.dp))
+                                    ProfileColorPicker(color, enabled = !busy, onColor = { color = it })
+                                    Spacer(Modifier.height(24.dp))
+                                    Text("표정", color = Color(0xFF626269), fontSize = 16.sp)
+                                    Spacer(Modifier.height(12.dp))
+                                    ProfileExpressionPicker(expression, enabled = !busy, onExpression = { expression = it })
+                                    Spacer(Modifier.height(24.dp))
+                                    Text("캐릭터", color = Color(0xFF626269), fontSize = 16.sp)
+                                    Spacer(Modifier.height(12.dp))
+                                    ProfilePresetPicker(color, expression, enabled = !busy) { preset ->
+                                        expression = preset
+                                        color = ProfileExpressions[preset].presetColor
+                                    }
+                                    error?.let { Text(it, color = Color(0xFFA52C2C), fontSize = 16.sp, modifier = Modifier.padding(top = 12.dp)) }
                                 }
-                                error?.let { Text(it, color = Color(0xFFA52C2C), fontSize = 16.sp, modifier = Modifier.padding(top = 12.dp)) }
+                                HorizontalDivider(color = Color(0xFFEFEFF1))
+                                Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = if (short) 8.dp else 16.dp)) {
+                                    Text("위치정보 수집 동의", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                                    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                                        .toggleable(value = locationConsent, enabled = !busy, role = Role.Checkbox,
+                                            onValueChange = { locationConsent = it })
+                                        .semantics { contentDescription = "위치정보 수집 동의" },
+                                        verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(checked = locationConsent, onCheckedChange = null, enabled = !busy)
+                                        Text(if (profile == null) "업무 운행의 도착 위치 저장에 동의합니다." else "업무 운행의 도착 위치를 저장합니다.",
+                                            fontSize = 16.sp, modifier = Modifier.padding(start = 8.dp))
+                                    }
+                                    if (!short) Text(if (profile == null) "동의에 체크해야 프로필을 생성할 수 있습니다." else "체크를 해제하고 저장하면 동의를 철회합니다.",
+                                        fontSize = 14.sp, color = Color(0xFF626269))
+                                }
                             }
                         }
                         val preview: @Composable (Modifier) -> Unit = { modifier ->
-                            Column(
-                                modifier.padding(horizontal = 24.dp, vertical = if (stacked) 12.dp else 28.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                if (!stacked) Spacer(Modifier.height(24.dp))
-                                Text(name.trim().ifEmpty { "나의 프로필" }, fontSize = if (stacked) 26.sp else 34.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 2)
-                                DriverAvatar(color, Modifier.widthIn(max = if (stacked) 160.dp else 400.dp).fillMaxWidth().aspectRatio(4f / 3f), blinking = true, expression = expression)
-                                Button(
-                                    onClick = { onSave(name.trim(), color, expression) }, enabled = name.isNotBlank() && !busy,
-                                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = CircleShape,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF141416), contentColor = Color.White),
-                                ) { Text(if (busy) "저장 중…" else "저장", fontSize = 18.sp) }
+                            if (stacked && short) Row(modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                DriverAvatar(color, Modifier.size(72.dp), expression = expression)
+                                Text(name.trim().ifEmpty { "나의 프로필" }, Modifier.weight(1f), fontSize = 20.sp, maxLines = 2)
+                                Button(onClick = { onSave(name.trim(), color, expression) },
+                                    enabled = name.isNotBlank() && !busy && (profile != null || locationConsent),
+                                    modifier = Modifier.heightIn(min = 56.dp), shape = CircleShape) {
+                                    Text(if (busy) "저장 중…" else "저장", fontSize = 18.sp)
+                                }
+                            } else {
+                                Column(
+                                    modifier.padding(horizontal = 24.dp, vertical = if (stacked) 12.dp else 28.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    if (!stacked) Spacer(Modifier.height(24.dp))
+                                    Text(name.trim().ifEmpty { "나의 프로필" }, fontSize = if (stacked) 26.sp else 34.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 2)
+                                    DriverAvatar(color, Modifier.widthIn(max = if (stacked) 160.dp else 400.dp).fillMaxWidth().aspectRatio(4f / 3f), blinking = true, expression = expression)
+                                    Button(
+                                        onClick = { onSave(name.trim(), color, expression) }, enabled = name.isNotBlank() && !busy && (profile != null || locationConsent),
+                                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = CircleShape,
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF141416), contentColor = Color.White),
+                                    ) { Text(if (busy) "저장 중…" else "저장", fontSize = 18.sp) }
+                                }
                             }
                         }
                         if (stacked) Column {
                             editor(Modifier.weight(1f).fillMaxWidth())
                             HorizontalDivider(color = Color(0xFFEFEFF1))
-                            preview(Modifier.fillMaxWidth().height(270.dp))
+                            preview(Modifier.fillMaxWidth().height(if (short) 96.dp else 250.dp))
                         } else Row {
                             editor(Modifier.weight(1.15f).fillMaxHeight())
                             VerticalDivider(color = Color(0xFFEFEFF1))
