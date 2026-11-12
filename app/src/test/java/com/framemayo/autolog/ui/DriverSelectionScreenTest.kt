@@ -31,6 +31,12 @@ class DriverSelectionScreenTest {
         compose.setContent { DriverSelectionScreen(profiles, parked, linked, ready, onStart, { _, _, _ -> }, { true }, {}) }
     }
 
+    @Test fun pendingServerDriverKeepsApprovalLabel() {
+        val pending = profiles.take(1).map { it.copy(driver = it.driver.copy(status = com.framemayo.autolog.data.local.DriverStatus.PENDING)) }
+        compose.setContent { DriverSelectionScreen(pending, true, true, true, {}, { _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithText("승인 대기").assertIsDisplayed()
+    }
+
     @Test fun selectingAProfileStartsImmediately() {
         val starts = mutableListOf<Long>()
         show(onStart = { starts.add(it) })
