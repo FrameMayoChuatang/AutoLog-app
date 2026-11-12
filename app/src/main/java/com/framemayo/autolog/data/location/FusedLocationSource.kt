@@ -32,7 +32,11 @@ class FusedLocationSource(
     override suspend fun currentFix(): LocationFix? {
         if (!usable()) return fallback.currentFix()
         val f = fused ?: return fallback.currentFix()
-        return withTimeoutOrNull(FIX_TIMEOUT_MS) {
+        return fusedFix(f) ?: fallback.currentFix()
+    }
+
+    private suspend fun fusedFix(f: FusedLocation): LocationFix? =
+        withTimeoutOrNull(FIX_TIMEOUT_MS) {
             suspendCancellableCoroutine<LocationFix?> { cont ->
                 val listener = object : FusedLocationListener {
                     override fun onChanged(data: LocationData?) {
@@ -54,7 +58,6 @@ class FusedLocationSource(
                 }
             }
         }
-    }
 
     companion object {
         const val PERMISSION = "pleos.car.permission.FUSED_LOCATION"

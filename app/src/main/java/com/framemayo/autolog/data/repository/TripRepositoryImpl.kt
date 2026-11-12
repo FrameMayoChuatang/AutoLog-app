@@ -61,6 +61,21 @@ class TripRepositoryImpl(
         dao.update(trip.copy(purpose = purpose, memo = memo ?: trip.memo, syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(trip)))
         onPending()
     }
+    override suspend fun setDriver(tripId: Long, driverId: Long): Boolean {
+        val trip = dao.get(tripId) ?: return false
+        if (trip.driverId != null) return false
+        dao.update(
+            trip.copy(
+                driverId = driverId,
+                syncState = SyncState.PENDING,
+                sourceRevision = trip.sourceRevision + 1,
+                updatedAt = nextUpdatedAt(trip),
+            ),
+        )
+        onPending()
+        return true
+    }
+
     override suspend fun recoverInterrupted(): TripEntity? {
         val trip = dao.active() ?: return null
         val recovered = trip.copy(
@@ -83,6 +98,14 @@ class TripRepositoryImpl(
 
     override suspend fun rebase(trip: TripEntity, serverVersion: Long, serverRevision: Long) =
         dao.rebase(trip.id, serverVersion, serverRevision)
+
+    override suspend fun recordConfirm(trip: TripEntity, serverVersion: Long) =
+        dao.recordConfirm(trip.id, serverVersion, trip.updatedAt)
+
+    override suspend fun updateServerVersion(trip: TripEntity, serverVersion: Long) =
+        dao.setServerVersion(trip.id, serverVersion)
+
+    override suspend fun clearServerState() = dao.clearServerState()
 
     override suspend fun markSynced(trip: TripEntity) = dao.markSynced(trip.id, trip.updatedAt, clock())
 
