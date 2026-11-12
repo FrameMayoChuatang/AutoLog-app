@@ -98,6 +98,8 @@ class DrivingRestrictionTest {
         show()
         compose.onNodeWithText("기록 중").assertIsDisplayed()
         compose.onNodeWithText("운전자").assertIsDisplayed()
+        compose.onNodeWithContentDescription("현재 운전자 프로필").assertIsDisplayed()
+        compose.onNodeWithText("검색과 편집은 주차 후 이용해 주세요.").assertDoesNotExist()
         compose.onNodeWithText("12.4 km").assertIsDisplayed()
         compose.onNodeWithText("25분").assertIsDisplayed()
         compose.onNodeWithText("운행 종료").assertDoesNotExist()
@@ -107,12 +109,15 @@ class DrivingRestrictionTest {
     @Test
     @Config(qualifiers = "w640dp-h360dp-land-night-mdpi")
     fun compactDisplayKeepsStatusAndValuesVisible() {
-        state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE))
+        state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE),
+            activeTrip = TripEntity(id = 1, driverId = null, startedAt = 0, startOdometerKm = 100f,
+                lastOdometerKm = 101f, lastSavedAt = 60_000L))
         show()
         compose.onNodeWithText("운행 현황").assertIsDisplayed()
-        compose.onNodeWithText("운행 시작 대기").assertIsDisplayed()
+        compose.onNodeWithText("기록 중").assertIsDisplayed()
+        compose.onNodeWithContentDescription("미지정 운전자 프로필").assertIsDisplayed()
         compose.onNodeWithText("주행 거리").assertIsDisplayed()
         compose.onNodeWithText("주행 시간").assertIsDisplayed()
-        compose.onNodeWithText("검색과 편집은 주차 후 이용해 주세요.").assertIsDisplayed()
+        compose.onNodeWithText("검색과 편집은 주차 후 이용해 주세요.").assertDoesNotExist()
     }
 }
