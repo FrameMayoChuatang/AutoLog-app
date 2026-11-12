@@ -72,6 +72,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.framemayo.autolog.data.local.DriverStatus
 import com.framemayo.autolog.data.local.DriverProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -261,6 +262,9 @@ private fun DriverProfileCard(profile: DriverProfile, size: Dp, managing: Boolea
             }
         }
         Text(profile.displayName, Modifier.padding(top = 18.dp), fontSize = 22.sp, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (profile.driver.status == DriverStatus.PENDING) {
+            Text("승인 대기", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

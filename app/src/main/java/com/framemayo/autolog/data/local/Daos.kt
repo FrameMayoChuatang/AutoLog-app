@@ -14,7 +14,7 @@ interface DriverDao {
         SELECT d.*, COALESCE(p.displayName, d.name) AS displayName, COALESCE(p.color, 0) AS color,
                COALESCE(p.expression, 0) AS expression
         FROM drivers d LEFT JOIN driver_profiles p ON p.driverId = d.id
-        WHERE COALESCE(p.hidden, 0) = 0
+        WHERE COALESCE(p.hidden, 0) = 0 AND (d.status IS NULL OR d.status != 'INACTIVE')
         ORDER BY (SELECT MAX(t.startedAt) FROM trips t WHERE t.driverId = d.id) DESC,
                  d.createdAt DESC, d.id DESC
     """)
@@ -55,6 +55,9 @@ interface DriverDao {
     @Query("SELECT locationConsent FROM drivers WHERE id = :id")
     suspend fun consentOf(id: Long): Boolean?
 
+    @Query("SELECT * FROM drivers WHERE id = :id")
+    suspend fun byId(id: Long): DriverEntity?
+
     @Query("SELECT remoteId FROM drivers WHERE id = :id")
     suspend fun remoteIdOf(id: Long): String?
 
@@ -64,12 +67,31 @@ interface DriverDao {
     @Update
     suspend fun update(driver: DriverEntity)
 
+    @Query("SELECT * FROM drivers ORDER BY id")
+    suspend fun all(): List<DriverEntity>
+
+    @Query("UPDATE drivers SET remoteId = :remoteId, status = :status WHERE id = :id AND remoteId IS NULL")
+    suspend fun link(id: Long, remoteId: String, status: DriverStatus)
+
+    @Query("UPDATE drivers SET remoteId = NULL, status = NULL, consentSentAt = NULL")
+    suspend fun clearServerLinks()
+
+    @Query("UPDATE drivers SET status = 'INACTIVE' WHERE remoteId IS NOT NULL AND remoteId NOT IN (:remoteIds)")
+    suspend fun markMissingInactive(remoteIds: List<String>)
+
+    @Query("SELECT * FROM drivers WHERE remoteId IS NOT NULL AND locationConsent IS NOT NULL AND consentSentAt IS NOT consentUpdatedAt ORDER BY id")
+    suspend fun consentPending(): List<DriverEntity>
+
+    @Query("UPDATE drivers SET consentSentAt = :at WHERE id = :id AND consentUpdatedAt = :at")
+    suspend fun markConsentSent(id: Long, at: Long)
+
     @Transaction
     suspend fun upsertRemote(drivers: List<DriverEntity>) {
         drivers.forEach { d ->
             val cur = d.remoteId?.let { byRemoteId(it) }
-            if (cur == null) insert(d) else update(cur.copy(name = d.name, department = d.department))
+            if (cur == null) insert(d) else update(cur.copy(name = d.name, department = d.department, status = d.status))
         }
+        markMissingInactive(drivers.mapNotNull { it.remoteId })
     }
 }
 
@@ -136,6 +158,15 @@ interface TripDao {
 
     @Query("UPDATE trips SET ackedRevision = :revision, serverVersion = :serverVersion WHERE id = :id AND ackedRevision < :revision")
     suspend fun recordAck(id: Long, revision: Long, serverVersion: Long)
+
+    @Query("UPDATE trips SET serverVersion = :serverVersion, confirmSentAt = CASE WHEN updatedAt = :updatedAt THEN :updatedAt ELSE confirmSentAt END WHERE id = :id")
+    suspend fun recordConfirm(id: Long, serverVersion: Long, updatedAt: Long)
+
+    @Query("UPDATE trips SET ackedRevision = 0, serverVersion = 0, confirmSentAt = NULL, syncState = 'PENDING' WHERE syncState != 'SYNCED'")
+    suspend fun clearServerState()
+
+    @Query("UPDATE trips SET serverVersion = :serverVersion WHERE id = :id")
+    suspend fun setServerVersion(id: Long, serverVersion: Long)
 
     @Query("UPDATE trips SET serverVersion = :serverVersion, sourceRevision = MAX(sourceRevision + 1, :serverRevision + 1) WHERE id = :id")
     suspend fun rebase(id: Long, serverVersion: Long, serverRevision: Long)
