@@ -39,7 +39,8 @@ class DriverSelectionScreenTest {
         compose.setContent { DriverSelectionScreen(profiles, true, false, true, { started = true }, { _, _, _, _ -> }, { true }, { opened++ }) }
         compose.onNodeWithText("차량 연결하기").assertDoesNotExist()
         compose.onNodeWithText("운행 기록 · 차량").assertDoesNotExist()
-        compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").performClick()
+        compose.onNodeWithContentDescription("운전자1 프로필 선택").performClick()
+        compose.onNodeWithText("주행 시작").performClick()
         compose.onNodeWithText("차량 연결이 필요합니다").assertIsDisplayed()
         compose.onNodeWithText("차량 연결하기").performClick()
         compose.onNodeWithText("차량 연결이 필요합니다").assertDoesNotExist()
@@ -91,27 +92,50 @@ class DriverSelectionScreenTest {
         compose.onNodeWithText("승인 대기").assertIsDisplayed()
     }
 
-    @Test fun selectingAProfileStartsImmediately() {
+    @Test fun selectingAProfileAsksBeforeStarting() {
         val starts = mutableListOf<Long>()
         show(onStart = { starts.add(it) })
-        compose.onNodeWithContentDescription("운전자2 프로필로 운행 시작").performClick()
-        assertEquals(listOf(2L), starts)
-        compose.onNodeWithText("운행 시작", substring = false).assertDoesNotExist()
         screenshot("selection-native")
+        compose.onNodeWithContentDescription("운전자2 프로필 선택").performClick()
+        assertEquals(emptyList<Long>(), starts) // 누르기만 해서는 시작하지 않는다
+        compose.onNodeWithText("프로필 수정").assertIsDisplayed()
+        compose.onNodeWithText("주행 시작").assertIsDisplayed().performClick()
+        assertEquals(listOf(2L), starts)
+        compose.onNodeWithText("주행 시작").assertDoesNotExist()
+    }
+
+    @Test fun editFromStartDialogOpensProfileEditor() {
+        val starts = mutableListOf<Long>()
+        show(onStart = { starts.add(it) })
+        compose.onNodeWithContentDescription("운전자3 프로필 선택").performClick()
+        compose.onNodeWithText("프로필 수정").performClick()
+        compose.onNodeWithText("주행 시작").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 이름").assertTextContains("운전자3")
+        assertEquals(emptyList<Long>(), starts)
+    }
+
+    @Test fun closingStartDialogDoesNotStart() {
+        val starts = mutableListOf<Long>()
+        show(onStart = { starts.add(it) })
+        compose.onNodeWithContentDescription("운전자1 프로필 선택").performClick()
+        compose.onNodeWithText("닫기").performClick()
+        compose.onNodeWithText("주행 시작").assertDoesNotExist()
+        assertEquals(emptyList<Long>(), starts)
     }
 
     @Test fun moreButtonDisappearsAfterRevealingExtraProfiles() {
         val starts = mutableListOf<Long>()
         show(onStart = { starts.add(it) })
-        compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").assertIsDisplayed()
-        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자5 프로필 선택").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자6 프로필 선택").assertDoesNotExist()
         compose.onNodeWithText("더보기").assertIsDisplayed().performClick()
-        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("운전자6 프로필 선택").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithText("주행 시작").performClick()
         assertEquals(listOf(6L), starts)
         compose.onNodeWithText("접기").assertDoesNotExist()
         compose.onNodeWithText("더보기").assertDoesNotExist()
-        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertExists()
-        compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자6 프로필 선택").assertExists()
+        compose.onNodeWithContentDescription("운전자5 프로필 선택").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun moreButtonOnlyAppearsWhenThereAreExtraProfiles() {
@@ -127,9 +151,9 @@ class DriverSelectionScreenTest {
     @Test fun searchStaysAtTopRightAndOtherProfilesStayBelowRecent() {
         show()
         compose.onNodeWithText("더보기").performClick()
-        val recent = compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").fetchSemanticsNode().boundsInRoot
+        val recent = compose.onNodeWithContentDescription("운전자5 프로필 선택").fetchSemanticsNode().boundsInRoot
         val search = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot
-        val other = compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").fetchSemanticsNode().boundsInRoot
+        val other = compose.onNodeWithContentDescription("운전자6 프로필 선택").fetchSemanticsNode().boundsInRoot
         val manage = compose.onNodeWithText("프로필 관리").fetchSemanticsNode().boundsInRoot
         org.junit.Assert.assertTrue(search.bottom < recent.top)
         org.junit.Assert.assertTrue(search.left > manage.right)
@@ -145,8 +169,8 @@ class DriverSelectionScreenTest {
         compose.onNodeWithText("더보기").performClick()
         val manageBefore = compose.onNodeWithText("프로필 관리").fetchSemanticsNode().boundsInRoot
         val searchBefore = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot
-        compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("운전자30 프로필로 운행 시작"))
-        compose.onNodeWithContentDescription("운전자30 프로필로 운행 시작").assertIsDisplayed()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("운전자30 프로필 선택"))
+        compose.onNodeWithContentDescription("운전자30 프로필 선택").assertIsDisplayed()
         assertEquals(manageBefore, compose.onNodeWithText("프로필 관리").assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
         assertEquals(searchBefore, compose.onNodeWithContentDescription("운전자 검색 열기").assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
@@ -164,11 +188,11 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed().performTextInput("7")
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertIsDisplayed()
         compose.onNodeWithContentDescription("운전자6 검색 결과 선택").assertDoesNotExist()
-        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertExists()
+        compose.onNodeWithContentDescription("운전자6 프로필 선택").assertExists()
         compose.onNodeWithContentDescription("검색 닫기").performClick()
         compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("운전자 이름 검색...")
-        compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").assertExists()
-        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자1 프로필 선택").assertExists()
+        compose.onNodeWithContentDescription("운전자6 프로필 선택").performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").assertTextContains("").performTextReplacement("없는이름")
         compose.onNodeWithText("검색 결과 0명").assertIsDisplayed()
@@ -207,6 +231,7 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").performClick()
+        compose.onNodeWithText("주행 시작").performClick()
         assertEquals(listOf(7L), starts)
         compose.onNodeWithContentDescription("운전자 이름 검색").assertDoesNotExist()
         compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("운전자 이름 검색...")
@@ -280,7 +305,8 @@ class DriverSelectionScreenTest {
     @Test fun unlinkedVehicleCannotStart() {
         val starts = mutableListOf<Long>()
         show(linked = false, onStart = { starts.add(it) })
-        compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").performClick()
+        compose.onNodeWithContentDescription("운전자1 프로필 선택").performClick()
+        compose.onNodeWithText("주행 시작").performClick()
         compose.onNodeWithText("차량 연결이 필요합니다").assertIsDisplayed()
         assertEquals(emptyList<Long>(), starts)
     }
@@ -288,7 +314,8 @@ class DriverSelectionScreenTest {
     @Test fun missingOdometerCannotStart() {
         val starts = mutableListOf<Long>()
         show(ready = false, onStart = { starts.add(it) })
-        compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").performClick()
+        compose.onNodeWithContentDescription("운전자1 프로필 선택").performClick()
+        compose.onNodeWithText("주행 시작").performClick()
         compose.onNodeWithText("주행거리 수신 대기").assertIsDisplayed()
         assertEquals(emptyList<Long>(), starts)
     }
@@ -487,6 +514,7 @@ class DriverSelectionScreenTest {
         org.junit.Assert.assertTrue(result.fetchSemanticsNode().boundsInRoot.bottom <= 240f)
         compose.onNodeWithContentDescription("검색 닫기").performScrollTo().assertIsDisplayed()
         result.performScrollTo().performClick()
+        compose.onNodeWithText("주행 시작").performClick()
         assertEquals(listOf(7L), starts)
     }
 

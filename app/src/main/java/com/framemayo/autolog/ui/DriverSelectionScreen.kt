@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -128,7 +129,8 @@ internal fun DriverSelectionScreen(
             if (driverId == null) onStartLater() else onStart(driverId)
         }
     }
-    val select: (DriverProfile) -> Unit = { start(it.driver.id) }
+    var selectedId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val select: (DriverProfile) -> Unit = { keyboard?.hide(); selectedId = it.driver.id }
     MaterialTheme(colorScheme = SelectionColors) {
         Surface(Modifier.fillMaxSize(), color = SelectionColors.background) {
             if (!parked) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -261,6 +263,13 @@ internal fun DriverSelectionScreen(
             }, modifier = Modifier.heightIn(min = 56.dp)) { Text("삭제") } },
             dismissButton = { TextButton(onClick = { deletingId = null }, enabled = !busy, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소") } },
         )
+        val selected = profiles.find { it.driver.id == selectedId }
+        if (parked && selected != null) StartTripDialog(
+            selected,
+            onStart = { selectedId = null; start(selected.driver.id) },
+            onEdit = { selectedId = null; editingId = selected.driver.id; error = null; editing = true },
+            onDismiss = { selectedId = null },
+        )
         if (parked && blocked) AlertDialog(
             onDismissRequest = { blocked = false }, title = { Text(if (!linked) "차량 연결이 필요합니다" else "주행거리 수신 대기", fontSize = 28.sp) },
             text = { Text(if (!linked) "화면 아래 차량 연결에 관리자가 발급한 8자리 페어링 코드를 입력해 주세요. 연결 후 운행을 시작할 수 있습니다." else "차량의 유효한 주행거리 정보를 받은 후 다시 선택해 주세요.", fontSize = 22.sp, lineHeight = 32.sp) },
@@ -286,7 +295,7 @@ private fun DriverProfileCard(profile: DriverProfile, size: Dp, managing: Boolea
         Box {
             if (managing) Surface(Modifier.size(size), shape = RoundedCornerShape(18.dp), color = Color.White) {
                 Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f), expression = profile.expression) }
-            } else Surface(onClick = onSelect, modifier = Modifier.size(size).semantics { contentDescription = "${profile.displayName} 프로필로 운행 시작" }, shape = RoundedCornerShape(18.dp), color = Color.White) {
+            } else Surface(onClick = onSelect, modifier = Modifier.size(size).semantics { contentDescription = "${profile.displayName} 프로필 선택" }, shape = RoundedCornerShape(18.dp), color = Color.White) {
                 Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f), expression = profile.expression) }
             }
             if (managing) Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -348,6 +357,35 @@ private fun ProfileIcon(kind: String, modifier: Modifier, color: Color) {
             "search" -> { drawCircle(color, 8 * unit, point(11f, 11f), style = Stroke(2 * unit)); line(17f, 17f, 21f, 21f) }
             "edit" -> { line(5f, 16f, 16f, 5f); line(8f, 19f, 19f, 8f); line(16f, 5f, 19f, 8f); line(5f, 16f, 4f, 20f); line(4f, 20f, 8f, 19f) }
             "delete" -> { line(4f, 6f, 20f, 6f); line(9f, 3f, 15f, 3f); line(6f, 6f, 7f, 21f); line(18f, 6f, 17f, 21f); line(7f, 21f, 17f, 21f); line(10f, 10f, 10f, 17f); line(14f, 10f, 14f, 17f) }
+        }
+    }
+}
+
+@Composable
+private fun StartTripDialog(profile: DriverProfile, onStart: () -> Unit, onEdit: () -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(Modifier.widthIn(max = 480.dp).fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = SelectionColors.surface) {
+            Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Surface(Modifier.size(180.dp), shape = RoundedCornerShape(24.dp), color = Color.White) {
+                    Box(contentAlignment = Alignment.Center) { DriverAvatar(profile.color, Modifier.fillMaxWidth().aspectRatio(4f / 3f), blinking = true, expression = profile.expression) }
+                }
+                Text(profile.displayName, Modifier.padding(top = 20.dp), fontSize = 32.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (profile.driver.status == DriverStatus.PENDING) {
+                    Text("승인 대기 · 관리자 승인 후 운행 확인이 전송돼요.", Modifier.padding(top = 6.dp), fontSize = 18.sp, color = SelectionColors.onSurfaceVariant, textAlign = TextAlign.Center)
+                }
+                Button(
+                    onClick = onStart, modifier = Modifier.padding(top = 28.dp).fillMaxWidth().heightIn(min = 64.dp), shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = SelectionColors.surface),
+                ) { Text("주행 시작", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                OutlinedButton(
+                    onClick = onEdit, modifier = Modifier.padding(top = 12.dp).fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, SelectionColors.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
+                ) { Text("프로필 수정", fontSize = 20.sp) }
+                TextButton(onClick = onDismiss, modifier = Modifier.padding(top = 4.dp).heightIn(min = 56.dp)) {
+                    Text("닫기", fontSize = 18.sp, color = SelectionColors.onSurfaceVariant)
+                }
+            }
         }
     }
 }
