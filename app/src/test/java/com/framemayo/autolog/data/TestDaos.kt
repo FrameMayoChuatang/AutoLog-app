@@ -3,6 +3,7 @@ package com.framemayo.autolog.data
 import com.framemayo.autolog.data.local.SyncState
 import com.framemayo.autolog.data.local.TripDao
 import com.framemayo.autolog.data.local.TripEntity
+import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.local.TripStatus
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.flow.flowOf
@@ -16,13 +17,33 @@ internal fun fakeTripDao(): TripDao {
             "insert" -> { val t = (a[0] as TripEntity).copy(id = nextId++); rows += t; t.id }
             "update" -> { val t = a[0] as TripEntity; rows[rows.indexOfFirst { it.id == t.id }] = t; Unit }
             "get" -> rows.firstOrNull { it.id == a[0] }
+            "updatePurpose" -> {
+                val i = rows.indexOfFirst { it.id == a[0] }
+                if (i >= 0) rows[i] = rows[i].copy(purpose = a[1] as TripPurpose, purposeText = a[2] as String?, memo = a[3] as String?, syncState = SyncState.PENDING, updatedAt = a[4] as Long)
+                Unit
+            }
+            "assignDriver" -> {
+                val i = rows.indexOfFirst { it.id == a[0] && it.driverId == null }
+                if (i >= 0) rows[i] = rows[i].copy(driverId = a[1] as Long, syncState = SyncState.PENDING, sourceRevision = rows[i].sourceRevision + 1, updatedAt = a[2] as Long)
+                if (i >= 0) 1 else 0
+            }
+            "complete" -> {
+                val i = rows.indexOfFirst { it.id == a[0] && it.status == TripStatus.ACTIVE }
+                if (i >= 0) rows[i] = rows[i].copy(
+                    endedAt = a[1] as Long, endOdometerKm = a[2] as Float, lastOdometerKm = a[2] as Float, status = TripStatus.COMPLETED,
+                    syncState = SyncState.PENDING, sourceRevision = rows[i].sourceRevision + 1, updatedAt = a[3] as Long,
+                    endedBy = a[4] as com.framemayo.autolog.data.local.TripEndReason,
+                    endFuelPercent = (a[5] as Float?) ?: rows[i].endFuelPercent, endBatteryPercent = (a[6] as Float?) ?: rows[i].endBatteryPercent,
+                )
+                if (i >= 0) 1 else 0
+            }
             "active" -> rows.lastOrNull { it.status == TripStatus.ACTIVE }
             "lastInterrupted" -> rows.lastOrNull { it.status == TripStatus.INTERRUPTED }
             "lastEnded" -> rows.lastOrNull { it.status != TripStatus.ACTIVE }
             "pendingSync" -> rows.filter { it.syncState == SyncState.PENDING }.sortedBy { it.startedAt }
             "deleteSyncedBefore" -> {
                 val n = rows.size
-                rows.removeAll { it.syncState == SyncState.SYNCED && it.status != TripStatus.ACTIVE && (it.syncedAt ?: Long.MAX_VALUE) < (a[0] as Long) }
+                rows.removeAll { it.syncState == SyncState.SYNCED && it.status != TripStatus.ACTIVE && it.purpose != TripPurpose.UNCONFIRMED && (it.syncedAt ?: Long.MAX_VALUE) < (a[0] as Long) }
                 n - rows.size
             }
             "markSynced" -> {

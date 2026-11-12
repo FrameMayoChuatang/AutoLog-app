@@ -67,6 +67,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -154,6 +155,9 @@ internal fun DriverSelectionScreen(
                 var topBarHeight by remember { mutableIntStateOf(0) }
                 var footerHeight by remember { mutableIntStateOf(0) }
                 val footerPx = if (managing) 0 else footerHeight
+                val firstPageHeight = with(LocalDensity.current) {
+                    (viewportHeight.roundToPx() - topBarHeight - footerPx).coerceAtLeast(0).toDp()
+                }
                 Column(Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().onSizeChanged { topBarHeight = it.height }.padding(top = 24.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
@@ -182,13 +186,18 @@ internal fun DriverSelectionScreen(
                         contentPadding = PaddingValues(bottom = 40.dp),
                     ) {
                         item {
+                            // 첫 화면 안에 더보기를 두고, 펼친 목록은 실제 스크롤 영역 아래에서 시작한다.
+                            Column(Modifier.fillMaxWidth().heightIn(min = firstPageHeight),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.SpaceBetween) {
                             Box(Modifier.fillMaxWidth()) {
                                 Column(
                                     Modifier.fillMaxWidth().layout { measurable, constraints ->
                                         val group = measurable.measure(constraints)
                                         // 탑바 높이를 제외해 기존 화면 중앙을 유지하고, 목록만 탑바 아래에서 스크롤한다.
                                         val centered = (viewportHeight.roundToPx() - group.height) / 2 - topBarHeight
-                                        val available = viewportHeight.roundToPx() - topBarHeight - footerPx - group.height
+                                        val buttonSpace = if (others.isNotEmpty()) 104.dp.roundToPx() else 0
+                                        val available = viewportHeight.roundToPx() - topBarHeight - footerPx - group.height - buttonSpace
                                         val top = minOf(centered, available).coerceAtLeast(0)
                                         layout(group.width, top + group.height) { group.placeRelative(0, top) }
                                     },
@@ -216,14 +225,15 @@ internal fun DriverSelectionScreen(
                                     }
                                 }
                             }
-                        }
-                        if (others.isNotEmpty() && !showingMore) item {
+                        if (others.isNotEmpty() && !showingMore) {
                             OutlinedButton(
                                 onClick = { showingMore = true },
-                                modifier = Modifier.padding(top = 180.dp, bottom = 24.dp).widthIn(min = 160.dp).heightIn(min = 56.dp),
+                                modifier = Modifier.padding(vertical = 24.dp).widthIn(min = 160.dp).heightIn(min = 56.dp),
                                 shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SelectionColors.outline),
                                 colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
                             ) { Text("더보기", fontSize = 20.sp) }
+                        }
+                            }
                         }
                         if (showingMore && others.isNotEmpty()) item { Box(Modifier.fillMaxWidth().padding(top = 72.dp)) }
                         if (showingMore) items(others.chunked(columns), key = { row -> "others-${row.first().driver.id}" }) { row ->

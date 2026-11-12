@@ -199,7 +199,7 @@ internal fun TripReviewCard(
     if (candidate != null && trip.driverId == null && parked) AlertDialog(
         onDismissRequest = { candidateId = null },
         title = { Text("운전자를 지정할까요?", fontSize = VehicleUi.Title) },
-        text = { Text("${candidate.displayName}님으로 지정합니다. 지정한 운전자는 차량에서 다시 변경할 수 없습니다.", fontSize = VehicleUi.Body) },
+        text = { Text("${candidate.displayName}님으로 지정합니다. 지정한 운전자는 차량에서 다시 변경할 수 없습니다.", fontSize = VehicleUi.Body, lineHeight = 34.sp) },
         confirmButton = { TextButton(onClick = { onAssign(candidate.driver.id); candidateId = null }, modifier = Modifier.heightIn(min = 56.dp)) { Text("지정", fontSize = VehicleUi.ButtonText) } },
         dismissButton = { TextButton(onClick = { candidateId = null }, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소", fontSize = VehicleUi.ButtonText) } },
     )

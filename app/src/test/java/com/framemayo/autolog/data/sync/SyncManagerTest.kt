@@ -165,6 +165,18 @@ class SyncManagerTest {
         assertEquals(1, api.uploads.size)
     }
 
+    @Test fun endingTripDuringUploadIsNotMarkedSyncedAndIsSentNext() = runBlocking {
+        val t = repo.start(1, 100f)
+        api.duringUpload = { repo.end(110f) }
+        sync.syncPending()
+        assertEquals(SyncState.PENDING, dao.get(t.id)!!.syncState)
+        assertEquals("RUNNING", api.store.getValue(t.uuid).payload.state)
+
+        assertTrue(sync.syncPending())
+        assertEquals("COMPLETED", api.store.getValue(t.uuid).payload.state)
+        assertEquals(SyncState.SYNCED, dao.get(t.id)!!.syncState)
+    }
+
     @Test fun interruptedIsSentWithoutEstimatedEndValues() = runBlocking {
         val t = repo.start(1, 100f)
         repo.heartbeat(104.5f)
