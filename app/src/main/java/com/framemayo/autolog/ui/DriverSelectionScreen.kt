@@ -322,7 +322,7 @@ private fun DriverProfileCard(profile: DriverProfile, size: Dp, managing: Boolea
         }
         Text(profile.displayName, Modifier.padding(top = 18.dp), fontSize = 22.sp, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (profile.driver.status == DriverStatus.PENDING) {
-            Text("승인 대기", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("승인 대기", Modifier.padding(top = 4.dp), fontSize = VehicleUi.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -388,7 +388,7 @@ private fun StartTripDialog(profile: DriverProfile, onStart: () -> Unit, onEdit:
                 }
                 Text(profile.displayName, Modifier.padding(top = 20.dp), fontSize = 32.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (profile.driver.status == DriverStatus.PENDING) {
-                    Text("승인 대기 · 관리자 승인 후 운행 확인이 전송돼요.", Modifier.padding(top = 6.dp), fontSize = 18.sp, color = SelectionColors.onSurfaceVariant, textAlign = TextAlign.Center)
+                    Text("승인 대기 · 관리자 승인 후 운행 확인이 전송돼요.", Modifier.padding(top = 6.dp), fontSize = VehicleUi.Caption, color = SelectionColors.onSurfaceVariant, textAlign = TextAlign.Center)
                 }
                 Button(
                     onClick = onStart, modifier = Modifier.padding(top = 28.dp).fillMaxWidth().heightIn(min = 64.dp), shape = RoundedCornerShape(16.dp),
