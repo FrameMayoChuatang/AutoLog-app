@@ -61,12 +61,14 @@ internal fun DriverProfileEditor(
     busy: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onSave: (String, Int, Int, Boolean) -> Unit,
+    onSave: (String, Int, Int, Boolean?) -> Unit,
 ) {
     var name by rememberSaveable(profile?.driver?.id) { mutableStateOf(profile?.displayName.orEmpty()) }
     var color by rememberSaveable(profile?.driver?.id) { mutableIntStateOf(profile?.color ?: 0) }
     var expression by rememberSaveable(profile?.driver?.id) { mutableIntStateOf(profile?.expression ?: 0) }
     var locationConsent by rememberSaveable(profile?.driver?.id) { mutableStateOf(profile?.driver?.locationConsent == true) }
+    var consentTouched by rememberSaveable(profile?.driver?.id) { mutableStateOf(false) }
+    val consentToSave: Boolean? = if (profile != null && profile.driver.locationConsent == null && !consentTouched) null else locationConsent
     Dialog(
         onDismissRequest = { if (!busy) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !busy, dismissOnClickOutside = !busy),
@@ -113,7 +115,7 @@ internal fun DriverProfileEditor(
                                     Text("위치정보 수집 동의 (선택)", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                                     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
                                         .toggleable(value = locationConsent, enabled = !busy, role = Role.Checkbox,
-                                            onValueChange = { locationConsent = it })
+                                            onValueChange = { locationConsent = it; consentTouched = true })
                                         .semantics { contentDescription = "위치정보 수집 동의" },
                                         verticalAlignment = Alignment.CenterVertically) {
                                         Checkbox(checked = locationConsent, onCheckedChange = null, enabled = !busy)
@@ -130,7 +132,7 @@ internal fun DriverProfileEditor(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 DriverAvatar(color, Modifier.size(72.dp), expression = expression)
                                 Text(name.trim().ifEmpty { "나의 프로필" }, Modifier.weight(1f), fontSize = 20.sp, maxLines = 2)
-                                Button(onClick = { onSave(name.trim(), color, expression, locationConsent) },
+                                Button(onClick = { onSave(name.trim(), color, expression, consentToSave) },
                                     enabled = name.isNotBlank() && !busy,
                                     modifier = Modifier.heightIn(min = 56.dp), shape = CircleShape) {
                                     Text(if (busy) "저장 중…" else "저장", fontSize = 20.sp)
@@ -145,7 +147,7 @@ internal fun DriverProfileEditor(
                                     Text(name.trim().ifEmpty { "나의 프로필" }, fontSize = if (stacked) 26.sp else 34.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 2)
                                     DriverAvatar(color, Modifier.widthIn(max = if (stacked) 160.dp else 400.dp).fillMaxWidth().aspectRatio(4f / 3f), blinking = true, expression = expression)
                                     Button(
-                                        onClick = { onSave(name.trim(), color, expression, locationConsent) }, enabled = name.isNotBlank() && !busy,
+                                        onClick = { onSave(name.trim(), color, expression, consentToSave) }, enabled = name.isNotBlank() && !busy,
                                         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = CircleShape,
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF141416), contentColor = Color.White),
                                     ) { Text(if (busy) "저장 중…" else "저장", fontSize = 20.sp) }
