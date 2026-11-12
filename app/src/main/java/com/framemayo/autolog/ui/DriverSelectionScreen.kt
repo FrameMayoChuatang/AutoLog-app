@@ -210,6 +210,17 @@ internal fun DriverSelectionScreen(
                         if (showingMore) items(others.chunked(columns), key = { row -> "others-${row.first().driver.id}" }) { row ->
                             Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.Top) { row.forEach { card(it) } }
                         }
+                        if (showingMore && others.isNotEmpty()) item(key = "collapse-profiles") {
+                            OutlinedButton(
+                                onClick = {
+                                    showingMore = false
+                                    scope.launch { listState.scrollToItem(0) }
+                                },
+                                modifier = Modifier.padding(top = 24.dp, bottom = 24.dp).widthIn(min = 160.dp).heightIn(min = 56.dp),
+                                shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SelectionColors.outline),
+                                colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
+                            ) { Text("접기", fontSize = 20.sp) }
+                        }
                         // 차량 연결은 운전자 선택 화면 맨 아래에 둔다. 연결 안내창의 `차량 연결하기`가 여기로 스크롤한다.
                         if (!managing) item(key = "vehicle-link") {
                             Box(Modifier.padding(top = 240.dp).widthIn(max = 960.dp).fillMaxWidth()) { footer() }
