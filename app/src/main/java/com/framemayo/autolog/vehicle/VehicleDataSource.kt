@@ -10,6 +10,8 @@ import ai.pleos.playground.vehicle.listener.GearSelectionListener
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
+import com.framemayo.autolog.BuildConfig
+import java.io.IOException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -20,6 +22,7 @@ import kotlin.coroutines.resume
 class VehicleDataSource(context: Context) {
 
     private val vehicle = Vehicle(context.applicationContext)
+    private val consoleOdometer = if (BuildConfig.DEBUG && BuildConfig.USE_CONSOLE_ODOMETER) ConsoleOdometerSource() else null
     @Volatile private var initialized = false
 
     fun initialize() {
@@ -34,7 +37,19 @@ class VehicleDataSource(context: Context) {
         initialized = false
     }
 
-    suspend fun currentOdometerKm(): Float? = suspendCancellableCoroutine { cont ->
+    suspend fun currentOdometerKm(): Float? {
+        consoleOdometer?.let { source ->
+            return try {
+                source.currentKm()
+            } catch (error: IOException) {
+                Log.w(TAG, "개발용 콘솔 누적거리 조회 실패", error)
+                null // 초기 복구는 기존 SDK 조회 실패와 동일하게 다음 유효값을 기다린다.
+            }
+        }
+        return currentSdkOdometerKm()
+    }
+
+    private suspend fun currentSdkOdometerKm(): Float? = suspendCancellableCoroutine { cont ->
         vehicle.getOdometer().getCurrentDistanceDriven(
             onComplete = { if (cont.isActive) cont.resume(it) },
             onFailed = { e ->
@@ -44,7 +59,9 @@ class VehicleDataSource(context: Context) {
         )
     }
 
-    fun odometerKm(): Flow<Float?> = callbackFlow {
+    fun odometerKm(): Flow<Float?> = consoleOdometer?.updates() ?: sdkOdometerKm()
+
+    private fun sdkOdometerKm(): Flow<Float?> = callbackFlow {
         val odometer = vehicle.getOdometer()
         val listener = object : DistanceDrivenListener {
             override fun onDistanceDrivenUpdated(value: Float?) {

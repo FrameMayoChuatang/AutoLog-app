@@ -116,6 +116,21 @@ app/src/main/java/com/framemayo/autolog
 - DB 마이그레이션/프로필 설정/서버 목록 갱신 후 보존, 삭제 시 운행 보존과 진행 중 삭제 차단을 검증합니다.
 - UI 테스트는 Robolectric SDK 35에서 실행합니다. SDK 34 테스트 엔진은 실제 API 34와 달리 이전 Skia를 사용해 child RuntimeShader를 지원하지 않습니다. 테스트 이미지 `app/build/reports/driver-selection/`는 소프트웨어 캔버스 기반 배치 확인용이며 색상·깜박임의 GPU 출력 검증을 대신하지 않습니다.
 
+### Pleos 에뮬레이터 누적거리 개발 옵션 (#115)
+
+현재 Pleos 이미지에서 Virtual Console/DDS의 누적거리와 VHAL `PERF_ODOMETER` 값이 다르게 전달되는 문제가 확인됐습니다. 해당 환경에서만 다음 옵션으로 APK를 빌드합니다.
+
+```sh
+./gradlew :app:assembleDebug -PconsoleOdometer=true
+```
+
+- 이 옵션을 명시한 debug APK는 에뮬레이터 내부 `http://127.0.0.1:8088/vehicle/state`의 `odometer.traveled_distance_km`을 1초 간격으로 읽습니다. 호스트 서버 주소인 `10.0.2.2:8080`과 별개입니다.
+- `bridge_ready`와 `emulator_active`가 모두 true인 숫자 값만 사용합니다. HTTP/응답 오류는 기존 수집기 재시도로 전달하며 이전 값 재사용·거리 추정·SDK 자동 전환을 하지 않습니다. 진행 중인 HTTP 호출의 연결/읽기 제한 시간은 각각 1.5초입니다.
+- 초기 1회 조회 실패는 null로 처리하여 다음 유효값을 기다립니다. 0 km 및 감소한 값에 대한 기존 운행 수집기 검증은 유지합니다.
+- 기본 debug와 모든 release 빌드는 기존 Vehicle SDK를 사용합니다. 기어 등 다른 차량 신호도 기존 SDK를 유지합니다.
+- 서로 다른 누적거리 기준을 가진 APK로 **진행 중인 운행을 이어서 테스트하지 않습니다**. 먼저 운행을 종료하고, 콘솔 거리를 기존 기록과 일관된 값으로 설정한 뒤 시작합니다. DB와 기존 운행 기록은 자동 초기화하지 않습니다.
+- 벤더 이미지의 전달 문제가 해결되면 옵션을 끄고 콘솔 어댑터를 제거합니다. 이 옵션은 실차 배포용 해결책이 아닙니다.
+
 ## 브랜치 / 커밋
 
 - `main`: 시연 가능한 상태 유지
