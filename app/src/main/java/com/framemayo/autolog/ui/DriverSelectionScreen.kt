@@ -148,6 +148,8 @@ internal fun DriverSelectionScreen(
                     DriverProfileCard(profile, avatarSize, managing, { select(profile) }, { openEditor(profile.driver.id) }, { error = null; deletingId = profile.driver.id })
                 }
                 var topBarHeight by remember { mutableIntStateOf(0) }
+                var footerHeight by remember { mutableIntStateOf(0) }
+                val footerPx = if (managing) 0 else footerHeight
                 Column(Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().onSizeChanged { topBarHeight = it.height }.padding(top = 24.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
@@ -179,7 +181,9 @@ internal fun DriverSelectionScreen(
                                     Modifier.fillMaxWidth().layout { measurable, constraints ->
                                         val group = measurable.measure(constraints)
                                         // 탑바 높이를 제외해 기존 화면 중앙을 유지하고, 목록만 탑바 아래에서 스크롤한다.
-                                        val top = ((viewportHeight.roundToPx() - group.height) / 2 - topBarHeight).coerceAtLeast(0)
+                                        val centered = (viewportHeight.roundToPx() - group.height) / 2 - topBarHeight
+                                        val available = viewportHeight.roundToPx() - topBarHeight - footerPx - group.height
+                                        val top = minOf(centered, available).coerceAtLeast(0)
                                         layout(group.width, top + group.height) { group.placeRelative(0, top) }
                                     },
                                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -230,11 +234,11 @@ internal fun DriverSelectionScreen(
                                 colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
                             ) { Text("접기", fontSize = 20.sp) }
                         }
-                        // 차량 연결은 운전자 선택 화면 맨 아래에 둔다. 연결 안내창의 `차량 연결하기`가 여기로 스크롤한다.
-                        if (!managing) item(key = "vehicle-link") {
-                            Box(Modifier.padding(top = 240.dp).widthIn(max = 960.dp).fillMaxWidth()) { footer() }
-                        }
                     }
+                    if (!managing) Box(
+                        Modifier.fillMaxWidth().onSizeChanged { footerHeight = it.height }.padding(top = 16.dp, bottom = 24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { Box(Modifier.widthIn(max = 960.dp).fillMaxWidth()) { footer() } }
                 }
             }
         }
@@ -290,7 +294,6 @@ internal fun DriverSelectionScreen(
             confirmButton = { TextButton(onClick = {
                 blocked = false
                 if (linked) onOpenVehicle()
-                else scope.launch { listState.animateScrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)) }
             }, modifier = Modifier.heightIn(min = 56.dp)) { Text(if (!linked) "차량 연결하기" else "차량 상태 확인", fontSize = 20.sp) } },
             dismissButton = { TextButton(onClick = { blocked = false }, modifier = Modifier.heightIn(min = 56.dp)) { Text("닫기") } },
         )

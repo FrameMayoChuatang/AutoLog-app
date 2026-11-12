@@ -41,8 +41,8 @@ internal fun TripSyncStatusNotice(status: TripSyncStatus, purpose: TripPurpose) 
     }
     Surface(color = accent.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, color = accent, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Text(description, color = Color(0xFFD7DAE1), fontSize = 18.sp, lineHeight = 26.sp)
+            Text(title, color = accent, fontSize = VehicleUi.ButtonText, fontWeight = FontWeight.SemiBold)
+            Text(description, color = Color(0xFFD7DAE1), fontSize = VehicleUi.Caption, lineHeight = 28.sp)
         }
     }
 }
