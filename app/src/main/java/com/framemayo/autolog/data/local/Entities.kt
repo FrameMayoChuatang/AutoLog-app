@@ -70,6 +70,7 @@ data class TripEntity(
     val ackedRevision: Long = 0,
     val serverVersion: Long = 0,
     val confirmSentAt: Long? = null,
+    val purposeText: String? = null,
 )
 
 fun TripEntity.distanceKm(): Float = (endOdometerKm ?: lastOdometerKm) - startOdometerKm
