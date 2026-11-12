@@ -147,12 +147,6 @@ internal fun DriverSelectionScreen(
                                 contentColor = if (managing) SelectionColors.surface else SelectionColors.onSurface,
                             ),
                         ) { Text(if (managing) "완료" else "프로필 관리", fontSize = 18.sp) }
-                        OutlinedButton(
-                            onClick = onOpenVehicle,
-                            modifier = Modifier.padding(start = 16.dp).heightIn(min = 56.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = SelectionColors.onSurface),
-                        ) { Text("운행 기록 · 차량", fontSize = 18.sp) }
                         Box(Modifier.weight(1f).padding(start = 24.dp), contentAlignment = Alignment.CenterEnd) {
                             DriverSearchBar(
                                 query, { query = it }, { keyboard?.hide() },

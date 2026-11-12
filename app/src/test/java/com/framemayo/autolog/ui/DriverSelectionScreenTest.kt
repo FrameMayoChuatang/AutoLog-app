@@ -31,16 +31,6 @@ class DriverSelectionScreenTest {
         compose.setContent { DriverSelectionScreen(profiles, parked, linked, ready, onStart, { _, _, _, _ -> }, { true }, {}) }
     }
 
-    @Test fun linkedVehicleCanOpenRecordsWithoutSelectingDriver() {
-        var opened = 0
-        compose.setContent { DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _, _ -> }, { true }, { opened++ }) }
-        compose.onNodeWithText("운행 기록 · 차량").assertIsDisplayed().performClick()
-        assertEquals(1, opened)
-        compose.onNodeWithText("프로필 관리").performClick()
-        compose.onNodeWithText("운행 기록 · 차량").assertIsDisplayed().performClick()
-        assertEquals(2, opened)
-    }
-
     @Test fun unlinkedBannerOpensPairingWithoutStartingTrip() {
         var opened = 0
         var started = false
