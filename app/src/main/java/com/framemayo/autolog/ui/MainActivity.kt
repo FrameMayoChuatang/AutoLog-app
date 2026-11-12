@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.framemayo.autolog.service.VehicleSnapshot
 import androidx.compose.ui.unit.sp
@@ -123,15 +124,15 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
         val active = state.activeTrip
         if (active != null) {
             item {
-                Card {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val driver = state.driverName(active.driverId)
-                        Text("운행 중 · $driver", style = MaterialTheme.typography.titleMedium)
-                        Text("%.2f km · %d분".format(active.distanceKm(), active.durationMs() / 60_000))
-                        Button(onClick = vm::endTrip, enabled = v.isParked && v.odometerKm != null) {
-                            Text("운행 종료")
-                        }
+                VehicleSection("운행 중 · ${state.driverName(active.driverId)}") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "%.2f km · %d분".format(active.distanceKm(), active.durationMs() / 60_000),
+                            Modifier.weight(1f), fontSize = VehicleUi.Value, fontWeight = FontWeight.Bold, color = VehicleUi.Primary,
+                        )
+                        VehiclePrimaryButton("운행 종료", vm::endTrip, enabled = v.isParked && v.odometerKm != null)
                     }
+                    if (!v.isParked) Text("주차(P) 후 종료할 수 있어요.", fontSize = VehicleUi.Caption, color = VehicleUi.Caution)
                 }
             }
         }
@@ -164,10 +165,10 @@ private fun VehicleStatusCard(v: VehicleSnapshot) {
 
 @Composable
 private fun StatusTile(label: String, value: String, modifier: Modifier, ok: Boolean) {
-    Surface(modifier, shape = RoundedCornerShape(16.dp), color = Color(0xFF22242A)) {
+    Surface(modifier, shape = RoundedCornerShape(16.dp), color = VehicleUi.Tile) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(label, fontSize = VehicleUi.Caption, color = VehicleUi.Secondary)
-            Text(value, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = if (ok) VehicleUi.Primary else VehicleUi.Caution)
+            Text(value, fontSize = VehicleUi.Value, lineHeight = 38.sp, fontWeight = FontWeight.Bold, color = if (ok) VehicleUi.Primary else VehicleUi.Caution)
         }
     }
 }

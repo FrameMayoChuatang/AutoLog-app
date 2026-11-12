@@ -35,12 +35,12 @@ internal fun ConsentDialog(name: String, vm: MainViewModel, requestLocationPermi
     AlertDialog(
         onDismissRequest = vm::dismissConsent,
         containerColor = VehicleUi.Surface,
-        title = { Text("위치정보 수집 동의", fontSize = 28.sp, color = VehicleUi.Primary) },
+        title = { Text("위치정보 수집 동의", fontSize = VehicleUi.Title, color = VehicleUi.Primary) },
         text = {
             Text(
                 "${name}님의 업무 운행에 한해 도착 위치를 저장합니다. 개인 운행은 저장하지 않으며, " +
                     "동의하지 않아도 운행 기록은 정상 작성됩니다. 동의는 언제든 철회할 수 있습니다.",
-                fontSize = VehicleUi.Body, lineHeight = 32.sp, color = VehicleUi.Secondary,
+                fontSize = VehicleUi.Body, lineHeight = 34.sp, color = VehicleUi.Secondary,
             )
         },
         confirmButton = { VehiclePrimaryButton("동의", { vm.answerConsent(true); requestLocationPermission() }) },
@@ -85,7 +85,7 @@ internal fun VehicleLinkCard(vm: MainViewModel) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("연결됨", fontSize = VehicleUi.Caption, color = VehicleUi.Positive)
-                    Text(link.registrationNumber, fontSize = 30.sp, fontWeight = FontWeight.SemiBold, color = VehicleUi.Primary)
+                    Text(link.registrationNumber, fontSize = VehicleUi.Value, fontWeight = FontWeight.Bold, color = VehicleUi.Primary)
                     if (link.model.isNotBlank()) Text(link.model, fontSize = VehicleUi.Caption, color = VehicleUi.Secondary)
                 }
                 VehicleSecondaryButton("연결 해제", { confirming = true })
@@ -94,11 +94,11 @@ internal fun VehicleLinkCard(vm: MainViewModel) {
         if (confirming) AlertDialog(
             onDismissRequest = { confirming = false },
             containerColor = VehicleUi.Surface,
-            title = { Text("차량 연결을 해제할까요?", fontSize = 28.sp, color = VehicleUi.Primary) },
+            title = { Text("차량 연결을 해제할까요?", fontSize = VehicleUi.Title, color = VehicleUi.Primary) },
             text = {
                 Text(
                     "해제하면 운행을 시작할 수 없고, 아직 전송되지 않은 기록은 다시 연결한 뒤 처음부터 전송합니다.",
-                    fontSize = VehicleUi.Body, lineHeight = 32.sp, color = VehicleUi.Secondary,
+                    fontSize = VehicleUi.Body, lineHeight = 34.sp, color = VehicleUi.Secondary,
                 )
             },
             confirmButton = {
@@ -124,10 +124,10 @@ internal fun VehicleLinkCard(vm: MainViewModel) {
                 Modifier.weight(1f).widthIn(max = 480.dp),
                 label = { Text("페어링 코드", fontSize = VehicleUi.Caption) },
                 singleLine = true,
-                textStyle = TextStyle(fontSize = 28.sp, letterSpacing = 4.sp, color = VehicleUi.Primary),
+                textStyle = TextStyle(fontSize = VehicleUi.Value, letterSpacing = 4.sp, color = VehicleUi.Primary),
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = VehicleUi.Primary, unfocusedBorderColor = VehicleUi.Outline,
+                    focusedBorderColor = VehicleUi.Primary, unfocusedBorderColor = VehicleUi.Secondary,
                     focusedLabelColor = VehicleUi.Primary, unfocusedLabelColor = VehicleUi.Secondary,
                     cursorColor = VehicleUi.Primary,
                 ),
@@ -141,6 +141,6 @@ internal fun VehicleLinkCard(vm: MainViewModel) {
             )
         }
         Text("${code.length}/${VehicleLinkRepository.CODE_LENGTH}자리", fontSize = VehicleUi.Caption, color = VehicleUi.Secondary)
-        s.error?.let { Text(it, fontSize = VehicleUi.Caption, lineHeight = 26.sp, color = VehicleUi.Error) }
+        s.error?.let { Text(it, fontSize = VehicleUi.Caption, lineHeight = 24.sp, color = VehicleUi.Error) }
     }
 }

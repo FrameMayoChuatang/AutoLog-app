@@ -21,26 +21,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 internal object VehicleUi {
-    val Surface = Color(0xFF17181D)
-    val Primary = Color(0xFFF4F5F7)
-    val Secondary = Color(0xFFB9BEC8)
-    val Outline = Color(0xFF696B75)
-    val Positive = Color(0xFF95D7BA)
+    val Surface = Color(0xFF1D1E21)
+    val Tile = Color(0xFF313236)
+    val Primary = Color(0xFFFFFFFF)
+    val Secondary = Color(0xA3FFFFFF)
+    val Outline = Color(0x33FFFFFF)
+    val Disabled = Color(0x52FFFFFF)
+    val Positive = Color(0xFF02C265)
+    val Error = Color(0xFFFE3D16)
     val Caution = Color(0xFFF0CF8A)
-    val Error = Color(0xFFFFB4AB)
 
-    val Title = 26.sp
-    val Body = 22.sp
-    val Caption = 18.sp
-    val ButtonText = 20.sp
+    val Title = 32.sp
+    val Value = 30.sp
+    val Body = 26.sp
+    val Caption = 20.sp
+    val ButtonText = 24.sp
     val MinTouch = 56.dp
 }
 
 @Composable
 internal fun VehicleSection(title: String, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = VehicleUi.Surface) {
-        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(title, fontSize = VehicleUi.Title, fontWeight = FontWeight.SemiBold, color = VehicleUi.Primary)
+        Column(Modifier.padding(32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(title, fontSize = VehicleUi.Title, lineHeight = 40.sp, fontWeight = FontWeight.Bold, color = VehicleUi.Primary)
             content()
         }
     }
@@ -53,7 +56,7 @@ internal fun VehiclePrimaryButton(text: String, onClick: () -> Unit, modifier: M
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Color.White, contentColor = VehicleUi.Surface,
-            disabledContainerColor = Color(0xFF33353C), disabledContentColor = Color(0xFF8A8E98),
+            disabledContainerColor = VehicleUi.Tile, disabledContentColor = VehicleUi.Disabled,
         ),
     ) { Text(text, fontSize = VehicleUi.ButtonText) }
 }
