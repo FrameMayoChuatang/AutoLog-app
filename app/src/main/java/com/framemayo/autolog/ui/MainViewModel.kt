@@ -1,12 +1,14 @@
 package com.framemayo.autolog.ui
 
 import android.app.Application
+import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.framemayo.autolog.container
 import com.framemayo.autolog.data.link.LinkResult
 import com.framemayo.autolog.data.link.VehicleLink
 import com.framemayo.autolog.data.local.DriverEntity
+import com.framemayo.autolog.data.local.DriverProfile
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.sync.SyncScheduler
@@ -27,6 +29,7 @@ data class MainUiState(
     val activeTrip: TripEntity? = null,
     val recentTrips: List<TripEntity> = emptyList(),
     val consentPrompt: DriverEntity? = null,
+    val profiles: List<DriverProfile> = emptyList(),
     val syncStatus: Map<Long, TripSyncStatus> = emptyMap(),
     val linked: Boolean = false,
 )
@@ -46,12 +49,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val consentPrompt = MutableStateFlow<DriverEntity?>(null)
 
+    private val driverLists = combine(drivers.all, drivers.profiles) { all, profiles -> all to profiles }
+    private var startingTrip = false
     private val vehicleLink = app.container.vehicleLink
 
     val state: StateFlow<MainUiState> = combine(
-        RecorderState.snapshot, drivers.all, trips.active, trips.recent, consentPrompt,
+        RecorderState.snapshot, driverLists, trips.active, trips.recent, consentPrompt,
     ) { vehicle, driverList, active, recent, prompt ->
-        MainUiState(vehicle, driverList, active, recent, prompt)
+        MainUiState(vehicle, driverList.first, active, recent, prompt, driverList.second)
     }.combine(vehicleLink.link) { ui, link ->
         val byId = ui.drivers.associateBy { it.id }
         ui.copy(
@@ -96,7 +101,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { drivers.add(name, department) }
     }
 
+    suspend fun saveProfile(id: Long?, name: String, color: Int) {
+        check(RecorderState.snapshot.value.gear == VehicleGear.GEAR_PARK) { "Profile editing requires Park" }
+        if (id == null) drivers.addProfile(name, color) else drivers.editProfile(id, name, color)
+    }
+
+    suspend fun deleteProfile(id: Long): Boolean {
+        check(RecorderState.snapshot.value.gear == VehicleGear.GEAR_PARK) { "Profile deletion requires Park" }
+        return drivers.hideProfile(id)
+    }
+
     fun startTrip(driverId: Long?) {
+        if (RecorderState.snapshot.value.gear != VehicleGear.GEAR_PARK || startingTrip || consentPrompt.value != null) return
+        if (state.value.profiles.none { it.driver.id == driverId }) return
         val driver = state.value.drivers.find { it.id == driverId }
         if (driver != null && driver.locationConsent == null) {
             consentPrompt.value = driver
@@ -126,9 +143,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun beginTrip(driverId: Long?) {
-        if (vehicleLink.link.value == null) return
-        val km = RecorderState.snapshot.value.odometerKm ?: return
-        viewModelScope.launch { trips.start(driverId, km) }
+        val vehicle = RecorderState.snapshot.value
+        if (vehicle.gear != VehicleGear.GEAR_PARK || vehicleLink.link.value == null || startingTrip) return
+        val km = vehicle.odometerKm?.takeIf { it.isFinite() && it > 0f } ?: return
+        startingTrip = true
+        viewModelScope.launch {
+            try { trips.start(driverId, km) } finally { startingTrip = false }
+        }
     }
 
     fun endTrip() {

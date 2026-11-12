@@ -1,20 +1,15 @@
 package com.framemayo.autolog.ui
 
 import android.app.Application
-import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import com.framemayo.autolog.data.local.DriverEntity
+import com.framemayo.autolog.data.local.DriverProfile
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -25,109 +20,153 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], application = Application::class, qualifiers = "w1100dp-h760dp-land-night-mdpi")
+// Robolectric SDK 34는 Android 12 Skia를 사용하므로 child RuntimeShader 검증은 SDK 35에서 실행한다.
+@Config(sdk = [35], application = Application::class, qualifiers = "w1100dp-h900dp-land-night-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DriverSelectionScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
-    private val drivers = listOf(
-        DriverEntity(id = 1, name = "김민수", department = "영업팀"),
-        DriverEntity(id = 2, name = "이서연", department = "운영팀"),
-        DriverEntity(id = 3, name = "박지훈", department = "경영지원팀"),
-    )
+    private val profiles = (1L..7).map { DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", ((it - 1) % 5).toInt()) }
 
-    private fun show(
-        linked: Boolean = true,
-        odometerReady: Boolean = true,
-        parked: Boolean = true,
-        onStart: (Long) -> Unit = {},
-    ) {
-        compose.setContent {
-            DriverSelectionScreen(drivers, 1, parked, linked, odometerReady, onStart, { _, _ -> }, {})
-        }
+    private fun show(parked: Boolean = true, linked: Boolean = true, ready: Boolean = true, onStart: (Long) -> Unit = {}) {
+        compose.setContent { DriverSelectionScreen(profiles, parked, linked, ready, onStart, { _, _, _ -> }, { true }, {}) }
     }
 
-    @Test fun selectionRequiresAnExplicitStartAndSurvivesRecreation() {
+    @Test fun pendingServerDriverKeepsApprovalLabel() {
+        val pending = profiles.take(1).map { it.copy(driver = it.driver.copy(status = com.framemayo.autolog.data.local.DriverStatus.PENDING)) }
+        compose.setContent { DriverSelectionScreen(pending, true, true, true, {}, { _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithText("승인 대기").assertIsDisplayed()
+    }
+
+    @Test fun selectingAProfileStartsImmediately() {
         val starts = mutableListOf<Long>()
-        val restoration = StateRestorationTester(compose)
-        restoration.setContent {
-            DriverSelectionScreen(drivers, 1, true, true, true, { starts.add(it) }, { _, _ -> }, {})
-        }
-        compose.onNodeWithText("운행 시작").assertIsNotEnabled()
-        compose.onNodeWithText("이서연").performClick()
-        assertEquals(emptyList<Long>(), starts)
-        restoration.emulateSavedInstanceStateRestore()
-        compose.onNodeWithText("이서연님으로 운행을 기록합니다.").assertIsDisplayed()
-        compose.onNodeWithText("운행 시작").assertIsEnabled().performClick()
+        show(onStart = { starts.add(it) })
+        compose.onNodeWithContentDescription("운전자2 프로필로 운행 시작").performClick()
         assertEquals(listOf(2L), starts)
-        screenshot("night-selected")
+        compose.onNodeWithText("운행 시작", substring = false).assertDoesNotExist()
+        screenshot("selection-native")
     }
 
-    @Test fun searchFiltersDriversAndReportsNoResults() {
+    @Test fun recentFiveStayAboveSearchAndOthersStayBelow() {
         show()
-        compose.onNodeWithText("운전자 검색").performClick()
-        compose.onNodeWithText("운전자 이름").performTextInput("서연")
-        compose.onNodeWithText("이서연").assertIsDisplayed()
-        compose.onNodeWithText("김민수").assertDoesNotExist()
-        compose.onNodeWithText("운전자 이름").performTextInput("없는이름")
-        compose.onNodeWithText("검색한 운전자가 없어요. 이름을 확인해 주세요.").assertIsDisplayed()
-        compose.onNodeWithText("닫기").performClick()
-        compose.onNodeWithText("김민수").assertIsDisplayed()
+        val recent = compose.onNodeWithContentDescription("운전자5 프로필로 운행 시작").fetchSemanticsNode().boundsInRoot
+        val search = compose.onNodeWithContentDescription("운전자 이름 검색").fetchSemanticsNode().boundsInRoot
+        val other = compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue(recent.bottom < search.top)
+        org.junit.Assert.assertTrue(other.top > search.bottom)
     }
 
-    @Test fun unlinkedVehicleCannotStartWithASelectedDriver() {
-        show(linked = false)
-        compose.onNodeWithText("김민수").performClick()
-        compose.onNodeWithText("운행 시작").assertIsNotEnabled()
-        compose.onNodeWithText("운행을 시작하려면 차량을 먼저 연결해 주세요.").assertIsDisplayed()
+    @Test fun searchFiltersLowerListAndKeepsRecentProfiles() {
+        show()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
+        compose.onNodeWithContentDescription("운전자7 프로필로 운행 시작").assertExists()
+        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").assertExists()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextReplacement("없는이름")
+        compose.onNodeWithText("검색 결과가 없습니다.").assertExists()
     }
 
-    @Test fun missingOdometerCannotStartWithASelectedDriver() {
-        show(odometerReady = false)
-        compose.onNodeWithText("김민수").performClick()
-        compose.onNodeWithText("운행 시작").assertIsNotEnabled()
+    @Test fun queryAndManagementModeSurviveRecreation() {
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent { DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithText("프로필 관리", useUnmergedTree = true).performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").performTextInput("7")
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithText("완료").assertExists()
+        compose.onNodeWithContentDescription("운전자7 프로필 수정").assertExists()
+        compose.onNodeWithContentDescription("운전자6 프로필 수정").assertDoesNotExist()
     }
 
-    @Test fun unknownOrNonParkGearHidesDriverControls() {
+    @Test fun unlinkedVehicleCannotStart() {
+        val starts = mutableListOf<Long>()
+        show(linked = false, onStart = { starts.add(it) })
+        compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").performClick()
+        compose.onNodeWithText("차량 연결이 필요합니다").assertIsDisplayed()
+        assertEquals(emptyList<Long>(), starts)
+    }
+
+    @Test fun missingOdometerCannotStart() {
+        val starts = mutableListOf<Long>()
+        show(ready = false, onStart = { starts.add(it) })
+        compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").performClick()
+        compose.onNodeWithText("주행거리 수신 대기").assertIsDisplayed()
+        assertEquals(emptyList<Long>(), starts)
+    }
+
+    @Test fun unknownOrNonParkGearHidesControls() {
         show(parked = false)
         compose.onNodeWithText("주차 후 이용해 주세요").assertIsDisplayed()
-        compose.onNodeWithText("김민수").assertDoesNotExist()
-        compose.onNodeWithText("운행 시작").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("운전자 추가").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertDoesNotExist()
     }
 
-    @Test fun leavingParkDismissesInputAndBlocksSelection() {
+    @Test fun leavingParkClosesEditor() {
         val parked = mutableStateOf(true)
-        compose.setContent {
-            DriverSelectionScreen(drivers, 1, parked.value, true, true, {}, { _, _ -> }, {})
-        }
+        compose.setContent { DriverSelectionScreen(profiles, parked.value, true, true, {}, { _, _, _ -> }, { true }, {}) }
         compose.onNodeWithContentDescription("운전자 추가").performClick()
-        compose.onNodeWithText("이름").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자 이름").assertIsDisplayed()
         compose.runOnIdle { parked.value = false }
-        compose.onNodeWithText("이름").assertDoesNotExist()
-        compose.onNodeWithText("운행 시작").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("운전자 이름").assertDoesNotExist()
         compose.onNodeWithText("주차 후 이용해 주세요").assertIsDisplayed()
     }
 
-    @Test fun emptyListSupportsAddingANamedDriver() {
-        val added = mutableListOf<Pair<String, String>>()
-        compose.setContent {
-            DriverSelectionScreen(emptyList(), null, true, true, true, {}, { name, dept -> added.add(name to dept) }, {})
-        }
-        compose.onNodeWithText("등록된 운전자가 없어요. 운전자를 추가해 주세요.").assertIsDisplayed()
+    @Test fun createProfileValidatesNameAndSavesChosenColor() {
+        val saved = mutableListOf<Pair<String, Int>>()
+        compose.setContent { DriverSelectionScreen(emptyList(), true, true, true, {}, { _, name, color -> saved.add(name to color) }, { true }, {}) }
         compose.onNodeWithContentDescription("운전자 추가").performClick()
-        compose.onNodeWithText("추가").assertIsNotEnabled()
-        compose.onNodeWithText("이름").performTextInput("  홍길동  ")
-        compose.onNodeWithText("부서 (선택)").performTextInput("운영팀")
-        compose.onNodeWithText("추가").performClick()
-        assertEquals(listOf("홍길동" to "운영팀"), added)
+        compose.onNodeWithText("저장").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("운전자 이름").performTextInput("  홍길동  ")
+        compose.onNodeWithContentDescription("분홍").performClick()
+        compose.onNodeWithContentDescription("기본 구름 캐릭터").assertIsNotSelected()
+        compose.onNodeWithText("홍길동", substring = false).assertExists()
+        screenshot("editor-native")
+        compose.onNodeWithText("저장").performClick()
+        compose.waitForIdle()
+        assertEquals(listOf("홍길동" to 2), saved)
+    }
+
+    @Test fun presetRestoresBlueAndEditingPreservesIdentity() {
+        val saved = mutableListOf<Triple<Long?, String, Int>>()
+        compose.setContent { DriverSelectionScreen(profiles, true, true, true, {}, { id, name, color -> saved.add(Triple(id, name, color)) }, { true }, {}) }
+        compose.onNodeWithText("프로필 관리", useUnmergedTree = true).performClick()
+        compose.onNodeWithContentDescription("운전자2 프로필 수정").performClick()
+        compose.onNodeWithContentDescription("운전자 이름").performTextReplacement("수정 이름")
+        compose.onNodeWithContentDescription("기본 구름 캐릭터").performClick()
+        compose.onNodeWithContentDescription("하늘").assertIsSelected()
+        compose.onNodeWithText("저장").performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(Triple(2L, "수정 이름", 0)), saved)
+    }
+
+    @Test fun deleteNeedsConfirmationAndCancelDoesNothing() {
+        val deleted = mutableListOf<Long>()
+        compose.setContent { DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _ -> }, { deleted.add(it); true }, {}) }
+        compose.onNodeWithText("프로필 관리", useUnmergedTree = true).performClick()
+        compose.onNodeWithContentDescription("운전자1 프로필 삭제").performClick()
+        compose.onNodeWithText("취소").performClick()
+        assertEquals(emptyList<Long>(), deleted)
+        compose.onNodeWithContentDescription("운전자1 프로필 삭제").performClick()
+        compose.onNodeWithText("삭제", substring = false).performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(1L), deleted)
+    }
+
+    @Test fun failedSaveKeepsEditorOpen() {
+        compose.setContent { DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _ -> error("storage unavailable") }, { true }, {}) }
+        compose.onNodeWithContentDescription("운전자 추가").performClick()
+        compose.onNodeWithContentDescription("운전자 이름").performTextInput("이름")
+        compose.onNodeWithText("저장").performClick()
+        compose.onNodeWithText("저장하지 못했습니다. 다시 시도해 주세요.").assertExists()
+        compose.onNodeWithText("저장").assertIsEnabled()
     }
 
     @Test
     @Config(qualifiers = "w540dp-h900dp-port-notnight-mdpi")
-    fun splitScreenKeepsSelectionAndStartVisibleInDayMode() {
+    fun splitScreenSupportsScrollingAndEditing() {
         show()
-        compose.onNodeWithText("김민수").assertIsDisplayed().performClick()
-        compose.onNodeWithText("운행 시작").assertIsDisplayed().assertIsEnabled()
-        screenshot("day-split")
+        compose.onNodeWithContentDescription("운전자 추가").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("운전자 이름").performTextInput("분할 화면")
+        compose.onNodeWithText("저장").assertIsDisplayed().assertIsEnabled()
+        screenshot("editor-split")
     }
 
     private fun screenshot(name: String) {
@@ -135,9 +174,9 @@ class DriverSelectionScreenTest {
             val view = compose.activity.window.decorView
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val target = File("build/reports/driver-selection/$name.png")
-            target.parentFile?.mkdirs()
-            target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            val file = File("build/reports/driver-selection/$name.png")
+            file.parentFile?.mkdirs()
+            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
     }
 }

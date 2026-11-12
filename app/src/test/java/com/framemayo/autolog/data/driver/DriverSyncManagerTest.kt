@@ -43,6 +43,15 @@ class DriverSyncManagerTest {
         assertNull(all.getValue("Kim").locationConsent)
     }
 
+    @Test fun profileCreationSchedulesAndRegistersDriver() = runBlocking {
+        val id = repo.addProfile("프로필", 2)
+        assertEquals(1, pendingCalls)
+        assertTrue(sync.sync())
+        assertEquals(id, drivers().single().id)
+        assertEquals(DriverStatus.PENDING, drivers().single().status)
+        assertEquals(1, api.registered.size)
+    }
+
     @Test fun localDriverIsRegisteredPendingAndLinkedOnlyOnce() = runBlocking {
         repo.add("Park", "IT")
         assertTrue(sync.sync())
