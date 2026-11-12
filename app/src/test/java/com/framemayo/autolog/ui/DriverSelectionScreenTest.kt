@@ -77,22 +77,24 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자30 프로필 수정").assertIsDisplayed()
     }
 
-    @Test fun searchDialogFiltersResultsAndSharesQueryWithTopBar() {
+    @Test fun searchOnlyFiltersDialogAndClosingClearsQuery() {
         show()
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
         compose.onNodeWithContentDescription("운전자 이름 검색").assertIsDisplayed().performTextInput("7")
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertIsDisplayed()
         compose.onNodeWithContentDescription("운전자6 검색 결과 선택").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertExists()
         compose.onNodeWithContentDescription("검색 닫기").performClick()
-        compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("7")
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("운전자 이름 검색...")
         compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").assertExists()
+        compose.onNodeWithContentDescription("운전자6 프로필로 운행 시작").assertIsDisplayed()
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
-        compose.onNodeWithContentDescription("운전자 이름 검색").assertTextContains("7").performTextReplacement("없는이름")
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertTextContains("").performTextReplacement("없는이름")
         compose.onNodeWithText("검색 결과 0명").assertIsDisplayed()
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertDoesNotExist()
     }
 
-    @Test fun backdropFirstEndsInputThenClosesDialogAndKeepsQuery() {
+    @Test fun backdropFirstEndsInputThenClosesDialogAndClearsQuery() {
         val starts = mutableListOf<Long>()
         show(onStart = { starts.add(it) })
         compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
@@ -102,7 +104,7 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertIsDisplayed()
         compose.onNodeWithContentDescription("검색 모달 배경").performTouchInput { click(androidx.compose.ui.geometry.Offset(4f, 4f)) }
         compose.onNodeWithContentDescription("운전자 이름 검색").assertDoesNotExist()
-        compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("7")
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("운전자 이름 검색...")
         assertEquals(emptyList<Long>(), starts)
     }
 
@@ -126,6 +128,10 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").performClick()
         assertEquals(listOf(7L), starts)
         compose.onNodeWithContentDescription("운전자 이름 검색").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("운전자 이름 검색...")
+        compose.onNodeWithContentDescription("운전자 검색 열기").performClick()
+        compose.onNodeWithContentDescription("운전자 이름 검색").assertTextContains("")
+        compose.onNodeWithContentDescription("운전자1 검색 결과 선택").assertIsDisplayed()
     }
 
     @Test fun leavingParkClosesSearchDialog() {
@@ -158,7 +164,7 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("검색 닫기").performClick()
         compose.onNodeWithText("완료").assertExists()
         compose.onNodeWithContentDescription("운전자7 프로필 수정").assertExists()
-        compose.onNodeWithContentDescription("운전자6 프로필 수정").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자6 프로필 수정").assertExists()
     }
 
     @Test fun unlinkedVehicleCannotStart() {
@@ -267,7 +273,7 @@ class DriverSelectionScreenTest {
         val close = compose.onNodeWithContentDescription("검색 닫기").assertIsDisplayed().assertTextContains("닫기").fetchSemanticsNode().boundsInRoot
         org.junit.Assert.assertTrue(close.top > result.bottom)
         compose.onNodeWithContentDescription("검색 닫기").performClick()
-        compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("7")
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertTextContains("운전자 이름 검색...")
     }
 
     @Test
