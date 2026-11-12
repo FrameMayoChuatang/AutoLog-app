@@ -30,6 +30,7 @@ private class FakeDrivers : DriverRepository {
     override suspend fun addProfile(name: String, color: Int, expression: Int) = 1L
     override suspend fun editProfile(id: Long, name: String, color: Int, expression: Int) = Unit
     override suspend fun hideProfile(id: Long) = true
+    override val profileSettings = flowOf(emptyList<com.framemayo.autolog.data.local.DriverProfileEntity>())
     override val all: Flow<List<DriverEntity>> = flowOf(emptyList())
     override suspend fun add(name: String, department: String) = 1L
     override suspend fun remoteIdOf(localId: Long): String? = if (localId == 1L) remoteId else null
@@ -194,6 +195,23 @@ class SyncManagerTest {
         val t = finishedTrip(startKm)
         repo.setPurpose(t.id, purpose, memo)
         return t
+    }
+
+    @Test fun customPurposeSurvivesOfflineAndReconfirmationWithoutChangingMeasurements() = runBlocking {
+        val trip = finishedTrip()
+        repo.setPurpose(trip.id, TripPurpose.BUSINESS_GENERAL, memo = "메모 유지", purposeText = "거래처 방문")
+        api.online = false
+        assertFalse(sync.syncPending())
+        api.online = true
+        assertTrue(sync.syncPending())
+        assertEquals("거래처 방문", api.confirms.last().purposeText)
+        assertEquals("메모 유지", api.confirms.last().note)
+        val uploads = api.uploads.size
+        repo.setPurpose(trip.id, TripPurpose.BUSINESS_GENERAL, purposeText = "물품 수령")
+        assertTrue(sync.syncPending())
+        assertEquals("물품 수령", api.confirms.last().purposeText)
+        assertEquals("차량에서 목적 변경", api.confirms.last().reason)
+        assertEquals(uploads, api.uploads.size)
     }
 
     @Test fun chosenPurposeIsConfirmedAfterMeasurementAndBecomesSynced() = runBlocking {

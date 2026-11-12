@@ -25,6 +25,21 @@ class DriverProfileTest {
 
     @After fun close() { db.close(); context.deleteDatabase("profiles-migration.db") }
 
+    @Test fun hiddenProfileNameRemainsAvailableForHistoricalTripsOnly() = runBlocking {
+        val id = repo.addProfile("서버 등록 이름", 0)
+        repo.editProfile(id, "표시 이름", 2)
+        repo.hideProfile(id)
+        val settings = repo.profileSettings.first()
+        val state = com.framemayo.autolog.ui.MainUiState(
+            drivers = repo.all.first(), profiles = repo.profiles.first(),
+            profileNames = settings.mapNotNull { p -> p.displayName?.let { p.driverId to it } }.toMap(),
+        )
+        assertEquals("표시 이름", state.driverName(id))
+        assertTrue(state.profiles.isEmpty())
+        assertEquals("서버 등록 이름", repo.find(id)?.name)
+        assertEquals("운전자 없음", state.driverName(null))
+    }
+
     @Test fun localAppearanceSurvivesRemoteRefreshAndHidingPreservesIdentity() = runBlocking {
         repo.upsertRemote(listOf(RemoteDriver("server-driver", "서버 이름", "영업", DriverStatus.ACTIVE)))
         val id = repo.all.first().single().id
@@ -92,10 +107,11 @@ class DriverProfileTest {
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
             it.execSQL("DROP TABLE driver_profiles")
             it.execSQL("DROP TABLE room_master_table")
+            removePurposeTextColumn(it)
             it.version = 9
         }
         fun open() = Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
-            .addMigrations(AutoLogDatabase.MIGRATION_9_10).allowMainThreadQueries().build()
+            .addMigrations(AutoLogDatabase.MIGRATION_9_10, AutoLogDatabase.MIGRATION_10_11).allowMainThreadQueries().build()
         val migrated = open()
         try {
             val repository = DriverRepositoryImpl(migrated.driverDao())
@@ -131,10 +147,11 @@ class DriverProfileTest {
             it.execSQL("DROP TABLE driver_profiles")
             it.execSQL("ALTER TABLE driver_profiles_v8 RENAME TO driver_profiles")
             it.execSQL("DROP TABLE room_master_table")
+            removePurposeTextColumn(it)
             it.version = 8
         }
         val migrated = Room.databaseBuilder(context, AutoLogDatabase::class.java, name)
-            .addMigrations(AutoLogDatabase.MIGRATION_8_10).allowMainThreadQueries().build()
+            .addMigrations(AutoLogDatabase.MIGRATION_8_10, AutoLogDatabase.MIGRATION_10_11).allowMainThreadQueries().build()
         try {
             val profile = migrated.driverDao().observeProfiles().first().single()
             assertEquals(id, profile.driver.id)

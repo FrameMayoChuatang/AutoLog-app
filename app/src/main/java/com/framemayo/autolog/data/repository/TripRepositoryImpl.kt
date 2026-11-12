@@ -56,9 +56,14 @@ class TripRepositoryImpl(
         return ended
     }
 
-    override suspend fun setPurpose(tripId: Long, purpose: TripPurpose, memo: String?) {
+    override suspend fun setPurpose(tripId: Long, purpose: TripPurpose, memo: String?, purposeText: String?) {
         val trip = dao.get(tripId) ?: return
-        dao.update(trip.copy(purpose = purpose, memo = memo ?: trip.memo, syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(trip)))
+        val text = if (purpose == TripPurpose.BUSINESS_GENERAL) {
+            (purposeText?.trim() ?: trip.purposeText ?: "일반 업무").also {
+                require(it.isNotBlank() && it.length <= 200) { "업무 목적은 1~200자로 입력해 주세요." }
+            }
+        } else null
+        dao.update(trip.copy(purpose = purpose, purposeText = text, memo = memo ?: trip.memo, syncState = SyncState.PENDING, updatedAt = nextUpdatedAt(trip)))
         onPending()
     }
     override suspend fun setDriver(tripId: Long, driverId: Long): Boolean {

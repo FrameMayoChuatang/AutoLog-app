@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +39,7 @@ import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.local.distanceKm
 import com.framemayo.autolog.data.local.durationMs
+import com.framemayo.autolog.data.sync.syncStatus
 import com.framemayo.autolog.data.location.FusedLocationSource
 import com.framemayo.autolog.service.TripRecorderService
 import com.framemayo.autolog.ui.theme.AutoLogTheme
@@ -77,8 +79,12 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
     // 현재 Pleos v2.1은 해당 API가 없어 OS 차단을 유지하고, P 확인 전에는 이 UI를 잠근다.
     val parked = v.gear == VehicleGear.GEAR_PARK
     var showVehicle by rememberSaveable { mutableStateOf(false) }
+    // 운행을 마친 뒤에도 목적 선택과 기록 확인 화면에 머문다.
+    LaunchedEffect(state.activeTrip?.id) {
+        if (state.activeTrip != null) showVehicle = true
+    }
     if (parked) {
-        state.consentPrompt?.let { ConsentDialog(it.name, vm, requestLocationPermission) }
+        state.consentPrompt?.let { ConsentDialog(state.driverName(it.id), vm, requestLocationPermission) }
     }
     if (state.activeTrip == null && (!showVehicle || !parked)) {
         DriverSelectionScreen(
@@ -90,6 +96,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             onSave = vm::saveProfile,
             onDelete = vm::deleteProfile,
             onOpenVehicle = { showVehicle = true },
+            onStartLater = { vm.startTrip(null) },
         )
         return
     }
@@ -119,7 +126,7 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             item {
                 Card {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val driver = state.drivers.find { it.id == active.driverId }?.name ?: "미확인"
+                        val driver = state.driverName(active.driverId)
                         Text("운행 중 · $driver", style = MaterialTheme.typography.titleMedium)
                         Text("%.2f km · %d분".format(active.distanceKm(), active.durationMs() / 60_000))
                         Button(onClick = vm::endTrip, enabled = v.isParked && v.odometerKm != null) {
@@ -133,42 +140,11 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
         item { LocationConsentCard(state, vm, requestLocationPermission) }
 
         item { Text("최근 운행", style = MaterialTheme.typography.titleMedium) }
-        items(state.recentTrips, key = { it.id }) { trip -> TripRow(trip, state.drivers, vm) }
-    }
-}
-
-private val KST = ZoneId.of("Asia/Seoul")
-private val TIME = DateTimeFormatter.ofPattern("MM/dd HH:mm").withZone(KST)
-
-@Composable
-private fun TripRow(trip: TripEntity, drivers: List<DriverEntity>, vm: MainViewModel) {
-    Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val driverName = drivers.find { it.id == trip.driverId }?.name ?: "운전자 없음"
-            Text(
-                "${TIME.format(Instant.ofEpochMilli(trip.startedAt))} · ${"%.2f".format(trip.distanceKm())} km · " +
-                    "${trip.status} · ${trip.purpose} · $driverName",
+        items(state.recentTrips, key = { it.id }) { trip ->
+            TripReviewCard(
+                trip, state, parked, { vm.assignDriver(trip.id, it) },
+                { purpose, text -> vm.setPurpose(trip.id, purpose, text) }, vm::loadPurposes,
             )
-            if (trip.driverId == null && trip.endedAt != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("운전자 지정:")
-                    drivers.filter { it.status != DriverStatus.INACTIVE }.forEach { d ->
-                        PurposeButton(d.name) { vm.assignDriver(trip.id, d.id) }
-                    }
-                }
-            }
-            if (trip.purpose == TripPurpose.UNCONFIRMED && trip.endedAt != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PurposeButton("업무(출퇴근)") { vm.setPurpose(trip.id, TripPurpose.BUSINESS_COMMUTE) }
-                    PurposeButton("업무(일반)") { vm.setPurpose(trip.id, TripPurpose.BUSINESS_GENERAL) }
-                    PurposeButton("개인") { vm.setPurpose(trip.id, TripPurpose.PERSONAL) }
-                }
-            }
         }
     }
-}
-
-@Composable
-private fun PurposeButton(label: String, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick) { Text(label) }
 }

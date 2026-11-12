@@ -31,6 +31,48 @@ class DriverSelectionScreenTest {
         compose.setContent { DriverSelectionScreen(profiles, parked, linked, ready, onStart, { _, _, _, _ -> }, { true }, {}) }
     }
 
+    @Test fun unlinkedVehicleOnlyOffersPairingAfterProfileSelection() {
+        var opened = 0
+        var started = false
+        compose.setContent { DriverSelectionScreen(profiles, true, false, true, { started = true }, { _, _, _, _ -> }, { true }, { opened++ }) }
+        compose.onNodeWithText("차량 연결하기").assertDoesNotExist()
+        compose.onNodeWithText("운행 기록 · 차량").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자1 프로필로 운행 시작").performClick()
+        compose.onNodeWithText("차량 연결이 필요합니다").assertIsDisplayed()
+        compose.onNodeWithText("차량 연결하기").performClick()
+        assertEquals(1, opened)
+        assertEquals(false, started)
+    }
+
+    @Test fun laterStartsWithoutAProfileAndIsHiddenWhileManaging() {
+        var later = 0
+        compose.setContent { DriverSelectionScreen(emptyList(), true, true, true, {}, { _, _, _, _ -> }, { true }, {}, { later++ }) }
+        compose.onNodeWithText("운전자는 나중에 선택").assertIsDisplayed().performClick()
+        assertEquals(1, later)
+        compose.onNodeWithText("프로필 관리").performClick()
+        compose.onNodeWithText("운전자는 나중에 선택").assertDoesNotExist()
+        compose.onNodeWithText("완료").performClick()
+        compose.onNodeWithText("운전자는 나중에 선택").assertIsDisplayed()
+    }
+
+    @Test fun laterStillRequiresLinkOdometerAndPark() {
+        val linked = mutableStateOf(false)
+        val ready = mutableStateOf(false)
+        val parked = mutableStateOf(true)
+        var later = 0
+        compose.setContent { DriverSelectionScreen(emptyList(), parked.value, linked.value, ready.value, {}, { _, _, _, _ -> }, { true }, {}, { later++ }) }
+        compose.onNodeWithText("운전자는 나중에 선택").performClick()
+        compose.onNodeWithText("차량 연결이 필요합니다").assertIsDisplayed()
+        compose.onNodeWithText("닫기").performClick()
+        compose.runOnIdle { linked.value = true }
+        compose.onNodeWithText("운전자는 나중에 선택").performClick()
+        compose.onNodeWithText("주행거리 수신 대기").assertIsDisplayed()
+        compose.onNodeWithText("닫기").performClick()
+        compose.runOnIdle { parked.value = false; ready.value = true }
+        compose.onNodeWithText("운전자는 나중에 선택").assertDoesNotExist()
+        assertEquals(0, later)
+    }
+
     @Test fun pendingServerDriverKeepsApprovalLabel() {
         val pending = profiles.take(1).map { it.copy(driver = it.driver.copy(status = com.framemayo.autolog.data.local.DriverStatus.PENDING)) }
         compose.setContent { DriverSelectionScreen(pending, true, true, true, {}, { _, _, _, _ -> }, { true }, {}) }

@@ -9,6 +9,8 @@ import com.framemayo.autolog.data.link.LinkResult
 import com.framemayo.autolog.data.link.VehicleLink
 import com.framemayo.autolog.data.local.DriverEntity
 import com.framemayo.autolog.data.local.DriverProfile
+import com.framemayo.autolog.data.local.PurposeEntity
+import com.framemayo.autolog.data.remote.PurposeCatalog
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.sync.SyncScheduler
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 data class MainUiState(
@@ -32,7 +35,13 @@ data class MainUiState(
     val profiles: List<DriverProfile> = emptyList(),
     val syncStatus: Map<Long, TripSyncStatus> = emptyMap(),
     val linked: Boolean = false,
-)
+    val profileNames: Map<Long, String> = emptyMap(),
+) {
+    fun driverName(id: Long?): String = profileNames[id]
+        ?: profiles.find { it.driver.id == id }?.displayName
+        ?: drivers.find { it.id == id }?.name
+        ?: "운전자 없음"
+}
 
 data class LinkUiState(
     val link: VehicleLink? = null,
@@ -49,14 +58,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val consentPrompt = MutableStateFlow<DriverEntity?>(null)
 
-    private val driverLists = combine(drivers.all, drivers.profiles) { all, profiles -> all to profiles }
+    private val driverLists = combine(drivers.all, drivers.profiles, drivers.profileSettings) { all, profiles, settings ->
+        Triple(all, profiles, settings.mapNotNull { p -> p.displayName?.let { p.driverId to it } }.toMap())
+    }
     private var startingTrip = false
     private val vehicleLink = app.container.vehicleLink
 
     val state: StateFlow<MainUiState> = combine(
         RecorderState.snapshot, driverLists, trips.active, trips.recent, consentPrompt,
     ) { vehicle, driverList, active, recent, prompt ->
-        MainUiState(vehicle, driverList.first, active, recent, prompt, driverList.second)
+        MainUiState(vehicle, driverList.first, active, recent, prompt, driverList.second, profileNames = driverList.third)
     }.combine(vehicleLink.link) { ui, link ->
         val byId = ui.drivers.associateBy { it.id }
         ui.copy(
@@ -113,7 +124,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startTrip(driverId: Long?) {
         if (RecorderState.snapshot.value.gear != VehicleGear.GEAR_PARK || startingTrip || consentPrompt.value != null) return
-        if (state.value.profiles.none { it.driver.id == driverId }) return
+        if (driverId != null && state.value.profiles.none { it.driver.id == driverId }) return
         val driver = state.value.drivers.find { it.id == driverId }
         if (driver != null && driver.locationConsent == null) {
             consentPrompt.value = driver
@@ -164,11 +175,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { trips.setDriver(tripId, driverId) }
     }
 
-    fun setPurpose(tripId: Long, purpose: TripPurpose) {
-        viewModelScope.launch {
-            trips.setPurpose(tripId, purpose)
-            val trip = trips.get(tripId) ?: return@launch
-            arrival.settle(tripId, consentOf(trip.driverId), purpose)
-        }
+    suspend fun loadPurposes(): List<PurposeEntity>? {
+        val link = vehicleLink.link.value ?: return null
+        val result = PurposeCatalog(getApplication<Application>().container.server).load()
+        // 조회 도중 연결이 바뀌면 이전 회사의 목록을 보여주지 않는다.
+        return result.takeIf { vehicleLink.link.value == link }
     }
+
+    // 화면이 닫혀도 목적 저장 뒤의 위치정보 정리까지 완료해야 한다.
+    suspend fun setPurpose(tripId: Long, purpose: TripPurpose, purposeText: String?) = viewModelScope.async {
+        check(RecorderState.snapshot.value.gear == VehicleGear.GEAR_PARK) { "주차 후 수정해 주세요." }
+        val previous = trips.get(tripId) ?: error("운행 기록을 찾을 수 없습니다.")
+        check(previous.endedAt != null) { "종료된 운행만 수정할 수 있습니다." }
+        trips.setPurpose(tripId, purpose, purposeText = purposeText)
+        arrival.settle(tripId, consentOf(previous.driverId), purpose)
+    }.await()
 }

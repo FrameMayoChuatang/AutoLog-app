@@ -94,6 +94,7 @@ internal fun DriverSelectionScreen(
     onSave: suspend (Long?, String, Int, Int) -> Unit,
     onDelete: suspend (Long) -> Boolean,
     onOpenVehicle: () -> Unit,
+    onStartLater: () -> Unit = {},
 ) {
     var managing by rememberSaveable { mutableStateOf(false) }
     var showingMore by rememberSaveable { mutableStateOf(false) }
@@ -115,10 +116,15 @@ internal fun DriverSelectionScreen(
         if (!parked) { searching = false; editing = false; deletingId = null; blocked = false; managing = false; query = ""; keyboard?.hide() }
     }
     BackHandler(managing && !searching && !editing && deletingId == null) { managing = false }
-    val select: (DriverProfile) -> Unit = { profile ->
+    val start: (Long?) -> Unit = { driverId ->
         if (!linked || !odometerReady) blocked = true
-        else { keyboard?.hide(); haptic.performHapticFeedback(HapticFeedbackType.LongPress); onStart(profile.driver.id) }
+        else {
+            keyboard?.hide()
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            if (driverId == null) onStartLater() else onStart(driverId)
+        }
     }
+    val select: (DriverProfile) -> Unit = { start(it.driver.id) }
     MaterialTheme(colorScheme = SelectionColors) {
         Surface(Modifier.fillMaxSize(), color = SelectionColors.background) {
             if (!parked) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -183,6 +189,11 @@ internal fun DriverSelectionScreen(
                                             }
                                         }
                                     }
+                                    if (!managing) TextButton(
+                                        onClick = { start(null) },
+                                        modifier = Modifier.padding(top = 24.dp).heightIn(min = 56.dp),
+                                        colors = ButtonDefaults.textButtonColors(contentColor = SelectionColors.onSurfaceVariant),
+                                    ) { Text("운전자는 나중에 선택", fontSize = 20.sp) }
                                 }
                             }
                         }
@@ -239,9 +250,9 @@ internal fun DriverSelectionScreen(
             dismissButton = { TextButton(onClick = { deletingId = null }, enabled = !busy, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소") } },
         )
         if (parked && blocked) AlertDialog(
-            onDismissRequest = { blocked = false }, title = { Text(if (!linked) "차량 연결이 필요합니다" else "주행거리 수신 대기") },
-            text = { Text(if (!linked) "차량을 연결한 후 운행을 시작할 수 있습니다." else "차량의 유효한 주행거리 정보를 받은 후 다시 선택해 주세요.") },
-            confirmButton = { TextButton(onClick = { blocked = false; onOpenVehicle() }, modifier = Modifier.heightIn(min = 56.dp)) { Text("차량 상태 확인") } },
+            onDismissRequest = { blocked = false }, title = { Text(if (!linked) "차량 연결이 필요합니다" else "주행거리 수신 대기", fontSize = 28.sp) },
+            text = { Text(if (!linked) "관리자가 발급한 8자리 페어링 코드를 입력해 차량을 연결해 주세요. 연결 후 운행을 시작할 수 있습니다." else "차량의 유효한 주행거리 정보를 받은 후 다시 선택해 주세요.", fontSize = 22.sp, lineHeight = 32.sp) },
+            confirmButton = { TextButton(onClick = { blocked = false; onOpenVehicle() }, modifier = Modifier.heightIn(min = 56.dp)) { Text(if (!linked) "차량 연결하기" else "차량 상태 확인", fontSize = 20.sp) } },
             dismissButton = { TextButton(onClick = { blocked = false }, modifier = Modifier.heightIn(min = 56.dp)) { Text("닫기") } },
         )
     }
