@@ -267,8 +267,8 @@ internal fun DriverSelectionScreen(
         )
         if (parked && deletingId != null) AlertDialog(
             onDismissRequest = { if (!busy) deletingId = null },
-            title = { Text("프로필을 삭제할까요?") },
-            text = { Text(error ?: "${profiles.find { it.driver.id == deletingId }?.displayName.orEmpty()} 프로필을 목록에서 삭제합니다. 기존 운행 기록은 유지됩니다.") },
+            title = { Text("프로필을 삭제할까요?", fontSize = 28.sp) },
+            text = { Text(error ?: "${profiles.find { it.driver.id == deletingId }?.displayName.orEmpty()} 프로필을 목록에서 삭제합니다. 기존 운행 기록은 유지됩니다.", fontSize = 22.sp, lineHeight = 32.sp) },
             confirmButton = { TextButton(enabled = !busy, onClick = {
                 val id = deletingId ?: return@TextButton
                 scope.launch {
@@ -278,8 +278,8 @@ internal fun DriverSelectionScreen(
                     catch (_: Exception) { error = "삭제하지 못했습니다. 다시 시도해 주세요." }
                     finally { busy = false }
                 }
-            }, modifier = Modifier.heightIn(min = 56.dp)) { Text("삭제") } },
-            dismissButton = { TextButton(onClick = { deletingId = null }, enabled = !busy, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소") } },
+            }, modifier = Modifier.heightIn(min = 56.dp)) { Text("삭제", fontSize = 20.sp) } },
+            dismissButton = { TextButton(onClick = { deletingId = null }, enabled = !busy, modifier = Modifier.heightIn(min = 56.dp)) { Text("취소", fontSize = 20.sp) } },
         )
         val selected = profiles.find { it.driver.id == selectedId }
         if (parked && selected != null) StartTripDialog(
@@ -295,7 +295,7 @@ internal fun DriverSelectionScreen(
                 blocked = false
                 if (linked) onOpenVehicle()
             }, modifier = Modifier.heightIn(min = 56.dp)) { Text(if (!linked) "차량 연결하기" else "차량 상태 확인", fontSize = 20.sp) } },
-            dismissButton = { TextButton(onClick = { blocked = false }, modifier = Modifier.heightIn(min = 56.dp)) { Text("닫기") } },
+            dismissButton = { TextButton(onClick = { blocked = false }, modifier = Modifier.heightIn(min = 56.dp)) { Text("닫기", fontSize = 20.sp) } },
         )
     }
 }
@@ -400,7 +400,7 @@ private fun StartTripDialog(profile: DriverProfile, onStart: () -> Unit, onEdit:
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
                 ) { Text("프로필 수정", fontSize = 20.sp) }
                 TextButton(onClick = onDismiss, modifier = Modifier.padding(top = 4.dp).heightIn(min = 56.dp)) {
-                    Text("닫기", fontSize = 18.sp, color = SelectionColors.onSurfaceVariant)
+                    Text("닫기", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
                 }
             }
         }

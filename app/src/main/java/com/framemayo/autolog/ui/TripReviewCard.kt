@@ -123,8 +123,8 @@ internal fun TripReviewCard(
                         OutlinedTextField(
                             value = purposeText, onValueChange = { purposeText = it.take(200) },
                             modifier = Modifier.fillMaxWidth(), enabled = !saving,
-                            label = { Text("업무 목적") }, placeholder = { Text("예: 거래처 방문, 물품 수령") },
-                            supportingText = { Text("${purposeText.length}/200 · 직접 입력하거나 회사 목록에서 선택하세요") },
+                            label = { Text("업무 목적", fontSize = VehicleUi.Caption) }, placeholder = { Text("예: 거래처 방문, 물품 수령", fontSize = VehicleUi.Body) },
+                            supportingText = { Text("${purposeText.length}/200 · 직접 입력하거나 회사 목록에서 선택하세요", fontSize = VehicleUi.Caption) },
                             textStyle = androidx.compose.ui.text.TextStyle(fontSize = VehicleUi.Body),
                             shape = RoundedCornerShape(14.dp), maxLines = 3,
                         )

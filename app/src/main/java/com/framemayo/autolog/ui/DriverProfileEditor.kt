@@ -77,30 +77,30 @@ internal fun DriverProfileEditor(
                             Column(modifier.verticalScroll(rememberScrollState()).padding(28.dp)) {
                                 Text(if (profile == null) "프로필 생성" else "프로필 수정", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
                                 Spacer(Modifier.height(28.dp))
-                                Text("이름", color = Color(0xFF626269), fontSize = 16.sp)
+                                Text("이름", color = Color(0xFF626269), fontSize = 20.sp)
                                 Spacer(Modifier.height(8.dp))
                                 OutlinedTextField(
                                     value = name, onValueChange = { name = it.take(40) }, enabled = !busy,
                                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = "운전자 이름" },
-                                    placeholder = { Text("이름을 입력하세요") }, singleLine = true,
+                                    placeholder = { Text("이름을 입력하세요", fontSize = 20.sp) }, singleLine = true,
                                     textStyle = TextStyle(fontSize = 20.sp), shape = RoundedCornerShape(12.dp),
                                 )
                                 Spacer(Modifier.height(24.dp))
-                                Text("색상", color = Color(0xFF626269), fontSize = 16.sp)
+                                Text("색상", color = Color(0xFF626269), fontSize = 20.sp)
                                 Spacer(Modifier.height(12.dp))
                                 ProfileColorPicker(color, enabled = !busy, onColor = { color = it })
                                 Spacer(Modifier.height(24.dp))
-                                Text("표정", color = Color(0xFF626269), fontSize = 16.sp)
+                                Text("표정", color = Color(0xFF626269), fontSize = 20.sp)
                                 Spacer(Modifier.height(12.dp))
                                 ProfileExpressionPicker(expression, enabled = !busy, onExpression = { expression = it })
                                 Spacer(Modifier.height(24.dp))
-                                Text("캐릭터", color = Color(0xFF626269), fontSize = 16.sp)
+                                Text("캐릭터", color = Color(0xFF626269), fontSize = 20.sp)
                                 Spacer(Modifier.height(12.dp))
                                 ProfilePresetPicker(color, expression, enabled = !busy) { preset ->
                                     expression = preset
                                     color = ProfileExpressions[preset].presetColor
                                 }
-                                error?.let { Text(it, color = Color(0xFFA52C2C), fontSize = 16.sp, modifier = Modifier.padding(top = 12.dp)) }
+                                error?.let { Text(it, color = Color(0xFFA52C2C), fontSize = 20.sp, modifier = Modifier.padding(top = 12.dp)) }
                             }
                         }
                         val preview: @Composable (Modifier) -> Unit = { modifier ->
@@ -116,7 +116,7 @@ internal fun DriverProfileEditor(
                                     onClick = { onSave(name.trim(), color, expression) }, enabled = name.isNotBlank() && !busy,
                                     modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = CircleShape,
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF141416), contentColor = Color.White),
-                                ) { Text(if (busy) "저장 중…" else "저장", fontSize = 18.sp) }
+                                ) { Text(if (busy) "저장 중…" else "저장", fontSize = 20.sp) }
                             }
                         }
                         if (stacked) Column {
@@ -166,7 +166,7 @@ private fun ProfileExpressionPicker(expression: Int, enabled: Boolean, onExpress
             ) {
                 Column(Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     DriverAvatar(face.presetColor, Modifier.fillMaxWidth().weight(1f), expression = index, faceOnly = true)
-                    Text(face.name, fontSize = 14.sp)
+                    Text(face.name, fontSize = 20.sp, lineHeight = 22.sp, maxLines = 1)
                 }
             }
         }
