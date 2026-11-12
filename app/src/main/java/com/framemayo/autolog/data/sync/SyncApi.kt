@@ -104,7 +104,7 @@ fun TripEntity.toConfirmPayload(driverRemoteId: String, firstTime: Boolean): Con
         expectedVersion = serverVersion,
         driverId = driverRemoteId,
         classification = classification,
-        purposeText = if (classification == "BUSINESS") DEFAULT_BUSINESS_PURPOSE else null,
+        purposeText = if (classification == "BUSINESS") purposeText?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_BUSINESS_PURPOSE else null,
         note = memo?.trim()?.takeIf { it.isNotEmpty() }?.take(1000),
         reason = if (firstTime) "차량에서 운전자 확인" else "차량에서 목적 변경",
     )
