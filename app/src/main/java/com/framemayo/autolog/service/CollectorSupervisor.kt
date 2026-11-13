@@ -84,3 +84,30 @@ fun <T> Flow<T>.resubscribing(
         primed?.let { emit(it) }
     }
 }
+
+/**
+ * 수집 루프의 한 주기를 감싸 예외가 루프·서비스를 끝내지 않게 한다(#139).
+ * 예외는 [onError]로 알리고 null을 돌려 다음 주기에 계속한다. 실패 뒤 처음 성공하면 [onRecovered]를 한 번 부른다.
+ * 취소([CancellationException])는 삼키지 않는다. 한 루프에 하나씩 만들어 쓴다.
+ */
+class CycleGuard(
+    private val onError: (Exception) -> Unit,
+    private val onRecovered: () -> Unit = {},
+) {
+    @Volatile private var failing = false
+
+    suspend fun <T> run(block: suspend () -> T): T? = try {
+        block().also {
+            if (failing) {
+                failing = false
+                onRecovered()
+            }
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        failing = true
+        onError(e)
+        null
+    }
+}
