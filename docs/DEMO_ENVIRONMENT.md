@@ -2,6 +2,12 @@
 
 발표 노트북 한 대에서 서버와 Pleos Connect 에뮬레이터를 함께 띄워 시연한다. 실차와 서버 호스팅은 필요 없다(운영사무국 답변, 2026-11-11).
 
+**배포 서버를 쓸 때(#168, #169).** 팀 배포 서버가 있으면 1(DB와 서버)은 건너뛴다. 서버 주소는 저장소에 올리지 않고 팀 채널로 공유한다.
+
+- 앱 저장소 루트의 `.env`(Git 제외)에 `AUTOLOG_SERVER_URL=https://<배포 서버>`를 한 줄 넣는다. APK 빌드와 시연 스크립트가 모두 이 값을 쓴다.
+- 시연 스크립트의 계정 정보는 서버별 파일(`tools/.demo-state-<주소>.json`)에 따로 저장된다. `setup`은 서버마다 처음 한 번 실행한다.
+- 확인: `curl https://<배포 서버>/actuator/health` → `{"status":"UP"}`
+
 이 문서는 이슈 #36 중 **환경 구동과 시연 데이터**를 다룬다. 화면 동선과 확인 항목은 [B_DEMO_SCENARIO.md](B_DEMO_SCENARIO.md)를 따른다.
 
 ## 한눈에 보기
@@ -86,7 +92,7 @@ adb install -r --user $(adb shell am get-current-user) app/build/outputs/apk/deb
 adb shell am start --user $(adb shell am get-current-user) -n com.framemayo.autolog/.ui.MainActivity
 ```
 
-- 서버 주소 기본값은 `http://10.0.2.2:8080`이다(에뮬레이터에서 본 노트북). 포트를 바꿨거나 다른 PC의 서버를 쓸 때만 `-PserverUrl=http://<주소>:<포트>`를 붙인다.
+- 서버 주소는 `-PserverUrl` → 환경 변수 `AUTOLOG_SERVER_URL` → `.env`의 `AUTOLOG_SERVER_URL` → `http://10.0.2.2:8080`(에뮬레이터에서 본 노트북) 순으로 정해진다. 노트북 서버로 시연하려면 `.env`의 해당 줄을 지운다. 주소를 바꾸면 APK를 다시 빌드한다.
 - debug 빌드만 http 서버에 연결할 수 있다. release 빌드는 시연에 쓰지 않는다.
 - Pleos 에뮬레이터는 앱을 사용자 10에서 실행한다. `--user` 없이 설치하면 화면에 앱이 보이지 않을 수 있다.
 - **운행 중에는 설치하지 않는다.** 설치하면 앱이 재시작되고 진행 중이던 운행이 `중단됨`으로 남는다.

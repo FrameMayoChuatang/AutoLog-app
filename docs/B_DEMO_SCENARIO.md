@@ -21,7 +21,7 @@
 | 서버 | 독립된 시연용 회사·차량·관리자 | 실사용 데이터와 구분되고 관리자 로그인이 가능함 |
 | 서버 | 승인 운전자 1명, 승인 대기 운전자 1명 | 이름과 승인 상태로 구별 가능하며 서버에 반영됨 (앱에는 부서 입력 없음) |
 | 서버 | 업무 목적 목록 | 미팅·물품 수령 등 회사에 맞는 항목을 준비함 |
-| 앱 C | debug APK와 서버 주소 | PC는 `127.0.0.1`, 에뮬레이터는 `10.0.2.2`, 포트 일치 |
+| 앱 C | debug APK와 서버 주소 | 노트북 서버: PC는 `127.0.0.1`, 에뮬레이터는 `10.0.2.2`, 포트 일치. 배포 서버: `.env`의 `AUTOLOG_SERVER_URL` |
 | 앱 A | Pleos 차량 값 | P 기어와 0보다 큰 누적거리 수신 확인 |
 | 앱 B | 기본 흐름과 예외 화면 | 아래 정상 흐름과 상태별 안내를 실제 기기에서 확인 |
 
@@ -30,7 +30,7 @@
 1. 서버 저장소에서 `docker compose up -d --wait` 후 `./mvnw spring-boot:run -Dspring-boot.run.profiles=emulator`를 실행한다.
 2. PC에서 `curl http://127.0.0.1:8080/actuator/health`의 UP 응답을 확인한다.
 3. Pleos Connect API 34 에뮬레이터를 독립 창으로 연다.
-4. 앱 저장소에서 JDK 17 또는 호환되는 Android Studio JBR로 `./gradlew :app:assembleDebug -PserverUrl=http://10.0.2.2:8080 -PconsoleOdometer=true`를 실행한다. 콘솔 거리 옵션은 현재 벤더 이미지 전달 오류가 있는 에뮬레이터 시연에만 사용하며, 기본/Release 빌드는 SDK 경로다. 자세한 실행·모의 주행은 [DEMO_ENVIRONMENT.md](DEMO_ENVIRONMENT.md)를 따른다.
+4. 앱 저장소에서 JDK 17 또는 호환되는 Android Studio JBR로 `./gradlew :app:assembleDebug -PconsoleOdometer=true`를 실행한다. 서버 주소는 `.env`의 `AUTOLOG_SERVER_URL`(배포 서버) 또는 기본값 `10.0.2.2:8080`(노트북 서버)을 쓴다. 콘솔 거리 옵션은 현재 벤더 이미지 전달 오류가 있는 에뮬레이터 시연에만 사용하며, 기본/Release 빌드는 SDK 경로다. 자세한 실행·모의 주행은 [DEMO_ENVIRONMENT.md](DEMO_ENVIRONMENT.md)를 따른다.
 5. `adb shell am get-current-user`로 현재 사용자를 확인하고, `adb install -r --user <현재 사용자> app/build/outputs/apk/debug/app-debug.apk`로 업데이트한다. 기존 기록을 보존하기 위해 앱 데이터 초기화나 재설치는 하지 않는다.
 6. `adb shell am start --user <현재 사용자> -n com.framemayo.autolog/.ui.MainActivity`로 실행한다.
 7. 관리자는 **시연 직전** 새 8자리 페어링 코드를 발급한다. 코드는 기본 10분 만료·1회용이며, 앞의 0을 유지한다. 토큰·비밀번호를 문서나 녹화 화면에 남기지 않는다.
