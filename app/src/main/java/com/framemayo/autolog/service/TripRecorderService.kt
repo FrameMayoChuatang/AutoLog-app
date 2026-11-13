@@ -54,6 +54,8 @@ class TripRecorderService : LifecycleService() {
     }
 
     @Volatile private var batteryCapacityKwh: Float? = null
+    /** 진행 중 운행이 있을 때만 1초 저장을 한다(#147). */
+    @Volatile private var hasActiveTrip = false
 
     override fun onCreate() {
         super.onCreate()
@@ -87,7 +89,12 @@ class TripRecorderService : LifecycleService() {
 
             // 자동 시작 기준값은 복구가 끝난 뒤 정한다(남은 ACTIVE 운행을 새 운행으로 오인하지 않도록).
             autoStart.seed()
-            launch { trips.active.collect { autoStart.onActiveTrip(it) } }
+            launch {
+                trips.active.collect {
+                    hasActiveTrip = it != null
+                    autoStart.onActiveTrip(it)
+                }
+            }
             launch { observeActiveTripForStops() }
             launch { collectOdometer() }
             launch { collectGear() }
@@ -220,7 +227,7 @@ class TripRecorderService : LifecycleService() {
             val now = now()
             // SDK가 늦어 보류한 운행은 재개 창이 끝나면 중단 처리한다(#145).
             if (recovery.awaitingOdometer) recovery.onTick(now).takeIf { it != RecoveryResult.None }?.let { onRecovered(it, "recovery timeout") }
-            RecorderState.snapshot.value.odometerKm?.let { container.trips.heartbeat(it) }
+            if (hasActiveTrip) RecorderState.snapshot.value.odometerKm?.let { container.trips.heartbeat(it) }
             feedMotion(now) { onTick(now) }
             recordEnergy(energyDetector.onTick(now))
             delay(HEARTBEAT_MS)

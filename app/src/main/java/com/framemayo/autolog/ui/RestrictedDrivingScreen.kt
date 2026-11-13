@@ -1,5 +1,6 @@
 package com.framemayo.autolog.ui
 
+import androidx.compose.runtime.getValue
 import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,7 +98,8 @@ internal fun RestrictedDrivingScreen(state: MainUiState, ux: DrivingUxState, onR
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 ReadOnlyTripValue("주행 거리", trip?.let { "%.1f km".format(it.distanceKm()) } ?: "—", Modifier.weight(1f), compact)
-                ReadOnlyTripValue("주행 시간", trip?.let { "${(it.durationMs() / 60_000).coerceAtLeast(0)}분" } ?: "—", Modifier.weight(1f), compact)
+                val now by rememberNow()
+                ReadOnlyTripValue("주행 시간", trip?.let { "${(it.durationMs(now) / 60_000).coerceAtLeast(0)}분" } ?: "—", Modifier.weight(1f), compact)
             }
         }
     }

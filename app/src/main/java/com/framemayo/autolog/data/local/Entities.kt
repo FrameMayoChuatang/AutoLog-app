@@ -129,3 +129,6 @@ data class EnergyEventEntity(
 fun TripEntity.distanceKm(): Float = (endOdometerKm ?: lastOdometerKm) - startOdometerKm
 
 fun TripEntity.durationMs(): Long = (endedAt ?: lastSavedAt) - startedAt
+
+/** 진행 중 운행은 저장 주기와 관계없이 [now]까지 흐른 시간을 보여 준다(#147). */
+fun TripEntity.durationMs(now: Long): Long = (endedAt ?: maxOf(lastSavedAt, now)) - startedAt

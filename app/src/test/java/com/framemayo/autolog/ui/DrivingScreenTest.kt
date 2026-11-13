@@ -25,8 +25,11 @@ import org.robolectric.annotation.GraphicsMode
 class DrivingScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
+    // 25분 30초 전에 시작, 마지막 저장은 20분 시점: 저장이 뜸해도 화면 시간은 현재까지 흐른다(#147).
+    private val startedAt = System.currentTimeMillis() - (25 * 60_000L + 30_000L)
     private val trip = TripEntity(
-        id = 1, driverId = 1, startedAt = 0, startOdometerKm = 100f, lastOdometerKm = 112.4f, lastSavedAt = 25 * 60_000L,
+        id = 1, driverId = 1, startedAt = startedAt, startOdometerKm = 100f, lastOdometerKm = 112.4f,
+        lastSavedAt = startedAt + 20 * 60_000L,
     )
     private val profile = DriverProfile(DriverEntity(id = 1, name = "김운전", department = ""), "김운전", 0)
 
