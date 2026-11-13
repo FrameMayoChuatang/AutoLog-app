@@ -23,6 +23,18 @@
 4. 테스트: `./gradlew test`
 5. 서버와 함께 시연 환경을 띄우는 방법: [docs/DEMO_ENVIRONMENT.md](docs/DEMO_ENVIRONMENT.md)
 
+## 서버 주소 로컬 설정
+
+저장소 루트의 `.env`에 `AUTOLOG_SERVER_URL`을 설정한다. 이 파일과 `.env.*`는 Git에서 제외되며 실제 배포 주소는 커밋·이슈·PR에 작성하지 않는다.
+
+```dotenv
+AUTOLOG_SERVER_URL=https://<서버호스트>
+```
+
+한 줄 URL 값에 작은따옴표·큰따옴표, 선택적인 `export`, 공백 뒤 `#` 주석을 사용할 수 있다. 인용부호 안의 `#`은 URL의 일부로 보존한다. 변수 치환·이스케이프·여러 줄 값은 지원하지 않는다.
+
+우선순위는 `-PserverUrl` → 실행 환경의 `AUTOLOG_SERVER_URL` → `.env` → 기존 로컬 서버 기본값이다. 주소 변경 후 APK를 다시 빌드해야 하며, 다른 서버로 전환하면 해당 서버의 새 차량 페어링 코드를 사용한다. 생성된 APK에도 설정 주소가 포함되므로 APK를 저장소에 올리지 않는다.
+
 ## 구조
 
 ```
