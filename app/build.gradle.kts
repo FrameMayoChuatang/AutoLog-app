@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -8,13 +6,26 @@ plugins {
 }
 
 // 배포 주소는 로컬 설정에만 두고, 명시적인 빌드 옵션을 우선한다.
-val localEnv = Properties().apply {
-    val envFile = rootProject.file(".env")
-    if (envFile.isFile) envFile.inputStream().use { load(it) }
+val localServerUrl by lazy {
+    rootProject.file(".env").takeIf { it.isFile }?.readLines()
+    ?.mapNotNull { line ->
+        Regex("""^\s*(?:export\s+)?AUTOLOG_SERVER_URL\s*=\s*(.*?)\s*$""")
+            .matchEntire(line)?.groupValues?.get(1)
+    }?.lastOrNull()?.let { raw ->
+        val value = if (raw.firstOrNull() == '\'' || raw.firstOrNull() == '"') {
+            val closing = raw.indexOf(raw.first(), startIndex = 1)
+            require(closing > 0 && raw.substring(closing + 1).trim().let { it.isEmpty() || it.startsWith("#") }) {
+                "AUTOLOG_SERVER_URL의 인용부호와 주석을 확인해 주세요."
+            }
+            raw.substring(1, closing)
+        } else raw.replace(Regex("""\s+#.*$"""), "").trimEnd()
+        require(value.isNotBlank()) { "AUTOLOG_SERVER_URL이 비어 있습니다." }
+        value
+    }
 }
 val serverUrl = project.findProperty("serverUrl")?.toString()
     ?: System.getenv("AUTOLOG_SERVER_URL")
-    ?: localEnv.getProperty("AUTOLOG_SERVER_URL")
+    ?: localServerUrl
     ?: "http://10.0.2.2:8080"
 
 android {
