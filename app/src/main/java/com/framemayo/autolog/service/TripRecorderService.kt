@@ -122,10 +122,11 @@ class TripRecorderService : LifecycleService() {
             is RecoveryResult.Completed -> result.trip
             is RecoveryResult.Interrupted -> result.trip
             is RecoveryResult.Resumed -> result.trip
+            is RecoveryResult.Deferred -> result.trip
             RecoveryResult.None -> null
         }
         Log.i(TAG, "$label: ${result::class.simpleName} trip=${trip?.id}")
-        if (trip == null || result is RecoveryResult.Resumed) return
+        if (trip == null || result is RecoveryResult.Resumed || result is RecoveryResult.Deferred) return
         container.stops.close(trip.id, trip.endedAt ?: trip.lastSavedAt)
     }
 
@@ -217,6 +218,8 @@ class TripRecorderService : LifecycleService() {
     private suspend fun tickLoop() {
         while (lifecycleScope.isActive) {
             val now = now()
+            // SDK가 늦어 보류한 운행은 재개 창이 끝나면 중단 처리한다(#145).
+            if (recovery.awaitingOdometer) recovery.onTick(now).takeIf { it != RecoveryResult.None }?.let { onRecovered(it, "recovery timeout") }
             RecorderState.snapshot.value.odometerKm?.let { container.trips.heartbeat(it) }
             feedMotion(now) { onTick(now) }
             recordEnergy(energyDetector.onTick(now))
