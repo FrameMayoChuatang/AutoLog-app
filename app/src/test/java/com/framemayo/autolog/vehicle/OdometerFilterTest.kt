@@ -83,4 +83,23 @@ class OdometerFilterTest {
         assertNull(f.accept(1000f, 5 * s))
         assertEquals(2000f, f.current)
     }
+
+    @Test fun `시연에서 한 번에 크게 올린 값은 이어서 3번 오면 받아들임`() {
+        val f = OdometerFilter()
+        f.accept(1000f, 0)
+        assertNull(f.accept(1500f, s)) // 1초에 +500 km: 일단 거부
+        assertNull(f.accept(1500f, 2 * s))
+        assertEquals(1500.1f, f.accept(1500.1f, 3 * s)) // 같은 흐름 3번째: 새 기준
+        assertEquals(1500.2f, f.accept(1500.2f, 4 * s))
+    }
+
+    @Test fun `튄 큰 값이 연속돼도 정상 값이 오면 정상 값이 바로 통과`() {
+        val f = OdometerFilter()
+        f.accept(1270f, 0)
+        assertNull(f.accept(99_999f, s))
+        assertNull(f.accept(99_999f, 2 * s))
+        assertEquals(1270.1f, f.accept(1270.1f, 3 * s))
+        assertNull(f.accept(99_999f, 4 * s)) // 연속이 끊겨 다시 처음부터
+        assertEquals(1270.1f, f.current)
+    }
 }
