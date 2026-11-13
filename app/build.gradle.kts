@@ -1,9 +1,21 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+// 배포 주소는 로컬 설정에만 두고, 명시적인 빌드 옵션을 우선한다.
+val localEnv = Properties().apply {
+    val envFile = rootProject.file(".env")
+    if (envFile.isFile) envFile.inputStream().use { load(it) }
+}
+val serverUrl = project.findProperty("serverUrl")?.toString()
+    ?: System.getenv("AUTOLOG_SERVER_URL")
+    ?: localEnv.getProperty("AUTOLOG_SERVER_URL")
+    ?: "http://10.0.2.2:8080"
 
 android {
     namespace = "com.framemayo.autolog"
@@ -17,7 +29,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         resValue("bool", "use_console_odometer", "false")
-        resValue("string", "server_url", "\"${project.findProperty("serverUrl") ?: "http://10.0.2.2:8080"}\"")
+        resValue("string", "server_url", "\"$serverUrl\"")
     }
 
     buildTypes {
