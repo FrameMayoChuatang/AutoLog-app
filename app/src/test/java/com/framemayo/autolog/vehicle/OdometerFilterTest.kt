@@ -102,4 +102,21 @@ class OdometerFilterTest {
         assertNull(f.accept(99_999f, 4 * s)) // 연속이 끊겨 다시 처음부터
         assertEquals(1270.1f, f.current)
     }
+
+    @Test fun `진행 중 운행이 있으면 작은 값이 이어져도 기준을 낮추지 않음`() {
+        val f = OdometerFilter()
+        f.accept(112_000f, 0)
+        repeat(5) { assertNull(f.accept(1_000f, (it + 1) * s, allowDownward = false)) }
+        assertEquals(112_000f, f.current)
+        // 운행이 끝난 뒤 같은 흐름이 이어지면 그때 옮긴다.
+        assertEquals(1_000f, f.accept(1_000f, 6 * s, allowDownward = true))
+    }
+
+    @Test fun `진행 중 운행이 있어도 위로 크게 바뀐 값은 확인되면 받아들임`() {
+        val f = OdometerFilter()
+        f.accept(1000f, 0)
+        assertNull(f.accept(1500f, s, allowDownward = false))
+        assertNull(f.accept(1500f, 2 * s, allowDownward = false))
+        assertEquals(1500f, f.accept(1500f, 3 * s, allowDownward = false))
+    }
 }

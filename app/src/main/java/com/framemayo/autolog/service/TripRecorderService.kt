@@ -45,6 +45,8 @@ class TripRecorderService : LifecycleService() {
     private val motion = MotionTracker()
     private val motionLock = Mutex()
     private val energyDetector = EnergyEventDetector()
+    /** 차량 데이터 경로(SDK 초기화·누적거리·기어)의 실패를 모아 수집 상태를 정한다. */
+    private val health = CollectorHealth()
     /** 실시간 누적거리 이상값 필터(#141). 수집 코루틴에서만 쓴다. */
     private val odometerFilter = OdometerFilter()
     private val autoStart by lazy {
@@ -71,7 +73,7 @@ class TripRecorderService : LifecycleService() {
             val init = async {
                 retryWithBackoff(onRetry = { n, e, ms ->
                     Log.w(TAG, "Vehicle SDK initialize failed (#$n), retry in ${ms}ms", e)
-                    setCollector(CollectorStatus.RETRYING)
+                    report("sdk", ok = false)
                 }) { vehicle.initialize() }
             }
             // 초기화가 늦어도 남은 ACTIVE 운행을 붙잡아 두지 않는다. 못 읽으면 첫 유효 누적거리로 늦게 판단한다.
@@ -87,7 +89,7 @@ class TripRecorderService : LifecycleService() {
             }
 
             init.await()
-            setCollector(CollectorStatus.RUNNING)
+            report("sdk", ok = true)
             batteryCapacityKwh = withTimeoutOrNull(RECOVERY_WAIT_MS) { vehicle.batteryCapacityKwh() }
 
             // 자동 시작 기준값은 복구가 끝난 뒤 정한다(남은 ACTIVE 운행을 새 운행으로 오인하지 않도록).
@@ -149,14 +151,15 @@ class TripRecorderService : LifecycleService() {
         vehicle.odometerKm().resubscribing(
             onFailure = { n, e, ms ->
                 Log.w(TAG, "odometer resubscribe #$n in ${ms}ms", e)
-                setCollector(CollectorStatus.RETRYING)
+                report("odometer sdk", ok = false)
             },
             prime = { vehicle.currentOdometerKm() },
-            onRecovered = { setCollector(CollectorStatus.RUNNING) },
-        ).collectGuarded(guard("odometer")) { value ->
+            onRecovered = { report("odometer sdk", ok = true) },
+        ).collectGuarded(guard("odometer", affectsInput = true)) { value ->
             val now = now()
             // 0·감소·튀는 값은 거른다. 튄 값이 기준이 돼도 일관된 정상 값이 이어지면 기준을 되돌린다(#141).
-            val km = odometerFilter.accept(value, now) ?: return@collectGuarded
+            // 진행 중 운행이 있으면 기준을 아래로 옮기지 않는다(운행 거리 음수 방지, PR #174 리뷰).
+            val km = odometerFilter.accept(value, now, allowDownward = !hasActiveTrip) ?: return@collectGuarded
             if (recovery.awaitingOdometer) onRecovered(recovery.onFirstValidOdometer(km, now), "late recovery")
             RecorderState.update { it.copy(odometerKm = km, odometerUpdatedAt = now) }
             feedMotion(now) { onOdometer(km, now) }
@@ -169,10 +172,10 @@ class TripRecorderService : LifecycleService() {
         gearWithCatchUp(vehicle.gear(), read = { vehicle.currentGear() }).resubscribing(
             onFailure = { n, e, ms ->
                 Log.w(TAG, "gear resubscribe #$n in ${ms}ms", e)
-                setCollector(CollectorStatus.RETRYING)
+                report("gear sdk", ok = false)
             },
-            onRecovered = { setCollector(CollectorStatus.RUNNING) },
-        ).collectGuarded(guard("gear")) { gear ->
+            onRecovered = { report("gear sdk", ok = true) },
+        ).collectGuarded(guard("gear", affectsInput = true)) { gear ->
             val now = now()
             if (RecorderState.snapshot.value.gear != gear) Log.i(TAG, "gear: $gear")
             RecorderState.update { it.copy(gear = gear) }
@@ -252,22 +255,27 @@ class TripRecorderService : LifecycleService() {
 
     private fun setCollector(status: CollectorStatus) = RecorderState.update { it.copy(collector = status) }
 
-    /** 한 주기가 실패해도(예: 저장 공간 부족으로 DB 쓰기 실패) 로그·상태만 남기고 다음 주기에 계속한다(#139). */
-    private fun guard(label: String) = CycleGuard(
+    private fun report(source: String, ok: Boolean) = setCollector(health.report(source, ok))
+
+    /**
+     * 한 주기가 실패해도(예: 저장 공간 부족으로 DB 쓰기 실패) 로그를 남기고 다음 주기에 계속한다(#139).
+     * [affectsInput]인 경로(누적거리·기어)만 수집 상태에 반영해 화면 입력을 잠근다. 에너지·정차·1초 주기 등
+     * 부가 경로의 실패로 입력 전체를 잠그지 않는다.
+     */
+    private fun guard(label: String, affectsInput: Boolean = false) = CycleGuard(
         onError = { e ->
             Log.e(TAG, "$label failed, continuing", e)
-            setCollector(CollectorStatus.RETRYING)
+            if (affectsInput) report(label, ok = false)
         },
         onRecovered = {
             Log.i(TAG, "$label recovered")
-            setCollector(CollectorStatus.RUNNING)
+            if (affectsInput) report(label, ok = true)
         },
     )
 
     /** 가드 밖에서 놓친 예외도 앱을 종료시키지 않도록 기록만 한다(#139). */
     private val uncaught = CoroutineExceptionHandler { _, e ->
         Log.e(TAG, "collector coroutine failed", e)
-        setCollector(CollectorStatus.RETRYING)
     }
 
     private fun now() = System.currentTimeMillis()

@@ -60,6 +60,7 @@ class TripRepositoryImpl(
         val now = clock()
         if (lastBeatKm == odometerKm && now - lastBeatAt < IDLE_SAVE_MS) return
         val trip = dao.active() ?: run { lastBeatKm = null; return }
+        if (odometerKm < trip.startOdometerKm) return // 출발값보다 작은 값은 저장하지 않는다(거리 음수 방지)
         if (trip.lastOdometerKm == odometerKm && now - trip.lastSavedAt < IDLE_SAVE_MS) {
             lastBeatKm = odometerKm
             lastBeatAt = trip.lastSavedAt
@@ -79,7 +80,9 @@ class TripRepositoryImpl(
         val trip = dao.active() ?: return null
         val now = nextUpdatedAt(trip)
         val end = (endedAt ?: now).coerceAtLeast(trip.startedAt)
-        if (dao.complete(trip.id, end, odometerKm, now, reason, energy?.fuelPercent, energy?.batteryPercent) == 0) return null
+        // 운행 중 누적거리는 줄 수 없으므로 출발값보다 작으면 마지막으로 저장한 실측값으로 끝낸다(거리 음수 방지).
+        val endKm = if (odometerKm >= trip.startOdometerKm) odometerKm else trip.lastOdometerKm
+        if (dao.complete(trip.id, end, endKm, now, reason, energy?.fuelPercent, energy?.batteryPercent) == 0) return null
         onPending()
         return dao.get(trip.id)
     }

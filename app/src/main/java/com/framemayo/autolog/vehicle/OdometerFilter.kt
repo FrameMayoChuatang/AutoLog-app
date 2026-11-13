@@ -11,6 +11,8 @@ package com.framemayo.autolog.vehicle
  * - 거부된 값이 서로 그럴듯하게 이어지며(같거나 조금씩 증가) [confirmCount]번 연속 오면 기준이 틀렸거나
  *   실제로 크게 바뀐 것으로 보고 그 값으로 기준을 옮긴다(위·아래 모두 복구). 튄 값 하나 뒤에 정상 값이
  *   오면 그 정상 값은 바로 통과하고 튄 값은 버려진다. 재시작 직후 한 번 늦게 오는 이전 값도 연속되지 않아 거부된다.
+ * - 진행 중 운행이 있으면(`allowDownward = false`) 기준을 아래로 옮기지 않는다. 운행 거리가 음수가 되는 것을 막고,
+ *   운행이 끝난 뒤 같은 흐름이 이어지면 그때 옮긴다.
  *
  * 스레드 안전하지 않다. 한 수집 코루틴에서만 호출한다.
  */
@@ -37,8 +39,8 @@ class OdometerFilter(
         resetCandidate()
     }
 
-    /** 받아들이면 그 값을, 거부하면 null을 돌려준다. */
-    fun accept(km: Float?, at: Long): Float? {
+    /** 받아들이면 그 값을, 거부하면 null을 돌려준다. [allowDownward]가 false면 기준보다 작은 값은 확인돼도 받지 않는다. */
+    fun accept(km: Float?, at: Long, allowDownward: Boolean = true): Float? {
         if (!isUsable(km)) return null
         val value = km!!
         val base = baselineKm
@@ -50,16 +52,16 @@ class OdometerFilter(
             seed(value, at)
             return value
         }
-        return confirmCandidate(value, at)
+        return confirmCandidate(value, at, allowDownward || value >= base)
     }
 
-    private fun confirmCandidate(value: Float, at: Long): Float? {
+    private fun confirmCandidate(value: Float, at: Long, mayMove: Boolean): Float? {
         val prev = candidateKm
         val continues = prev != null && value >= prev && value - prev <= allowedIncrease(candidateAt, at)
         candidateCount = if (continues) candidateCount + 1 else 1
         candidateKm = value
         candidateAt = at
-        if (candidateCount < confirmCount) return null
+        if (candidateCount < confirmCount || !mayMove) return null
         seed(value, at)
         return value
     }

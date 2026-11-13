@@ -111,3 +111,18 @@ class CycleGuard(
         null
     }
 }
+
+/**
+ * 여러 수집 경로의 실패를 모아 하나의 수집 상태를 만든다(PR #174 리뷰).
+ * 수집 상태는 화면의 입력 잠금(`canUseParkedControls`)에 쓰이므로, 차량 상태를 판단하는 경로(SDK 초기화·누적거리·기어)만 등록한다.
+ * 한 경로가 회복해도 다른 경로가 실패 중이면 [CollectorStatus.RETRYING]을 유지한다.
+ */
+class CollectorHealth {
+    private val failing = mutableSetOf<String>()
+
+    @Synchronized
+    fun report(source: String, ok: Boolean): CollectorStatus {
+        if (ok) failing.remove(source) else failing.add(source)
+        return if (failing.isEmpty()) CollectorStatus.RUNNING else CollectorStatus.RETRYING
+    }
+}

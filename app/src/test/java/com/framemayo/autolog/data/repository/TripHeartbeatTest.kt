@@ -82,4 +82,19 @@ class TripHeartbeatTest {
         val ended = active.copy(endedAt = 120_000L)
         assertEquals(120_000L, ended.durationMs(now = 999_999L))
     }
+
+    @Test
+    fun `출발값보다 작은 누적거리는 저장하지 않고 종료도 마지막 실측값으로 한다`() = runBlocking {
+        val id = trips.start(driverId = 1L, odometerKm = 112_000f).id
+        now += 1_000
+        trips.heartbeat(112_000.5f)
+        now += 1_000
+        trips.heartbeat(1_000f) // 콘솔에서 누적거리를 크게 낮춘 상황
+        assertEquals(112_000.5f, dao.get(id)!!.lastOdometerKm)
+
+        now += 1_000
+        val ended = trips.end(1_000f)!!
+        assertEquals(112_000.5f, ended.endOdometerKm)
+        assertEquals(0.5f, ended.endOdometerKm!! - ended.startOdometerKm, 0.001f)
+    }
 }

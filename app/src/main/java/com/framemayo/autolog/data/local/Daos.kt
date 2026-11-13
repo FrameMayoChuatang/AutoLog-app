@@ -195,7 +195,8 @@ interface TripDao {
     """)
     suspend fun complete(id: Long, endedAt: Long, km: Float, updatedAt: Long, endedBy: TripEndReason, fuel: Float?, battery: Float?): Int
 
-    @Query("UPDATE trips SET lastOdometerKm = :km, lastSavedAt = :at WHERE id = :id")
+    // 출발값보다 작은 누적거리는 저장하지 않는다(운행 거리 음수 방지).
+    @Query("UPDATE trips SET lastOdometerKm = :km, lastSavedAt = :at WHERE id = :id AND :km >= startOdometerKm")
     suspend fun heartbeat(id: Long, km: Float, at: Long)
 
     @Query("SELECT * FROM trips ORDER BY startedAt DESC LIMIT :limit")
