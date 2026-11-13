@@ -1,6 +1,8 @@
 .gradle/
 build/
 local.properties
+.env
+.env.*
 .idea/
 *.iml
 .DS_Store
@@ -10,4 +12,4 @@ captures/
 *.apk
 *.aab
 
-tools/.demo-state.json
+tools/.demo-state*.json

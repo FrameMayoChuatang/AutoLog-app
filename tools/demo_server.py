@@ -8,17 +8,35 @@
   python3 tools/demo_server.py trips            # 서버에 올라온 운행
   python3 tools/demo_server.py approve-trip <운행 id 앞자리>   # 관리자 승인 (이후 차량 수정은 거절됨)
 
-계정 정보는 tools/.demo-state.json(로컬 전용, Git 제외)에 저장한다. 시연용 로컬 서버에만 쓴다.
+서버 주소는 앱 빌드와 같은 AUTOLOG_SERVER_URL을 쓴다: 환경 변수 → 저장소 루트 .env(Git 제외) → 로컬 서버(http://127.0.0.1:8080).
+계정 정보는 서버별로 tools/.demo-state*.json(로컬 전용, Git 제외)에 저장한다.
 """
 import json
+import os
 import secrets
 import sys
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-BASE = "http://127.0.0.1:8080"
-STATE = Path(__file__).with_name(".demo-state.json")
+LOCAL = "http://127.0.0.1:8080"
+
+
+def _server_url():
+    if os.environ.get("AUTOLOG_SERVER_URL"):
+        return os.environ["AUTOLOG_SERVER_URL"]
+    env = Path(__file__).resolve().parent.parent / ".env"
+    if env.is_file():
+        for line in env.read_text().splitlines():
+            key, _, value = line.partition("=")
+            if key.strip() == "AUTOLOG_SERVER_URL" and value.strip():
+                return value.strip().strip('"').strip("'")
+    return LOCAL
+
+
+BASE = _server_url().rstrip("/")
+_HOST = BASE.split("://")[-1].replace(":", "_").replace("/", "_")
+STATE = Path(__file__).with_name(".demo-state.json" if BASE == LOCAL else f".demo-state-{_HOST}.json")
 
 
 def call(method, path, body=None, token=None):
@@ -71,7 +89,7 @@ def setup():
     for name in ("고객 미팅", "물품 수령"):
         admin("POST", "/api/catalog/purposes", {"name": name, "active": True})
     print("시연용 회사를 만들었습니다: 차량 12가3456, 승인된 운전자 김운전(영업팀), 업무 목적 2개")
-    print(f"관리자 로그인 정보는 {STATE} 에 있습니다. 다음: python3 tools/demo_server.py pair")
+    print(f"서버 {BASE} · 관리자 로그인 정보는 {STATE} 에 있습니다. 다음: python3 tools/demo_server.py pair")
 
 
 def main():
