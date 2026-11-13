@@ -84,3 +84,45 @@ fun <T> Flow<T>.resubscribing(
         primed?.let { emit(it) }
     }
 }
+
+/**
+ * 수집 루프의 한 주기를 감싸 예외가 루프·서비스를 끝내지 않게 한다(#139).
+ * 예외는 [onError]로 알리고 null을 돌려 다음 주기에 계속한다. 실패 뒤 처음 성공하면 [onRecovered]를 한 번 부른다.
+ * 취소([CancellationException])는 삼키지 않는다. 한 루프에 하나씩 만들어 쓴다.
+ */
+class CycleGuard(
+    private val onError: (Exception) -> Unit,
+    private val onRecovered: () -> Unit = {},
+) {
+    @Volatile private var failing = false
+
+    suspend fun <T> run(block: suspend () -> T): T? = try {
+        block().also {
+            if (failing) {
+                failing = false
+                onRecovered()
+            }
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        failing = true
+        onError(e)
+        null
+    }
+}
+
+/**
+ * 여러 수집 경로의 실패를 모아 하나의 수집 상태를 만든다(PR #174 리뷰).
+ * 수집 상태는 화면의 입력 잠금(`canUseParkedControls`)에 쓰이므로, 차량 상태를 판단하는 경로(SDK 초기화·누적거리·기어)만 등록한다.
+ * 한 경로가 회복해도 다른 경로가 실패 중이면 [CollectorStatus.RETRYING]을 유지한다.
+ */
+class CollectorHealth {
+    private val failing = mutableSetOf<String>()
+
+    @Synchronized
+    fun report(source: String, ok: Boolean): CollectorStatus {
+        if (ok) failing.remove(source) else failing.add(source)
+        return if (failing.isEmpty()) CollectorStatus.RUNNING else CollectorStatus.RETRYING
+    }
+}

@@ -52,7 +52,7 @@ internal fun fakeTripDao(): TripDao {
                 Unit
             }
             "heartbeat" -> {
-                val i = rows.indexOfFirst { it.id == a[0] }
+                val i = rows.indexOfFirst { it.id == a[0] && (a[1] as Float) >= it.startOdometerKm }
                 if (i >= 0) rows[i] = rows[i].copy(lastOdometerKm = a[1] as Float, lastSavedAt = a[2] as Long)
                 Unit
             }

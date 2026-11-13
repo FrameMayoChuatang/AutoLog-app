@@ -165,8 +165,9 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
             item {
                 VehicleSection("운행 중 · ${state.driverName(active.driverId)}") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val now by rememberNow()
                         Text(
-                            "%.2f km · %d분".format(active.distanceKm(), active.durationMs() / 60_000),
+                            "%.2f km · %d분".format(active.distanceKm(), active.durationMs(now) / 60_000),
                             Modifier.weight(1f), fontSize = VehicleUi.Value, fontWeight = FontWeight.Bold, color = VehicleUi.Primary,
                         )
                         VehiclePrimaryButton("운행 종료", vm::endTrip, enabled = v.isParked && v.odometerKm != null)

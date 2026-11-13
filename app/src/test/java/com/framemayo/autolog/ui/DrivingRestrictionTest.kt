@@ -25,6 +25,10 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DrivingRestrictionTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    /** 25분 30초 전에 시작한 운행(#147: 화면 시간은 현재 시각 기준). */
+    private val startedAt1 = System.currentTimeMillis() - 90_000L
+    private val startedAt25 = System.currentTimeMillis() - (25 * 60_000L + 30_000L)
     private val parked = VehicleSnapshot(serviceRunning = true, collector = CollectorStatus.RUNNING,
         gear = VehicleGear.GEAR_PARK, odometerKm = 120f)
     private val clearUx = DrivingUxState(ready = true, requiresOptimization = false)
@@ -93,8 +97,8 @@ class DrivingRestrictionTest {
 
     @Test fun activeTripDisplaysValuesWithoutActions() {
         state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE),
-            activeTrip = TripEntity(id = 1, driverId = 1, startedAt = 0, startOdometerKm = 100f,
-                lastOdometerKm = 112.4f, lastSavedAt = 25 * 60_000L))
+            activeTrip = TripEntity(id = 1, driverId = 1, startedAt = startedAt25, startOdometerKm = 100f,
+                lastOdometerKm = 112.4f, lastSavedAt = startedAt25 + 20 * 60_000L))
         show()
         compose.onNodeWithText("기록 중").assertIsDisplayed()
         compose.onNodeWithText("운전자").assertIsDisplayed()
@@ -136,7 +140,7 @@ class DrivingRestrictionTest {
     fun compactRestrictionFailureKeepsRetryAndTripValuesVisible() {
         ux.value = DrivingUxState(failure = DrivingUxFailure.READ_FAILED)
         state.value = state.value.copy(activeTrip = TripEntity(id = 1, driverId = 1,
-            startedAt = 0, startOdometerKm = 100f, lastOdometerKm = 101f, lastSavedAt = 60_000L))
+            startedAt = startedAt1, startOdometerKm = 100f, lastOdometerKm = 101f, lastSavedAt = startedAt1 + 30_000L))
         show()
         compose.onNodeWithText("제한 정보 다시 연결").assertIsDisplayed()
         compose.onNodeWithText("주행 제한 정보를 읽을 수 없음 · 입력 잠금").assertIsDisplayed()

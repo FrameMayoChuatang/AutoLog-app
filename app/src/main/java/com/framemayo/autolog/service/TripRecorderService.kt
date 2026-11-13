@@ -17,9 +17,12 @@ import com.framemayo.autolog.vehicle.DetectedEnergyEvent
 import com.framemayo.autolog.vehicle.EnergyEventDetector
 import com.framemayo.autolog.vehicle.MotionAction
 import com.framemayo.autolog.vehicle.MotionTracker
+import com.framemayo.autolog.vehicle.OdometerFilter
 import com.framemayo.autolog.vehicle.OdometerValidator
 import com.framemayo.autolog.vehicle.ResumedStop
 import com.framemayo.autolog.vehicle.gearWithCatchUp
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -42,6 +45,10 @@ class TripRecorderService : LifecycleService() {
     private val motion = MotionTracker()
     private val motionLock = Mutex()
     private val energyDetector = EnergyEventDetector()
+    /** 차량 데이터 경로(SDK 초기화·누적거리·기어)의 실패를 모아 수집 상태를 정한다. */
+    private val health = CollectorHealth()
+    /** 실시간 누적거리 이상값 필터(#141). 수집 코루틴에서만 쓴다. */
+    private val odometerFilter = OdometerFilter()
     private val autoStart by lazy {
         AutoTripController(
             container.trips,
@@ -51,6 +58,8 @@ class TripRecorderService : LifecycleService() {
     }
 
     @Volatile private var batteryCapacityKwh: Float? = null
+    /** 진행 중 운행이 있을 때만 1초 저장을 한다(#147). */
+    @Volatile private var hasActiveTrip = false
 
     override fun onCreate() {
         super.onCreate()
@@ -60,52 +69,63 @@ class TripRecorderService : LifecycleService() {
         val vehicle = container.vehicle
         val trips = container.trips
 
-        lifecycleScope.launch {
+        lifecycleScope.launch(uncaught) {
             val init = async {
                 retryWithBackoff(onRetry = { n, e, ms ->
                     Log.w(TAG, "Vehicle SDK initialize failed (#$n), retry in ${ms}ms", e)
-                    setCollector(CollectorStatus.RETRYING)
+                    report("sdk", ok = false)
                 }) { vehicle.initialize() }
             }
             // 초기화가 늦어도 남은 ACTIVE 운행을 붙잡아 두지 않는다. 못 읽으면 첫 유효 누적거리로 늦게 판단한다.
             val km = withTimeoutOrNull(RECOVERY_WAIT_MS) { init.await(); vehicle.currentOdometerKm() }
             val readAt = now()
-            onRecovered(recovery.recover(km, readAt), "recovery")
+            val startup = guard("startup")
+            startup.run { onRecovered(recovery.recover(km, readAt), "recovery") }
             // 복구 때 읽은 실측값을 먼저 반영해, 구독 직후 늦게 도착하는 이전(더 작은) 값을 감소값으로 걸러 낸다.
             // 이 값이 없으면 오래된 값이 자동 시작 기준점이 되어 앱이 꺼진 동안의 주행이 새 운행에 붙는다.
             if (OdometerValidator.isValid(km, null)) {
+                odometerFilter.seed(km, readAt)
                 RecorderState.update { it.copy(odometerKm = km, odometerUpdatedAt = readAt) }
             }
 
             init.await()
-            setCollector(CollectorStatus.RUNNING)
+            report("sdk", ok = true)
             batteryCapacityKwh = withTimeoutOrNull(RECOVERY_WAIT_MS) { vehicle.batteryCapacityKwh() }
 
             // 자동 시작 기준값은 복구가 끝난 뒤 정한다(남은 ACTIVE 운행을 새 운행으로 오인하지 않도록).
-            autoStart.seed()
-            launch { trips.active.collect { autoStart.onActiveTrip(it) } }
-            launch { observeActiveTripForStops() }
-            launch { collectOdometer() }
-            launch { collectGear() }
-            launch {
-                collectEnergy(vehicle.fuelPercent(), "fuel") { p, t ->
-                    RecorderState.update { it.copy(fuelPercent = p) }
-                    energyDetector.onFuel(p, t)
+            startup.run { autoStart.seed() }
+            // 한 수집기가 끝나도 형제 수집기는 계속 돈다(#139).
+            supervisorScope {
+                launch {
+                    val g = guard("active trip")
+                    trips.active.collect {
+                        hasActiveTrip = it != null
+                        g.run { autoStart.onActiveTrip(it) }
+                    }
                 }
-            }
-            launch {
-                collectEnergy(vehicle.batteryPercent(), "battery") { p, t ->
-                    RecorderState.update { it.copy(batteryPercent = p) }
-                    energyDetector.onBattery(p, t)
+                launch { observeActiveTripForStops() }
+                launch { collectOdometer() }
+                launch { collectGear() }
+                launch {
+                    collectEnergy(vehicle.fuelPercent(), "fuel") { p, t ->
+                        RecorderState.update { it.copy(fuelPercent = p) }
+                        energyDetector.onFuel(p, t)
+                    }
                 }
-            }
-            launch {
-                collectEnergy(vehicle.chargePortOpen(), "charge port") { open, t ->
-                    RecorderState.update { it.copy(chargePortOpen = open) }
-                    energyDetector.onChargePort(open, t)
+                launch {
+                    collectEnergy(vehicle.batteryPercent(), "battery") { p, t ->
+                        RecorderState.update { it.copy(batteryPercent = p) }
+                        energyDetector.onBattery(p, t)
+                    }
                 }
+                launch {
+                    collectEnergy(vehicle.chargePortOpen(), "charge port") { open, t ->
+                        RecorderState.update { it.copy(chargePortOpen = open) }
+                        energyDetector.onChargePort(open, t)
+                    }
+                }
+                launch { tickLoop() }
             }
-            launch { tickLoop() }
         }
     }
 
@@ -118,10 +138,11 @@ class TripRecorderService : LifecycleService() {
             is RecoveryResult.Completed -> result.trip
             is RecoveryResult.Interrupted -> result.trip
             is RecoveryResult.Resumed -> result.trip
+            is RecoveryResult.Deferred -> result.trip
             RecoveryResult.None -> null
         }
         Log.i(TAG, "$label: ${result::class.simpleName} trip=${trip?.id}")
-        if (trip == null || result is RecoveryResult.Resumed) return
+        if (trip == null || result is RecoveryResult.Resumed || result is RecoveryResult.Deferred) return
         container.stops.close(trip.id, trip.endedAt ?: trip.lastSavedAt)
     }
 
@@ -130,14 +151,15 @@ class TripRecorderService : LifecycleService() {
         vehicle.odometerKm().resubscribing(
             onFailure = { n, e, ms ->
                 Log.w(TAG, "odometer resubscribe #$n in ${ms}ms", e)
-                setCollector(CollectorStatus.RETRYING)
+                report("odometer sdk", ok = false)
             },
             prime = { vehicle.currentOdometerKm() },
-            onRecovered = { setCollector(CollectorStatus.RUNNING) },
-        ).collect { value ->
+            onRecovered = { report("odometer sdk", ok = true) },
+        ).collectGuarded(guard("odometer", affectsInput = true)) { value ->
             val now = now()
-            if (!OdometerValidator.isValid(value, RecorderState.snapshot.value.odometerKm)) return@collect
-            val km = value!!
+            // 0·감소·튀는 값은 거른다. 튄 값이 기준이 돼도 일관된 정상 값이 이어지면 기준을 되돌린다(#141).
+            // 진행 중 운행이 있으면 기준을 아래로 옮기지 않는다(운행 거리 음수 방지, PR #174 리뷰).
+            val km = odometerFilter.accept(value, now, allowDownward = !hasActiveTrip) ?: return@collectGuarded
             if (recovery.awaitingOdometer) onRecovered(recovery.onFirstValidOdometer(km, now), "late recovery")
             RecorderState.update { it.copy(odometerKm = km, odometerUpdatedAt = now) }
             feedMotion(now) { onOdometer(km, now) }
@@ -150,10 +172,10 @@ class TripRecorderService : LifecycleService() {
         gearWithCatchUp(vehicle.gear(), read = { vehicle.currentGear() }).resubscribing(
             onFailure = { n, e, ms ->
                 Log.w(TAG, "gear resubscribe #$n in ${ms}ms", e)
-                setCollector(CollectorStatus.RETRYING)
+                report("gear sdk", ok = false)
             },
-            onRecovered = { setCollector(CollectorStatus.RUNNING) },
-        ).collect { gear ->
+            onRecovered = { report("gear sdk", ok = true) },
+        ).collectGuarded(guard("gear", affectsInput = true)) { gear ->
             val now = now()
             if (RecorderState.snapshot.value.gear != gear) Log.i(TAG, "gear: $gear")
             RecorderState.update { it.copy(gear = gear) }
@@ -167,13 +189,13 @@ class TripRecorderService : LifecycleService() {
         source.resubscribing(
             maxMs = ENERGY_RETRY_MAX_MS,
             onFailure = { n, e, _ -> if (n == 1) Log.i(TAG, "$label unavailable: ${e.message}") },
-        ).collect { value -> recordEnergy(handle(value, now())) }
+        ).collectGuarded(guard(label)) { value -> recordEnergy(handle(value, now())) }
     }
 
     /** 운행 시작·종료·교체를 정차 추적에 알린다. 서비스 재시작 시 열린 정차 구간을 이어 받는다. */
     private suspend fun observeActiveTripForStops() {
         val stops = container.stops
-        container.trips.active.map { it?.let { t -> t.id to t.startedAt } }.distinctUntilChanged().collect { trip ->
+        container.trips.active.map { it?.let { t -> t.id to t.startedAt } }.distinctUntilChanged().collectGuarded(guard("stops")) { trip ->
             val now = now()
             val active = trip?.let { (id, startedAt) ->
                 ActiveTrip(id, startedAt, stops.openStop(id)?.let { ResumedStop(it.startedAt, it.odometerKm) })
@@ -211,16 +233,50 @@ class TripRecorderService : LifecycleService() {
     }
 
     private suspend fun tickLoop() {
+        val g = guard("tick")
         while (lifecycleScope.isActive) {
-            val now = now()
-            RecorderState.snapshot.value.odometerKm?.let { container.trips.heartbeat(it) }
-            feedMotion(now) { onTick(now) }
-            recordEnergy(energyDetector.onTick(now))
+            g.run { tick(now()) }
             delay(HEARTBEAT_MS)
         }
     }
 
+    /** 1초 주기 작업: 보류 복구 확인, 운행 중 저장, 정차 판단, 주유·충전 확인. */
+    private suspend fun tick(now: Long) {
+        // SDK가 늦어 보류한 운행은 재개 창이 끝나면 중단 처리한다(#145).
+        if (recovery.awaitingOdometer) recovery.onTick(now).takeIf { it != RecoveryResult.None }?.let { onRecovered(it, "recovery timeout") }
+        if (hasActiveTrip) RecorderState.snapshot.value.odometerKm?.let { container.trips.heartbeat(it) }
+        feedMotion(now) { onTick(now) }
+        recordEnergy(energyDetector.onTick(now))
+    }
+
+    /** 흐름의 각 값을 [g]로 감싸 처리한다. 한 값 처리가 실패해도 다음 값을 계속 받는다. */
+    private suspend fun <T> Flow<T>.collectGuarded(g: CycleGuard, block: suspend (T) -> Unit) =
+        collect { value -> g.run { block(value) } }
+
     private fun setCollector(status: CollectorStatus) = RecorderState.update { it.copy(collector = status) }
+
+    private fun report(source: String, ok: Boolean) = setCollector(health.report(source, ok))
+
+    /**
+     * 한 주기가 실패해도(예: 저장 공간 부족으로 DB 쓰기 실패) 로그를 남기고 다음 주기에 계속한다(#139).
+     * [affectsInput]인 경로(누적거리·기어)만 수집 상태에 반영해 화면 입력을 잠근다. 에너지·정차·1초 주기 등
+     * 부가 경로의 실패로 입력 전체를 잠그지 않는다.
+     */
+    private fun guard(label: String, affectsInput: Boolean = false) = CycleGuard(
+        onError = { e ->
+            Log.e(TAG, "$label failed, continuing", e)
+            if (affectsInput) report(label, ok = false)
+        },
+        onRecovered = {
+            Log.i(TAG, "$label recovered")
+            if (affectsInput) report(label, ok = true)
+        },
+    )
+
+    /** 가드 밖에서 놓친 예외도 앱을 종료시키지 않도록 기록만 한다(#139). */
+    private val uncaught = CoroutineExceptionHandler { _, e ->
+        Log.e(TAG, "collector coroutine failed", e)
+    }
 
     private fun now() = System.currentTimeMillis()
 

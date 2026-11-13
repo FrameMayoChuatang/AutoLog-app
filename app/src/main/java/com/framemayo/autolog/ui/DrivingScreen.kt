@@ -1,5 +1,6 @@
 package com.framemayo.autolog.ui
 
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,7 +55,8 @@ internal fun DrivingScreen(
             Spacer(Modifier.height(32.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 DrivingValue("주행 거리", "%.1f km".format(trip.distanceKm()), Modifier.weight(1f))
-                DrivingValue("주행 시간", formatDuration(trip.durationMs()), Modifier.weight(1f))
+                val now by rememberNow()
+                DrivingValue("주행 시간", formatDuration(trip.durationMs(now)), Modifier.weight(1f))
             }
             Spacer(Modifier.height(32.dp))
             VehiclePrimaryButton("운행 종료", onEnd, Modifier.fillMaxWidth(), enabled = canEnd)
