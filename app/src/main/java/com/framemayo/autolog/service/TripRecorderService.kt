@@ -17,6 +17,7 @@ import com.framemayo.autolog.vehicle.DetectedEnergyEvent
 import com.framemayo.autolog.vehicle.EnergyEventDetector
 import com.framemayo.autolog.vehicle.MotionAction
 import com.framemayo.autolog.vehicle.MotionTracker
+import com.framemayo.autolog.vehicle.OdometerFilter
 import com.framemayo.autolog.vehicle.OdometerValidator
 import com.framemayo.autolog.vehicle.ResumedStop
 import com.framemayo.autolog.vehicle.gearWithCatchUp
@@ -42,6 +43,8 @@ class TripRecorderService : LifecycleService() {
     private val motion = MotionTracker()
     private val motionLock = Mutex()
     private val energyDetector = EnergyEventDetector()
+    /** 실시간 누적거리 이상값 필터(#141). 수집 코루틴에서만 쓴다. */
+    private val odometerFilter = OdometerFilter()
     private val autoStart by lazy {
         AutoTripController(
             container.trips,
@@ -74,6 +77,7 @@ class TripRecorderService : LifecycleService() {
             // 복구 때 읽은 실측값을 먼저 반영해, 구독 직후 늦게 도착하는 이전(더 작은) 값을 감소값으로 걸러 낸다.
             // 이 값이 없으면 오래된 값이 자동 시작 기준점이 되어 앱이 꺼진 동안의 주행이 새 운행에 붙는다.
             if (OdometerValidator.isValid(km, null)) {
+                odometerFilter.seed(km, readAt)
                 RecorderState.update { it.copy(odometerKm = km, odometerUpdatedAt = readAt) }
             }
 
@@ -136,8 +140,8 @@ class TripRecorderService : LifecycleService() {
             onRecovered = { setCollector(CollectorStatus.RUNNING) },
         ).collect { value ->
             val now = now()
-            if (!OdometerValidator.isValid(value, RecorderState.snapshot.value.odometerKm)) return@collect
-            val km = value!!
+            // 0·감소·튀는 값은 거른다. 튄 값이 기준이 돼도 일관된 정상 값이 이어지면 기준을 되돌린다(#141).
+            val km = odometerFilter.accept(value, now) ?: return@collect
             if (recovery.awaitingOdometer) onRecovered(recovery.onFirstValidOdometer(km, now), "late recovery")
             RecorderState.update { it.copy(odometerKm = km, odometerUpdatedAt = now) }
             feedMotion(now) { onOdometer(km, now) }
