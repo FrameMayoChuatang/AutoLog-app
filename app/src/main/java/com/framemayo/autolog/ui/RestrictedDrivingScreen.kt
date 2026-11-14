@@ -142,19 +142,23 @@ private fun ReadOnlyTripValue(label: String, value: String, modifier: Modifier, 
     val density = LocalDensity.current
     val baseStyle = LocalTextStyle.current
     Surface(modifier.fillMaxHeight().testTag("metric-$label"), shape = RoundedCornerShape(24.dp), color = VehicleUi.Surface) {
-        Column(Modifier.padding(if (compact) 16.dp else 32.dp)) {
-            Text(label, fontSize = if (compact) 20.sp else 24.sp, color = VehicleUi.Secondary)
-            Spacer(Modifier.height(if (compact) 4.dp else 12.dp))
-            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.BottomStart) {
-                val preferred = if (compact) 36f else 88f
-                val style = baseStyle.copy(fontSize = preferred.sp, lineHeight = (preferred * 1.2f).sp,
-                    fontWeight = FontWeight.SemiBold)
-                val measured = measurer.measure(AnnotatedString(value), style = style, softWrap = false).size
-                // 카드 내부 공간과 글꼴 배율을 함께 반영해 단위까지 한 줄에 보존한다.
-                val scale = with(density) {
-                    minOf(1f, maxWidth.toPx() / measured.width.coerceAtLeast(1),
-                        maxHeight.toPx() / measured.height.coerceAtLeast(1))
-                }
+        BoxWithConstraints(Modifier.fillMaxSize().padding(if (compact) 16.dp else 32.dp)) {
+            val preferred = if (compact) 36f else 88f
+            val gap = if (compact) 8.dp else 12.dp
+            val labelStyle = baseStyle.copy(fontSize = if (compact) 20.sp else 24.sp)
+            val style = baseStyle.copy(fontSize = preferred.sp, lineHeight = (preferred * 1.2f).sp,
+                fontWeight = FontWeight.SemiBold)
+            val labelHeight = measurer.measure(AnnotatedString(label), style = labelStyle).size.height
+            val measured = measurer.measure(AnnotatedString(value), style = style, softWrap = false).size
+            // 카드 내부 공간과 글꼴 배율을 함께 반영해 단위까지 한 줄에 보존한다.
+            val scale = with(density) {
+                minOf(1f, maxWidth.toPx() / measured.width.coerceAtLeast(1),
+                    (maxHeight.toPx() - labelHeight - gap.toPx()).coerceAtLeast(1f) /
+                        measured.height.coerceAtLeast(1))
+            }
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+                Text(label, style = labelStyle, color = VehicleUi.Secondary)
+                Spacer(Modifier.height(gap))
                 Text(value, modifier = Modifier.fillMaxWidth(), style = style.copy(fontSize = (preferred * scale).sp,
                     lineHeight = (preferred * 1.2f * scale).sp),
                     color = VehicleUi.Primary, maxLines = 1, softWrap = false)
