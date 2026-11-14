@@ -17,6 +17,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.framemayo.autolog.data.local.DriverEntity
 import com.framemayo.autolog.data.local.DriverProfile
 import com.framemayo.autolog.data.local.TripEntity
+import com.framemayo.autolog.data.link.VehicleLink
 import com.framemayo.autolog.service.CollectorStatus
 import com.framemayo.autolog.service.VehicleSnapshot
 import com.framemayo.autolog.ui.theme.AutoLogTheme
@@ -42,13 +43,15 @@ class DrivingRestrictionTest {
         gear = VehicleGear.GEAR_PARK, odometerKm = 120f)
     private val clearUx = DrivingUxState(ready = true, requiresOptimization = false)
     private val profile = DriverProfile(DriverEntity(id = 1, name = "운전자", department = ""), "운전자", 0)
+    private val vehicleLink = VehicleLink("sample-vehicle", "00가0000", "테스트 차량", "test-only-token", "", 0)
     private val state = mutableStateOf(MainUiState(vehicle = parked, profiles = listOf(profile), linked = true))
     private val ux = mutableStateOf(clearUx)
 
     private fun show(onRetry: () -> Unit = {}) = compose.setContent {
         AutoLogTheme {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                DrivingRestrictionGate(state.value, ux.value, onRetryRestrictions = onRetry) {
+                DrivingRestrictionGate(state.value, ux.value, onRetryRestrictions = onRetry,
+                    waitingFooter = { VehicleLinkStatusCard(vehicleLink.takeIf { state.value.linked }) }) {
                     DriverSelectionScreen(state.value.profiles, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {})
                 }
             }
@@ -118,10 +121,39 @@ class DrivingRestrictionTest {
         compose.onNodeWithText("프로필 관리").assertIsNotEnabled()
         compose.onNodeWithText("최근 운행").assertIsNotEnabled()
         compose.onNodeWithContentDescription("운전자 추가").assertIsNotEnabled()
+        compose.onNodeWithTag("vehicle-link-status").assertIsDisplayed()
+        compose.onNodeWithText("차량 연결").assertIsDisplayed()
+        compose.onNodeWithText("00가0000").assertIsDisplayed()
+        compose.onNodeWithText("연결 해제").assertDoesNotExist()
+        compose.onNodeWithText("test-only-token").assertDoesNotExist()
         screenshot("selection-waiting")
         compose.runOnIdle { state.value = state.value.copy(vehicle = parked) }
         compose.onNodeWithContentDescription("운전자 프로필 선택").assertIsEnabled().performClick()
         compose.onNodeWithText("주행 시작").assertIsDisplayed()
+    }
+
+    @Test fun waitingVehicleCardStaysFixedWhenProfileCountChanges() {
+        state.value = state.value.copy(vehicle = parked.copy(collector = CollectorStatus.RETRYING))
+        show()
+        val before = compose.onNodeWithTag("vehicle-link-status").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        compose.runOnIdle {
+            state.value = state.value.copy(profiles = (1L..7L).map {
+                DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0)
+            })
+        }
+        val after = compose.onNodeWithTag("vehicle-link-status").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertEquals(before, after)
+        for (id in 1..5) compose.onNodeWithContentDescription("운전자$id 프로필 선택").assertIsDisplayed().assertIsNotEnabled()
+    }
+
+    @Test fun unlinkedWaitingShowsStatusWithoutPairingControls() {
+        state.value = state.value.copy(linked = false, vehicle = parked.copy(collector = CollectorStatus.RETRYING))
+        show()
+        compose.onNodeWithTag("vehicle-link-status").assertIsDisplayed()
+        compose.onNodeWithText("연결된 차량 없음").assertIsDisplayed()
+        compose.onNodeWithText("페어링 코드").assertDoesNotExist()
+        compose.onNodeWithText("연결").assertDoesNotExist()
+        compose.onAllNodes(hasClickAction() and isEnabled()).assertCountEquals(0)
     }
 
     @Test fun initialUnknownStateShowsProfilesWithoutEnablingActions() {
@@ -241,6 +273,7 @@ class DrivingRestrictionTest {
         compose.onNodeWithText("더보기").assertDoesNotExist()
         compose.onNodeWithText("제한 정보 다시 연결").assertIsDisplayed()
         compose.onNodeWithText("주행 제한 정보를 읽을 수 없음 · 입력 잠금").assertIsDisplayed()
+        compose.onNodeWithTag("vehicle-link-status").assertIsDisplayed()
         screenshot("selection-waiting-compact")
     }
 
@@ -257,6 +290,7 @@ class DrivingRestrictionTest {
         profiles.forEach { assertEquals(profiles.first().top, it.top, 1f) }
         compose.onNodeWithText("차량 정보 수신 대기 · 차량 상태 확인 후 운행을 시작할 수 있습니다.").assertIsDisplayed()
         compose.onAllNodes(hasClickAction() and isEnabled()).assertCountEquals(0)
+        compose.onNodeWithTag("vehicle-link-status").assertIsDisplayed()
         screenshot("selection-waiting-medium")
     }
 
@@ -271,6 +305,7 @@ class DrivingRestrictionTest {
         for (id in 1..5) compose.onNodeWithContentDescription("운전자$id 프로필 선택")
             .assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText("제한 정보 다시 연결").assertIsDisplayed()
+        compose.onNodeWithTag("vehicle-link-status").assertIsDisplayed()
         compose.onAllNodes(hasClickAction() and isEnabled()).assertCountEquals(1)
     }
 
