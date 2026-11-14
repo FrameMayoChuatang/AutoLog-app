@@ -94,16 +94,63 @@ class DrivingRestrictionTest {
         compose.onNodeWithText("운전자 추가").assertIsDisplayed()
     }
 
-    @Test fun connectionLossLocksInputAndDoesNotClaimRecording() {
+    @Test fun connectionLossKeepsReadOnlySelectionAndDoesNotClaimRecording() {
         show()
         compose.runOnIdle {
             ux.value = DrivingUxState()
             state.value = state.value.copy(vehicle = parked.copy(collector = CollectorStatus.RETRYING))
         }
-        compose.onNodeWithText("운행 현황").assertIsDisplayed()
-        compose.onNodeWithText("차량 정보 수신 대기").assertIsDisplayed()
+        compose.onNodeWithText("운전자의 프로필을 선택하세요.").assertIsDisplayed()
+        compose.onNodeWithText("운행 현황").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 프로필 선택").assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText("기록 중").assertDoesNotExist()
-        compose.onNodeWithContentDescription("운전자 검색 열기").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertIsNotEnabled()
+    }
+
+    @Test fun parkedOdometerFailureKeepsProfilesVisibleUntilRecovery() {
+        state.value = state.value.copy(vehicle = parked.copy(collector = CollectorStatus.RETRYING, odometerKm = null))
+        show()
+        compose.onNodeWithText("운전자의 프로필을 선택하세요.").assertIsDisplayed()
+        compose.onNodeWithText("차량 정보 수신 대기 · 차량 상태 확인 후 운행을 시작할 수 있습니다.").assertIsDisplayed()
+        compose.onNodeWithText("운행 현황").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 프로필 선택").assertIsDisplayed().assertIsNotEnabled().performClick()
+        compose.onNodeWithText("주행 시작").assertDoesNotExist()
+        compose.onNodeWithText("프로필 관리").assertIsNotEnabled()
+        compose.onNodeWithText("최근 운행").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("운전자 추가").assertIsNotEnabled()
+        screenshot("selection-waiting")
+        compose.runOnIdle { state.value = state.value.copy(vehicle = parked) }
+        compose.onNodeWithContentDescription("운전자 프로필 선택").assertIsEnabled().performClick()
+        compose.onNodeWithText("주행 시작").assertIsDisplayed()
+    }
+
+    @Test fun initialUnknownStateShowsProfilesWithoutEnablingActions() {
+        state.value = state.value.copy(vehicle = VehicleSnapshot())
+        ux.value = DrivingUxState()
+        show()
+        compose.onNodeWithContentDescription("운전자 프로필 선택").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertIsNotEnabled()
+        compose.onNodeWithText("운행 현황").assertDoesNotExist()
+        compose.onAllNodes(hasClickAction() and isEnabled()).assertCountEquals(0)
+    }
+
+    @Test fun confirmedPlatformRestrictionStillShowsDrivingStatusWithoutActiveTrip() {
+        ux.value = clearUx.copy(activeRestrictions = 64)
+        show()
+        compose.onNodeWithText("운행 현황").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자 프로필 선택").assertDoesNotExist()
+        compose.onAllNodes(hasClickAction()).assertCountEquals(0)
+    }
+
+    @Test fun activeTripRemainsVisibleWhenParkedVehicleDataFails() {
+        state.value = state.value.copy(vehicle = parked.copy(collector = CollectorStatus.RETRYING),
+            activeTrip = TripEntity(id = 1, driverId = 1, startedAt = 0, endedAt = 60_000L,
+                lastSavedAt = 60_000L, startOdometerKm = 100f, lastOdometerKm = 101f))
+        show()
+        compose.onNodeWithText("운행 현황").assertIsDisplayed()
+        compose.onNodeWithText("1.0 km").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자 프로필 선택").assertDoesNotExist()
+        compose.onAllNodes(hasClickAction()).assertCountEquals(0)
     }
 
     @Test fun activeTripDisplaysValuesWithoutActions() {
@@ -162,7 +209,7 @@ class DrivingRestrictionTest {
         compose.onNodeWithText("주행 제한 정보를 읽을 수 없음 · 입력 잠금").assertIsDisplayed()
         compose.onNodeWithText("제한 정보 다시 연결").performClick()
         compose.runOnIdle { assertEquals(1, retries) }
-        compose.onNodeWithContentDescription("운전자 검색 열기").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertIsNotEnabled()
         compose.runOnIdle { ux.value = clearUx }
         compose.onNodeWithContentDescription("운전자 검색 열기").assertIsDisplayed()
         compose.onNodeWithText("제한 정보 다시 연결").assertDoesNotExist()
@@ -178,6 +225,53 @@ class DrivingRestrictionTest {
         }
         compose.onNodeWithText("주행 제한 서비스 연결 끊김 · 입력 잠금").assertIsDisplayed()
         compose.onAllNodes(hasClickAction()).assertCountEquals(0)
+    }
+
+    @Test
+    @Config(qualifiers = "w540dp-h420dp-land-night-mdpi")
+    fun compactWaitingKeepsRecentProfilesAndRetryVisible() {
+        state.value = state.value.copy(profiles = (1L..7L).map {
+            DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0)
+        })
+        ux.value = DrivingUxState(failure = DrivingUxFailure.READ_FAILED)
+        show()
+        for (id in 1..5) compose.onNodeWithContentDescription("운전자$id 프로필 선택")
+            .assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithContentDescription("운전자6 프로필 선택").assertDoesNotExist()
+        compose.onNodeWithText("더보기").assertDoesNotExist()
+        compose.onNodeWithText("제한 정보 다시 연결").assertIsDisplayed()
+        compose.onNodeWithText("주행 제한 정보를 읽을 수 없음 · 입력 잠금").assertIsDisplayed()
+        screenshot("selection-waiting-compact")
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h600dp-land-night-mdpi")
+    fun mediumWaitingKeepsFiveProfilesInOneVisibleRow() {
+        state.value = state.value.copy(vehicle = parked.copy(collector = CollectorStatus.RETRYING),
+            profiles = (1L..7L).map {
+                DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0)
+            })
+        show()
+        val profiles = (1..5).map { id -> compose.onNodeWithContentDescription("운전자$id 프로필 선택")
+            .assertIsDisplayed().assertIsNotEnabled().fetchSemanticsNode().boundsInRoot }
+        profiles.forEach { assertEquals(profiles.first().top, it.top, 1f) }
+        compose.onNodeWithText("차량 정보 수신 대기 · 차량 상태 확인 후 운행을 시작할 수 있습니다.").assertIsDisplayed()
+        compose.onAllNodes(hasClickAction() and isEnabled()).assertCountEquals(0)
+        screenshot("selection-waiting-medium")
+    }
+
+    @Test
+    @Config(qualifiers = "w1100dp-h700dp-land-night-mdpi")
+    fun shortWideWaitingKeepsProfilesAndRestrictionRetryVisible() {
+        state.value = state.value.copy(profiles = (1L..5L).map {
+            DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0)
+        })
+        ux.value = DrivingUxState(failure = DrivingUxFailure.READ_FAILED)
+        show()
+        for (id in 1..5) compose.onNodeWithContentDescription("운전자$id 프로필 선택")
+            .assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithText("제한 정보 다시 연결").assertIsDisplayed()
+        compose.onAllNodes(hasClickAction() and isEnabled()).assertCountEquals(1)
     }
 
     @Test
