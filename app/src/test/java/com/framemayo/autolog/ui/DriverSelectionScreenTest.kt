@@ -370,7 +370,9 @@ class DriverSelectionScreenTest {
     @Test fun searchModalMovesWithKeyboardAndReturnsAfterHidingIt() {
         compose.setContent {
             androidx.compose.material3.MaterialTheme(colorScheme = androidx.compose.material3.darkColorScheme()) {
-                DriverSearchDialog("", {}, profiles, androidx.compose.ui.geometry.Rect.Zero, false, {}, {})
+                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides androidx.compose.ui.graphics.Color.White) {
+                    DriverSearchDialog("", {}, profiles, androidx.compose.ui.geometry.Rect.Zero, false, {}, {})
+                }
             }
         }
         val initial = compose.onNodeWithContentDescription("운전자 이름 검색").getUnclippedBoundsInRoot().top
