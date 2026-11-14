@@ -157,7 +157,7 @@ internal fun DriverSelectionScreen(
                 val compactWaiting = !inputEnabled && (maxHeight < 760.dp || maxWidth < fullRowMinWidth)
                 val avatarSize = if (compactWaiting) 60.dp else ((maxWidth - 20.dp * 5) / 6 - 16.dp).coerceIn(120.dp, 148.dp)
                 val viewportHeight = maxHeight
-                val columns = ((maxWidth - 48.dp + 20.dp) / (avatarSize + 36.dp)).toInt().coerceAtLeast(1)
+                val columns = ((maxWidth - 48.dp + 20.dp) / (avatarSize + 36.dp)).toInt().coerceIn(1, 6)
                 val openEditor: (Long?) -> Unit = { editingId = it; error = null; editing = true }
                 val card: @Composable (DriverProfile) -> Unit = { profile ->
                     DriverProfileCard(profile, avatarSize, managing, { select(profile) }, { openEditor(profile.driver.id) }, { error = null; deletingId = profile.driver.id }, enabled = inputEnabled)
