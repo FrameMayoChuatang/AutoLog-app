@@ -67,20 +67,17 @@ internal fun DrivingRestrictionGate(
             inputEnabled = false,
             footer = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(if (ux.ready) "차량 정보 수신 대기 · 차량 상태 확인 후 운행을 시작할 수 있습니다."
-                        else "주행 제한 정보를 확인 중입니다. 차량 상태 확인 후 운행을 시작할 수 있습니다.",
-                        color = VehicleUi.Secondary, fontSize = 20.sp)
-                    val receiving = state.vehicle.serviceRunning && state.vehicle.collector == CollectorStatus.RUNNING
-                    if (!ux.ready) {
-                        Text(when (ux.failure) {
+                    val message = if (ux.ready) "차량 정보 수신 대기 · 차량 상태 확인 후 운행을 시작할 수 있습니다."
+                        else when (ux.failure) {
                             DrivingUxFailure.WAITING -> "주행 제한 정보 수신 대기 · 입력 잠금"
                             DrivingUxFailure.DISCONNECTED -> "주행 제한 서비스 연결 끊김 · 입력 잠금"
                             DrivingUxFailure.READ_FAILED -> "주행 제한 정보를 읽을 수 없음 · 입력 잠금"
                             DrivingUxFailure.API_UNAVAILABLE -> "주행 제한 API 미지원 · 입력 잠금"
-                        }, color = VehicleUi.Secondary, fontSize = 20.sp)
-                        if (gear == VehicleGear.GEAR_PARK && receiving) OutlinedButton(onClick = onRetryRestrictions) {
-                            Text("제한 정보 다시 연결", fontSize = 20.sp, color = VehicleUi.Primary)
                         }
+                    Text(message, color = VehicleUi.Secondary, fontSize = 20.sp)
+                    val receiving = state.vehicle.serviceRunning && state.vehicle.collector == CollectorStatus.RUNNING
+                    if (!ux.ready && gear == VehicleGear.GEAR_PARK && receiving) OutlinedButton(onClick = onRetryRestrictions) {
+                        Text("제한 정보 다시 연결", fontSize = 20.sp, color = VehicleUi.Primary)
                     }
                 }
             },

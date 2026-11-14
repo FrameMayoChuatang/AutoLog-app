@@ -150,7 +150,8 @@ internal fun DriverSelectionScreen(
                     Text("차량 상태가 확인되면 선택할 수 있어요.", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
                 }
             } else BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 32.dp)) {
-                val avatarSize = ((maxWidth - 20.dp * 5) / 6 - 16.dp).coerceIn(120.dp, 148.dp)
+                val compactWaiting = !inputEnabled && maxHeight < 500.dp
+                val avatarSize = if (compactWaiting) 60.dp else ((maxWidth - 20.dp * 5) / 6 - 16.dp).coerceIn(120.dp, 148.dp)
                 val viewportHeight = maxHeight
                 val columns = ((maxWidth + 20.dp) / (avatarSize + 36.dp)).toInt().coerceAtLeast(1)
                 val openEditor: (Long?) -> Unit = { editingId = it; error = null; editing = true }
@@ -164,10 +165,10 @@ internal fun DriverSelectionScreen(
                     (viewportHeight.roundToPx() - topBarHeight - footerPx).coerceAtLeast(0).toDp()
                 }
                 Column(Modifier.fillMaxSize()) {
-                    Row(Modifier.fillMaxWidth().onSizeChanged { topBarHeight = it.height }.padding(top = 24.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (!compactWaiting) Row(Modifier.fillMaxWidth().onSizeChanged { topBarHeight = it.height }.padding(top = 24.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
                             enabled = inputEnabled,
-                            onClick = { managing = !managing }, shape = RoundedCornerShape(12.dp),
+                            onClick = { if (inputEnabled) managing = !managing }, shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.widthIn(min = 180.dp).heightIn(min = 72.dp),
                             contentPadding = PaddingValues(horizontal = 28.dp, vertical = 16.dp),
                             border = BorderStroke(1.dp, if (managing) Color.White else SelectionColors.outline),
@@ -179,7 +180,7 @@ internal fun DriverSelectionScreen(
                         Spacer(Modifier.weight(1f))
                         if (!managing) OutlinedButton(
                             enabled = inputEnabled,
-                            onClick = { keyboard?.hide(); onOpenRecords() }, shape = RoundedCornerShape(12.dp),
+                            onClick = { if (inputEnabled) { keyboard?.hide(); onOpenRecords() } }, shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.widthIn(min = 180.dp).heightIn(min = 72.dp),
                             contentPadding = PaddingValues(horizontal = 28.dp, vertical = 16.dp),
                             border = BorderStroke(1.dp, SelectionColors.outline),
@@ -203,25 +204,25 @@ internal fun DriverSelectionScreen(
                                     Modifier.fillMaxWidth().layout { measurable, constraints ->
                                         val group = measurable.measure(constraints)
                                         // 고정 탑바·차량 카드와 더보기 공간을 제외한 실제 목록 영역 안에서 중앙을 맞춘다.
-                                        val buttonSpace = if (others.isNotEmpty()) 104.dp.roundToPx() else 0
+                                        val buttonSpace = if (others.isNotEmpty() && !compactWaiting) 104.dp.roundToPx() else 0
                                         val available = viewportHeight.roundToPx() - topBarHeight - footerPx - group.height - buttonSpace
                                         val top = (available / 2).coerceAtLeast(0)
                                         layout(group.width, top + group.height) { group.placeRelative(0, top) }
                                     },
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
-                                    DriverSearchBar(
+                                    if (!compactWaiting) DriverSearchBar(
                                         query, { query = it }, { keyboard?.hide() },
                                         Modifier.padding(bottom = 32.dp)
                                             .onGloballyPositioned { searchBounds = it.boundsInWindow() }
                                             .graphicsLayer { alpha = if (searching) 0f else 1f },
-                                        onOpen = { searching = true },
+                                        onOpen = { if (inputEnabled) searching = true },
                                         enabled = inputEnabled,
                                     )
-                                    Text(if (managing) "프로필 관리" else "운전자의 프로필을 선택하세요.", Modifier.fillMaxWidth().padding(bottom = 36.dp), fontSize = 34.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+                                    Text(if (managing) "프로필 관리" else "운전자의 프로필을 선택하세요.", Modifier.fillMaxWidth().padding(bottom = if (compactWaiting) 20.dp else 36.dp), fontSize = if (compactWaiting) 26.sp else 34.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
                                     ProfileRow {
                                         recent.forEach { card(it) }
-                                        if (!managing) {
+                                        if (!managing && !compactWaiting) {
                                             Column(Modifier.width(avatarSize + 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Surface(
                                                     enabled = inputEnabled,
@@ -234,7 +235,7 @@ internal fun DriverSelectionScreen(
                                     }
                                 }
                             }
-                        if (others.isNotEmpty() && !showingMore) {
+                        if (others.isNotEmpty() && !showingMore && !compactWaiting) {
                             OutlinedButton(
                                 enabled = inputEnabled,
                                 onClick = { showingMore = true },
@@ -378,13 +379,13 @@ internal fun DriverSearchBar(query: String, onQuery: (String) -> Unit, onSearch:
             }
         } else Surface(Modifier.fillMaxWidth(), shape = CircleShape, color = Color.White) {
             OutlinedTextField(
-                query, onQuery, modifier = Modifier.padding(start = 16.dp).fillMaxWidth().heightIn(min = 64.dp).semantics { contentDescription = "운전자 이름 검색" },
+                query, onQuery, enabled = enabled, modifier = Modifier.padding(start = 16.dp).fillMaxWidth().heightIn(min = 64.dp).semantics { contentDescription = "운전자 이름 검색" },
                 shape = CircleShape, singleLine = true, placeholder = { Text("운전자 이름 검색...", color = Color(0xFF808088), fontSize = 20.sp) },
                 textStyle = TextStyle(color = Color(0xFF171719), fontSize = 20.sp),
                 colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, focusedBorderColor = Color.White, unfocusedBorderColor = Color.White, cursorColor = Color.Black),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 trailingIcon = {
-                    Surface(onClick = onSearch, Modifier.padding(6.dp).size(52.dp).semantics { contentDescription = "운전자 검색" }, shape = CircleShape, color = Color.Black) {
+                    Surface(onClick = onSearch, enabled = enabled, modifier = Modifier.padding(6.dp).size(52.dp).semantics { contentDescription = "운전자 검색" }, shape = CircleShape, color = Color.Black) {
                         Box(contentAlignment = Alignment.Center) { ProfileIcon("search", Modifier.size(28.dp), Color.White) }
                     }
                 },
