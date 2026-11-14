@@ -52,13 +52,22 @@ class HttpDriverApiTest {
         assertEquals(ApiOutcome.Retry, api().list())
     }
 
-    @Test fun registerSendsNameAndDepartmentAndParsesCreated() = runBlocking {
-        status = 201; body = driverJson("PENDING")
+    @Test fun registerSendsNameAndDepartmentAndParsesActiveDriver() = runBlocking {
+        status = 201; body = driverJson("ACTIVE")
         val r = api().register("Kim", "영업") as ApiOutcome.Ok
         assertEquals("POST", method)
         assertEquals("/api/device/drivers", path)
         assertEquals(setOf("name", "department"), JSONObject(sent).keys().asSequence().toSet())
-        assertEquals(DriverStatus.PENDING, r.value.status)
+        assertEquals(RemoteDriver(id, "Kim", "영업", DriverStatus.ACTIVE), r.value)
+    }
+
+    @Test fun registerPreservesLegacyPendingAndDoesNotActivateUnknownStatus() = runBlocking {
+        status = 201
+        for (value in listOf("PENDING", "SUSPENDED")) {
+            body = driverJson(value)
+            val r = api().register("Kim", "영업") as ApiOutcome.Ok
+            assertEquals(value, DriverStatus.PENDING, r.value.status)
+        }
     }
 
     @Test fun consentSendsGrantedAndNoticeVersionToDriverPath() = runBlocking {

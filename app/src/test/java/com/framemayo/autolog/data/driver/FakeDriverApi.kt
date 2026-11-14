@@ -9,6 +9,7 @@ class FakeDriverApi : DriverApi {
 
     @Volatile var loseNextRegisterResponse = false
     @Volatile var failConsent = false
+    var registrationStatus = DriverStatus.ACTIVE
 
     val server = mutableListOf<RemoteDriver>()
     val registered = mutableListOf<Pair<String, String>>()
@@ -27,7 +28,7 @@ class FakeDriverApi : DriverApi {
     override suspend fun register(name: String, department: String): ApiOutcome<RemoteDriver> {
         gate<RemoteDriver>()?.let { return it }
         registered += name to department
-        val d = RemoteDriver("00000000-0000-4000-8000-%012d".format(++next), name, department, DriverStatus.PENDING)
+        val d = RemoteDriver("00000000-0000-4000-8000-%012d".format(++next), name, department, registrationStatus)
         server += d
         if (loseNextRegisterResponse) {
             loseNextRegisterResponse = false
