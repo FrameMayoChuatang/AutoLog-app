@@ -245,6 +245,36 @@ class DrivingRestrictionTest {
     }
 
     @Test
+    @Config(qualifiers = "w800dp-h600dp-land-night-mdpi")
+    fun mediumWaitingKeepsFiveProfilesInOneVisibleRow() {
+        state.value = state.value.copy(vehicle = parked.copy(collector = CollectorStatus.RETRYING),
+            profiles = (1L..7L).map {
+                DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0)
+            })
+        show()
+        val profiles = (1..5).map { id -> compose.onNodeWithContentDescription("운전자$id 프로필 선택")
+            .assertIsDisplayed().assertIsNotEnabled().fetchSemanticsNode().boundsInRoot }
+        profiles.forEach { assertEquals(profiles.first().top, it.top, 1f) }
+        compose.onNodeWithText("차량 정보 수신 대기 · 차량 상태 확인 후 운행을 시작할 수 있습니다.").assertIsDisplayed()
+        compose.onAllNodes(hasClickAction() and isEnabled()).assertCountEquals(0)
+        screenshot("selection-waiting-medium")
+    }
+
+    @Test
+    @Config(qualifiers = "w1100dp-h700dp-land-night-mdpi")
+    fun shortWideWaitingKeepsProfilesAndRestrictionRetryVisible() {
+        state.value = state.value.copy(profiles = (1L..5L).map {
+            DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0)
+        })
+        ux.value = DrivingUxState(failure = DrivingUxFailure.READ_FAILED)
+        show()
+        for (id in 1..5) compose.onNodeWithContentDescription("운전자$id 프로필 선택")
+            .assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithText("제한 정보 다시 연결").assertIsDisplayed()
+        compose.onAllNodes(hasClickAction() and isEnabled()).assertCountEquals(1)
+    }
+
+    @Test
     @Config(qualifiers = "w640dp-h360dp-land-night-mdpi")
     fun compactRestrictionFailureKeepsRetryAndTripValuesVisible() {
         ux.value = DrivingUxState(failure = DrivingUxFailure.READ_FAILED)
