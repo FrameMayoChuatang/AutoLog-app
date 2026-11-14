@@ -107,17 +107,35 @@ adb shell am start --user $(adb shell am get-current-user) -n com.framemayo.auto
 
 ```sh
 adb forward tcp:8088 tcp:8088
+# 별도 터미널에서 실행해 두거나 아래 백그라운드 실행 방법 사용
+python3 -B scripts/console-session-keeper.py
+```
+
+연결 유지가 시작된 뒤 다른 터미널에서 시연용 값을 설정한다.
+
+```sh
 curl -X PUT "http://127.0.0.1:8088/vehicle/gear?gear=Park"
 curl -X PUT "http://127.0.0.1:8088/vehicle/odometer?traveled_distance_km=1000"
 ```
 
 브라우저에서 `http://127.0.0.1:8088/`을 열어 같은 값을 화면으로 바꿀 수도 있다.
 
-**콘솔 웹 페이지는 시연 내내 화면에 띄워 둔다(#172).** 페이지를 닫거나 다른 창 뒤로 보내면 몇 분 안에 콘솔 누적거리 연결이 끊긴다(페이지 위 배지 `DDS OFFLINE`, curl 응답 `emulator_inactive`). 그러면 앱이 `차량 정보 수신 대기`로 입력을 잠근다.
+**연결 유지 스크립트를 실행하면 콘솔 웹 페이지를 닫아도 된다.** 콘솔은 브라우저 세션의 주기적 신호로 DDS를 활성화한다. 스크립트가 별도 client ID로 같은 연결 유지 신호를 1초마다 보내므로 탭 종료·백그라운드 타이머 지연의 영향을 받지 않는다. 차량 값을 직접 발행하거나 앱의 입력 잠금을 해제하는 기능은 아니다.
 
-- 잠기면 콘솔 페이지를 다시 연다. 배지가 `DDS ONLINE`이 되고 30초 안에 앱이 풀린다.
+```sh
+# macOS/Linux, 저장소 루트에서 백그라운드 실행
+nohup python3 -B scripts/console-session-keeper.py > /tmp/autolog-console-session.log 2>&1 &
+python3 -B scripts/console-session-keeper.py status
+# 시연 종료 후 중지 (자신의 client 세션만 해제)
+python3 -B scripts/console-session-keeper.py stop
+```
+
+- `status`는 프로세스 실행 여부다. 실제 DDS 준비 상태는 콘솔의 `DDS ONLINE` 또는 `/vehicle/state`의 `odometer.bridge_ready`·`emulator_active`로 확인한다.
+- 사용자별 잠금으로 중복 실행을 막는다. `stop`은 종료 요청이며 최대 약 3초 후 종료된다. 기존 PID에 신호를 보내지 않아 다른 프로세스를 잘못 종료하지 않는다. 직접 실행 중에는 Ctrl+C도 가능하다.
+- 연결 실패 시 재시도한다. 에뮬레이터 재시작 후에는 `adb forward tcp:8088 tcp:8088`을 다시 실행한다. 컴퓨터 재부팅 후에는 스크립트도 다시 실행해야 한다. 자동 시작 등록은 하지 않는다.
+- 스크립트 없이 콘솔 페이지를 닫으면 기존처럼 연결이 만료된다(#172). 스크립트를 실행하거나 콘솔 페이지를 다시 열면 정상 수신 후 최대 30초 내 앱 입력이 복구된다.
 - 잠긴 동안 누른 버튼(차량 연결 등)은 반영되지 않는다. 풀린 뒤 다시 누른다.
-- 에뮬레이터를 다시 켠 직후에도 콘솔 페이지를 열어야 연결된다.
+- 벤더 내부 `/browser/session` API에 의존하는 개발 도구다. Pleos 이미지 업데이트 시 호환성을 재검증한다. 재연결 시 벤더의 에뮬레이터 활성화 동작은 발생할 수 있으므로 실제 주행 데이터 검증 환경과 구분한다.
 
 - 현재 벤더 이미지에서 SDK 누적거리 전달이 정상적이지 않아, 위 debug 빌드는 `-PconsoleOdometer=true`로 콘솔 거리를 읽는다. 기본 Debug와 모든 Release는 SDK 경로다. 진행 중인 운행에서 서로 다른 거리 출처의 APK로 바꾸지 않는다.
 - **콘솔 자체는 속도와 누적거리를 따로 관리한다.** 수동으로 거리를 올리거나, 별도 터미널에서 `python3 scripts/console-driving-simulator.py`를 실행해 D/R 속도와 경과 시간으로 모의 거리를 발행한다. 스크립트는 P·연결 실패에서 적산을 멈춘다.
@@ -188,7 +206,7 @@ curl -X PUT "http://127.0.0.1:8088/vehicle/ev-battery?field=charge_port_open&val
 |---|---|---|
 | "차량 연결이 필요합니다" | 차량이 서버에 연결되지 않음 | 6번대로 페어링 |
 | "주행거리 수신 대기" | 누적거리가 0 km | 5번대로 누적거리 입력 |
-| "차량 정보 수신 대기"로 화면이 잠김 | 콘솔 웹 페이지가 닫혀 콘솔 누적거리 연결이 끊김 | 콘솔 페이지를 다시 열고 30초 기다림. 잠긴 동안 누른 버튼은 다시 누름 |
+| "차량 정보 수신 대기"로 화면이 잠김 | 콘솔 세션 만료 또는 adb 연결 실패 | 연결 유지 스크립트와 adb forward 확인. 정상 수신 후 최대 30초 대기. 스크립트 없이 사용한다면 콘솔 페이지를 다시 열기 |
 | 위치 동의 후 "알 수 없는 작업 실행" 권한 창 | Pleos 위치 권한(`pleos.car.permission.FUSED_LOCATION`)에 에뮬레이터 설명 문구가 없음 | `허용`. 앞의 Android 위치 권한 창도 `앱 사용 중에만 허용` |
 | "서버에 연결할 수 없습니다" | 서버가 꺼졌거나 에뮬레이터 Wi‑Fi가 끊김 | 1번 health 확인, 3번 Wi‑Fi 확인 |
 | "페어링 코드가 올바르지 않거나 만료" | 코드가 10분 지났거나 이미 사용됨 | `pair`로 새 코드 발급 |

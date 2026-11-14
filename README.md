@@ -164,6 +164,8 @@ app/src/main/java/com/framemayo/autolog
 
 ### 개발용 가속 조작과 모의 거리 연결 (#119)
 
+콘솔 탭을 닫아도 차량 신호 연결을 유지하려면 별도 터미널에서 `python3 -B scripts/console-session-keeper.py`를 실행합니다. `status`로 실행 여부, `stop`으로 종료를 요청할 수 있습니다. 백그라운드 실행·재연결 절차는 [시연 환경 안내](docs/DEMO_ENVIRONMENT.md#5-누적거리와-기어-virtual-console)를 참고하세요. 이 스크립트는 연결만 유지하며 아래 모의 거리 생성기와 별개입니다.
+
 Virtual Console의 가속/브레이크는 속도와 누적거리를 따로 관리합니다. 에뮬레이터 시연에서 가속에 따라 거리가 증가하게 하려면 콘솔 거리 옵션으로 빌드한 앱과 함께 아래 스크립트를 실행합니다. macOS/Linux의 Python 3 표준 라이브러리만 사용합니다.
 
 ```sh
