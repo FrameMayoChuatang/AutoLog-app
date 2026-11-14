@@ -29,18 +29,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framemayo.autolog.data.link.VehicleLinkRepository
+import com.framemayo.autolog.data.link.VehicleLink
 import com.framemayo.autolog.data.local.DriverEntity
 
 @Composable
@@ -111,6 +114,33 @@ internal fun ConsentPromptDialog(
                             VehiclePrimaryButton(agreeText, onAgree, Modifier.weight(1f).heightIn(min = 64.dp))
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun VehicleLinkStatusCard(link: VehicleLink?) {
+    val status = if (link == null) "연결된 차량 없음" else "연결됨"
+    val statusColor = if (link == null) VehicleUi.Secondary else VehicleUi.Positive
+    BoxWithConstraints(Modifier.fillMaxWidth().testTag("vehicle-link-status")) {
+        if (maxWidth < 640.dp || maxHeight < 500.dp) Surface(shape = RoundedCornerShape(24.dp), color = VehicleUi.Surface) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("차량 연결", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = VehicleUi.Primary)
+                    Text(status, fontSize = 18.sp, color = statusColor)
+                }
+                if (link != null) Text(listOf(link.registrationNumber, link.model).filter { it.isNotBlank() }.joinToString(" · "),
+                    fontSize = 20.sp, color = VehicleUi.Primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        } else VehicleSection("차량 연결") {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(status, fontSize = VehicleUi.Caption, color = statusColor)
+                if (link != null) {
+                    Text(link.registrationNumber, fontSize = VehicleUi.Value, fontWeight = FontWeight.Bold, color = VehicleUi.Primary)
+                    if (link.model.isNotBlank()) Text(link.model, fontSize = VehicleUi.Caption, color = VehicleUi.Secondary)
                 }
             }
         }
