@@ -1,6 +1,7 @@
 package com.framemayo.autolog.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -13,12 +14,16 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -31,8 +36,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +59,7 @@ import androidx.compose.ui.text.style.TextAlign
 import com.framemayo.autolog.R
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -61,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.framemayo.autolog.data.local.DriverProfile
 
 /** 상단 검색창의 위치에서 입력창이 이동하며, 검색어는 선택 화면과 같은 상태를 사용한다. */
@@ -80,6 +90,8 @@ internal fun DriverSearchDialog(
     val keyboard = LocalSoftwareKeyboardController.current
     var inputFocused by remember { mutableStateOf(false) }
     var targetBounds by remember { mutableStateOf(Rect.Zero) }
+    var closing by remember { mutableStateOf(false) }
+    var selectedProfile by remember { mutableStateOf<DriverProfile?>(null) }
     val results = remember(profiles, query) {
         val searchText = query.trim()
         profiles.filter { it.displayName.contains(searchText, ignoreCase = true) }
@@ -93,10 +105,13 @@ internal fun DriverSearchDialog(
             0f, 0f, 0f, 1f, 0f,
         )))
     }
-    val dismiss = { keyboard?.hide(); onDismiss() }
+    val dismiss = { keyboard?.hide(); closing = true }
 
-    LaunchedEffect(targetBounds != Rect.Zero) {
-        if (targetBounds != Rect.Zero) {
+    LaunchedEffect(targetBounds != Rect.Zero, closing) {
+        if (closing) {
+            progress.animateTo(0f, tween(240, easing = FastOutSlowInEasing))
+            selectedProfile?.let(onSelect) ?: onDismiss()
+        } else if (targetBounds != Rect.Zero) {
             progress.animateTo(1f, tween(360, easing = FastOutSlowInEasing))
             focus.requestFocus()
             keyboard?.show()
@@ -104,26 +119,63 @@ internal fun DriverSearchDialog(
     }
     Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         val focusManager = LocalFocusManager.current
+        val view = LocalView.current
+        val window = (view.parent as? DialogWindowProvider)?.window
+        var visibleOcclusionPx by remember { mutableIntStateOf(0) }
+        // 차량용 IME가 Compose inset을 주지 않아도 실제 가용 창 영역으로 가림을 확인한다.
+        DisposableEffect(view) {
+            val root = view.rootView
+            val frame = android.graphics.Rect()
+            val location = IntArray(2)
+            val listener = android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                root.getWindowVisibleDisplayFrame(frame)
+                root.getLocationOnScreen(location)
+                visibleOcclusionPx = (location[1] + root.height - frame.bottom).coerceIn(0, root.height)
+            }
+            root.viewTreeObserver.addOnGlobalLayoutListener(listener)
+            onDispose {
+                if (root.viewTreeObserver.isAlive) root.viewTreeObserver.removeOnGlobalLayoutListener(listener)
+            }
+        }
+        // 키보드 옆에 드러난 앱 영역까지 같은 농도로 어둡게 하고 전환과 함께 복원한다.
+        val dimAmount = 0.65f * progress.value
+        SideEffect {
+            window?.setDimAmount(dimAmount)
+            // 시스템의 화면 밀기 대신 IME inset을 이용해 모달 자체를 이동한다.
+            @Suppress("DEPRECATION") // Pleos IME의 가용 창 영역 전달에 필요하다.
+            if (window?.attributes?.softInputMode != android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE) {
+                window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            }
+        }
         BoxWithConstraints(
             Modifier.fillMaxSize()
                 .semantics { contentDescription = "검색 모달 배경" }
-                .pointerInput(Unit) {
+                .pointerInput(closing) {
                     detectTapGestures {
+                        if (closing) return@detectTapGestures
                         if (inputFocused) {
                             focusManager.clearFocus()
                             keyboard?.hide()
                         } else dismiss()
                     }
                 }
-                .safeDrawingPadding().imePadding().padding(horizontal = 24.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center,
+                .systemBarsPadding().displayCutoutPadding().padding(horizontal = 24.dp, vertical = 8.dp),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            val compactHeight = maxHeight < 360.dp
+            val imeHeight = with(density) { maxOf(WindowInsets.ime.exclude(WindowInsets.systemBars).getBottom(this), visibleOcclusionPx).toDp() }
+            val availableHeight = (maxHeight - imeHeight).coerceAtLeast(0.dp)
+            val targetHeight = minOf(640.dp, availableHeight)
+            val dialogHeight by animateDpAsState(targetHeight, tween(240, easing = FastOutSlowInEasing), label = "searchDialogHeight")
+            val freeHeight = availableHeight - targetHeight
+            val targetTop = (freeHeight / 2 + if (imeHeight > 0.dp) 12.dp else 0.dp).coerceAtMost(freeHeight)
+            val topGap by animateDpAsState(targetTop, tween(240, easing = FastOutSlowInEasing), label = "searchDialogTop")
+            val compactHeight = dialogHeight < 360.dp
             val verticalPadding = if (compactHeight) 12.dp else 32.dp
             val horizontalPadding = if (compactHeight) 24.dp else 40.dp
             val closeButton: @Composable () -> Unit = {
                 OutlinedButton(
                     onClick = dismiss,
+                    enabled = !closing,
                     modifier = Modifier.fillMaxWidth().height(56.dp).semantics { contentDescription = "검색 닫기" },
                     shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFF696B75)),
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFF25262D), contentColor = Color.White),
@@ -131,7 +183,7 @@ internal fun DriverSearchDialog(
             }
             // 바깥 탭은 입력 종료 후 다음 탭에 모달을 닫고, 내부 빈 영역은 포커스만 해제한다.
             // 입력창·결과 버튼이 소비한 터치는 부모의 닫기 동작으로 전달되지 않는다.
-            Box(Modifier.widthIn(max = 840.dp).fillMaxWidth().height(minOf(640.dp, maxHeight))
+            Box(Modifier.padding(top = topGap).widthIn(max = 840.dp).fillMaxWidth().height(dialogHeight)
                 .pointerInput(Unit) {
                     detectTapGestures {
                         focusManager.clearFocus()
@@ -173,7 +225,8 @@ internal fun DriverSearchDialog(
                             }
                             items(results, key = { it.driver.id }) { profile ->
                                 Surface(
-                                    onClick = { keyboard?.hide(); onSelect(profile) },
+                                    onClick = { selectedProfile = profile; dismiss() },
+                                    enabled = !closing,
                                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = "${profile.displayName} 검색 결과 선택" },
                                     shape = RoundedCornerShape(16.dp), color = Color(0xFF25262D),
                                 ) {
@@ -212,7 +265,7 @@ internal fun DriverSearchDialog(
                             translationX = (sourceBounds.center.x - targetBounds.center.x) * remaining
                             translationY = (sourceBounds.center.y - targetBounds.center.y) * remaining
                         }
-                    }, maxWidth = 760.dp)
+                    }, maxWidth = 760.dp, enabled = !closing)
                 }
             }
         }
