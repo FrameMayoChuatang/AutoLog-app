@@ -42,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -76,15 +77,15 @@ internal fun DriverProfileEditor(
         MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF141416))) {
             BoxWithConstraints(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                 val stacked = maxWidth < 640.dp
-                val dialogHeight = minOf(maxHeight, 840.dp)
+                val dialogHeight = minOf(maxHeight, if (stacked) 840.dp else 720.dp)
                 val short = dialogHeight < 500.dp
-                Surface(Modifier.widthIn(max = 1200.dp).fillMaxWidth().height(dialogHeight), shape = RoundedCornerShape(24.dp), color = Color.White) {
+                Surface(Modifier.widthIn(max = 1200.dp).fillMaxWidth().height(dialogHeight).testTag("profile-editor"), shape = RoundedCornerShape(24.dp), color = Color.White) {
                     Box {
                         val editor: @Composable (Modifier) -> Unit = { modifier ->
                             Column(modifier) {
-                                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(28.dp)) {
+                                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp)) {
                                     Text(if (profile == null) "프로필 생성" else "프로필 수정", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-                                    Spacer(Modifier.height(28.dp))
+                                    Spacer(Modifier.height(20.dp))
                                     Text("이름", color = Color(0xFF626269), fontSize = 20.sp)
                                     Spacer(Modifier.height(8.dp))
                                     OutlinedTextField(
@@ -93,15 +94,15 @@ internal fun DriverProfileEditor(
                                         placeholder = { Text("이름을 입력하세요", fontSize = 20.sp) }, singleLine = true,
                                         textStyle = TextStyle(fontSize = 20.sp), shape = RoundedCornerShape(12.dp),
                                     )
-                                    Spacer(Modifier.height(24.dp))
+                                    Spacer(Modifier.height(20.dp))
                                     Text("색상", color = Color(0xFF626269), fontSize = 20.sp)
                                     Spacer(Modifier.height(12.dp))
                                     ProfileColorPicker(color, enabled = !busy, onColor = { color = it })
-                                    Spacer(Modifier.height(24.dp))
+                                    Spacer(Modifier.height(20.dp))
                                     Text("표정", color = Color(0xFF626269), fontSize = 20.sp)
                                     Spacer(Modifier.height(12.dp))
                                     ProfileExpressionPicker(expression, enabled = !busy, onExpression = { expression = it })
-                                    Spacer(Modifier.height(24.dp))
+                                    Spacer(Modifier.height(20.dp))
                                     Text("캐릭터", color = Color(0xFF626269), fontSize = 20.sp)
                                     Spacer(Modifier.height(12.dp))
                                     ProfilePresetPicker(color, expression, enabled = !busy) { preset ->
