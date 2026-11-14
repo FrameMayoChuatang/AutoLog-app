@@ -91,6 +91,7 @@ class DriverSelectionScreenTest {
         compose.setContent { DriverSelectionScreen(many, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {}) }
         compose.onNodeWithText("더보기").performClick()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("운전자12"))
+        screenshot("expanded-six-columns")
         val first = compose.onNodeWithContentDescription("운전자6 프로필 선택").getUnclippedBoundsInRoot()
         val sixth = compose.onNodeWithContentDescription("운전자11 프로필 선택").getUnclippedBoundsInRoot()
         val seventh = compose.onNodeWithContentDescription("운전자12 프로필 선택").getUnclippedBoundsInRoot()
