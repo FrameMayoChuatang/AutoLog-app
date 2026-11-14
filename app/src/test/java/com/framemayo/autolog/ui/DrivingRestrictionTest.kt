@@ -2,8 +2,14 @@ package com.framemayo.autolog.ui
 
 import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.framemayo.autolog.data.local.DriverEntity
@@ -19,6 +25,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class, qualifiers = "w1100dp-h900dp-land-night-mdpi")
@@ -38,8 +45,10 @@ class DrivingRestrictionTest {
 
     private fun show(onRetry: () -> Unit = {}) = compose.setContent {
         AutoLogTheme {
-            DrivingRestrictionGate(state.value, ux.value, onRetryRestrictions = onRetry) {
-                DriverSelectionScreen(state.value.profiles, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {})
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                DrivingRestrictionGate(state.value, ux.value, onRetryRestrictions = onRetry) {
+                    DriverSelectionScreen(state.value.profiles, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {})
+                }
             }
         }
     }
@@ -110,6 +119,40 @@ class DrivingRestrictionTest {
         compose.onAllNodes(hasClickAction()).assertCountEquals(0)
     }
 
+    @Test fun waitingDashboardUsesDisplayAreaWithoutInventingTripValues() {
+        state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE,
+            collector = CollectorStatus.RETRYING, odometerKm = null))
+        show()
+        compose.onNodeWithText("차량 정보 수신 대기").assertIsDisplayed()
+        compose.onNodeWithText("진행 중인 운행 없음").assertIsDisplayed()
+        compose.onAllNodesWithText("—").assertCountEquals(2)
+        compose.onNodeWithText("0.0 km").assertDoesNotExist()
+        compose.onAllNodes(hasClickAction()).assertCountEquals(0)
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        val panel = compose.onNodeWithTag("driving-dashboard").fetchSemanticsNode().boundsInRoot
+        assertTrue(panel.width >= root.width * 0.9f)
+        assertTrue(panel.height >= root.height * 0.65f)
+        screenshot("waiting-wide")
+    }
+
+    @Test fun wideDashboardKeepsDriverAboveEqualReadableMetrics() {
+        state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE),
+            activeTrip = TripEntity(id = 1, driverId = 1, startedAt = 0, startOdometerKm = 100f,
+                lastOdometerKm = 112.4f, lastSavedAt = 25 * 60_000L, endedAt = 25 * 60_000L))
+        show()
+        val driver = compose.onNodeWithTag("driving-driver").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val distance = compose.onNodeWithTag("metric-주행 거리").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val time = compose.onNodeWithTag("metric-주행 시간").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue(driver.bottom <= distance.top)
+        assertEquals(distance.width, time.width, 1f)
+        assertEquals(distance.top, time.top, 1f)
+        assertTrue(compose.onNodeWithText("12.4 km").assertIsDisplayed().fetchSemanticsNode().boundsInRoot.height >
+            compose.onNodeWithText("주행 거리").fetchSemanticsNode().boundsInRoot.height * 2)
+        compose.onNodeWithText("25분").assertIsDisplayed()
+        compose.onAllNodes(hasClickAction()).assertCountEquals(0)
+        screenshot("active-wide")
+    }
+
     @Test fun restrictionFailureExplainsLockAndRetryDoesNotUnlockBeforeConfirmedState() {
         ux.value = DrivingUxState(failure = DrivingUxFailure.READ_FAILED)
         var retries = 0
@@ -146,6 +189,7 @@ class DrivingRestrictionTest {
         compose.onNodeWithText("주행 제한 정보를 읽을 수 없음 · 입력 잠금").assertIsDisplayed()
         compose.onNodeWithText("1.0 km").assertIsDisplayed()
         compose.onNodeWithText("1분").assertIsDisplayed()
+        screenshot("restriction-compact")
     }
 
     @Test
@@ -161,5 +205,16 @@ class DrivingRestrictionTest {
         compose.onNodeWithText("주행 거리").assertIsDisplayed()
         compose.onNodeWithText("주행 시간").assertIsDisplayed()
         compose.onNodeWithText("검색과 편집은 주차 후 이용해 주세요.").assertDoesNotExist()
+    }
+
+    private fun screenshot(name: String) {
+        compose.runOnIdle {
+            val view = compose.activity.window.decorView
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val file = File("build/reports/driving-dashboard/$name.png")
+            file.parentFile?.mkdirs()
+            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
     }
 }
