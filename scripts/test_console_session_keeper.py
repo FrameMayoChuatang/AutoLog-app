@@ -136,6 +136,57 @@ class KeeperTest(unittest.TestCase):
         self.assertIsNone(second.poll())
         self.assertNotEqual(first_client, self.calls[-1][1])
 
+    def test_delayed_stop_cannot_target_a_replacement_process(self):
+        first = self.start()
+        self.wait_for(lambda: len(self.calls) >= 1)
+        first_query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.calls[0][1]).query)
+        code = '''
+import importlib.util, sys, time
+from pathlib import Path
+s = importlib.util.spec_from_file_location('keeper', sys.argv[1])
+m = importlib.util.module_from_spec(s)
+s.loader.exec_module(m)
+directory = Path(sys.argv[3])
+original = m.fcntl.flock
+def delayed_failure(fd, operation):
+    try:
+        return original(fd, operation)
+    except BlockingIOError:
+        (directory / 'stop-paused').touch()
+        deadline = time.monotonic() + 10
+        while not (directory / 'resume-stop').exists():
+            if time.monotonic() > deadline:
+                raise RuntimeError('stop 재개 신호 없음')
+            time.sleep(0.01)
+        raise
+m.fcntl.flock = delayed_failure
+sys.exit(m.control('stop', sys.argv[2], directory))
+'''
+        stop = subprocess.Popen([sys.executable, '-B', '-c', code, str(SCRIPT), self.url, self.directory.name],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.processes.append(stop)
+        paused = Path(self.directory.name) / 'stop-paused'
+        deadline = time.monotonic() + 5
+        while not paused.exists():
+            self.assertLess(time.monotonic(), deadline, 'stop 잠금 실패 지점 대기 시간 초과')
+            time.sleep(0.01)
+        first.terminate()
+        self.assertEqual(0, first.wait(timeout=5))
+        second = self.start()
+        # stop이 client ID를 읽기 직전에 멈춘 동안 대체 프로세스 시작을 시도한다.
+        # 제어 잠금이 없다면 이 구간에서 새 ID가 게시되어 이전 stop의 대상이 바뀐다.
+        time.sleep(0.3)
+        self.assertEqual(first_query['client'][0],
+                         (Path(self.directory.name) / 'session.lock').read_text().strip())
+        (Path(self.directory.name) / 'resume-stop').touch()
+        self.assertEqual(0, stop.wait(timeout=5))
+        self.assertEqual(first_query['client'][0], (Path(self.directory.name) / 'stop').read_text())
+        self.wait_for(lambda: len({urllib.parse.parse_qs(urllib.parse.urlsplit(p).query)['client'][0]
+                                   for _, p, _ in self.calls}) == 2)
+        self.assertIsNone(second.poll())
+        self.command('stop')
+        self.assertEqual(0, second.wait(timeout=5))
+
     def test_crashed_process_releases_lock_without_signalling_other_processes(self):
         first = self.start()
         self.wait_for(lambda: len(self.calls) >= 1)
