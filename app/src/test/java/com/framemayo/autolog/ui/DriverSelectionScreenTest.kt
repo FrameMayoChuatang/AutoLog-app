@@ -84,6 +84,21 @@ class DriverSelectionScreenTest {
         assertEquals(120f, withoutFooter - withFooter, 2f)
     }
 
+    @Test
+    @Config(qualifiers = "w1700dp-h1200dp-land-night-mdpi")
+    fun expandedProfilesHaveAtMostSixColumnsOnWideScreens() {
+        val many = (1L..30).map { DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0) }
+        compose.setContent { DriverSelectionScreen(many, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {}) }
+        compose.onNodeWithText("더보기").performClick()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("운전자12"))
+        screenshot("expanded-six-columns")
+        val first = compose.onNodeWithContentDescription("운전자6 프로필 선택").getUnclippedBoundsInRoot()
+        val sixth = compose.onNodeWithContentDescription("운전자11 프로필 선택").getUnclippedBoundsInRoot()
+        val seventh = compose.onNodeWithContentDescription("운전자12 프로필 선택").getUnclippedBoundsInRoot()
+        assertEquals(first.top, sixth.top)
+        org.junit.Assert.assertTrue(seventh.top > first.top)
+    }
+
     @Test fun collapsedProfilesDoNotScrollWhenTheyFitButExpandedProfilesDo() {
         show()
         val search = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot
