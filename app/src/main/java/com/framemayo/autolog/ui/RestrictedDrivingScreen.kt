@@ -8,17 +8,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,7 +77,7 @@ internal fun RestrictedDrivingScreen(state: MainUiState, ux: DrivingUxState, onR
     }
     val canRetry = !ux.ready && state.vehicle.gear == VehicleGear.GEAR_PARK && receiving
     BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp), contentAlignment = Alignment.Center) {
-        val compact = maxHeight < 480.dp || maxWidth < 600.dp
+        val compact = maxHeight < 700.dp || maxWidth < 900.dp
         val gap = if (compact) 8.dp else 24.dp
         val panelHeight = if (compact) maxHeight else minOf(maxHeight * 0.78f, 720.dp)
         Column(
@@ -134,11 +138,27 @@ internal fun RestrictedDrivingScreen(state: MainUiState, ux: DrivingUxState, onR
 
 @Composable
 private fun ReadOnlyTripValue(label: String, value: String, modifier: Modifier, compact: Boolean) {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val baseStyle = LocalTextStyle.current
     Surface(modifier.fillMaxHeight().testTag("metric-$label"), shape = RoundedCornerShape(24.dp), color = VehicleUi.Surface) {
-        Column(Modifier.padding(if (compact) 16.dp else 32.dp), verticalArrangement = Arrangement.SpaceBetween) {
+        Column(Modifier.padding(if (compact) 16.dp else 32.dp)) {
             Text(label, fontSize = if (compact) 20.sp else 24.sp, color = VehicleUi.Secondary)
-            Text(value, fontSize = if (compact) 36.sp else 88.sp, fontWeight = FontWeight.SemiBold,
-                color = VehicleUi.Primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(if (compact) 4.dp else 12.dp))
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.BottomStart) {
+                val preferred = if (compact) 36f else 88f
+                val style = baseStyle.copy(fontSize = preferred.sp, lineHeight = (preferred * 1.2f).sp,
+                    fontWeight = FontWeight.SemiBold)
+                val measured = measurer.measure(AnnotatedString(value), style = style, softWrap = false).size
+                // 카드 내부 공간과 글꼴 배율을 함께 반영해 단위까지 한 줄에 보존한다.
+                val scale = with(density) {
+                    minOf(1f, maxWidth.toPx() / measured.width.coerceAtLeast(1),
+                        maxHeight.toPx() / measured.height.coerceAtLeast(1))
+                }
+                Text(value, modifier = Modifier.fillMaxWidth(), style = style.copy(fontSize = (preferred * scale).sp,
+                    lineHeight = (preferred * 1.2f * scale).sp),
+                    color = VehicleUi.Primary, maxLines = 1, softWrap = false)
+            }
         }
     }
 }
