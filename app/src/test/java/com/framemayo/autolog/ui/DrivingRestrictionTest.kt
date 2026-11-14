@@ -10,6 +10,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.framemayo.autolog.data.local.DriverEntity
@@ -205,6 +207,50 @@ class DrivingRestrictionTest {
         compose.onNodeWithText("주행 거리").assertIsDisplayed()
         compose.onNodeWithText("주행 시간").assertIsDisplayed()
         compose.onNodeWithText("검색과 편집은 주차 후 이용해 주세요.").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h600dp-land-night-mdpi")
+    fun mediumHeightKeepsValuesWholeWithRestrictionMessage() {
+        ux.value = DrivingUxState(failure = DrivingUxFailure.READ_FAILED)
+        state.value = state.value.copy(activeTrip = TripEntity(id = 1, driverId = 1,
+            startedAt = 0, endedAt = 25 * 60_000L, lastSavedAt = 25 * 60_000L,
+            startOdometerKm = 100f, lastOdometerKm = 112.4f))
+        show()
+        assertWholeMetric("12.4 km")
+        assertWholeMetric("25분")
+        compose.onNodeWithText("제한 정보 다시 연결").assertIsDisplayed()
+        screenshot("medium-height")
+    }
+
+    @Test
+    @Config(qualifiers = "w700dp-h900dp-land-night-mdpi")
+    fun narrowCardsFitLongValuesAndUnitsWithoutEllipsis() {
+        state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE),
+            activeTrip = TripEntity(id = 1, driverId = 1, startedAt = 0, endedAt = 125 * 60_000L,
+                lastSavedAt = 125 * 60_000L, startOdometerKm = 100f, lastOdometerKm = 12445.6f))
+        show()
+        assertWholeMetric("12345.6 km")
+        assertWholeMetric("125분")
+        compose.onAllNodes(hasClickAction()).assertCountEquals(0)
+        screenshot("narrow-long-values")
+    }
+
+    private fun assertWholeMetric(value: String) {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(value).assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val result = layouts.single()
+        assertFalse("$value: size=${result.size}, width=${result.didOverflowWidth}, height=${result.didOverflowHeight}, lines=${result.lineCount}, style=${result.layoutInput.style}", result.hasVisualOverflow)
+    }
+
+    @Test fun largeValuesFitWideCardsWithoutDroppingUnits() {
+        state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE),
+            activeTrip = TripEntity(id = 1, driverId = 1, startedAt = 0, endedAt = 125 * 60_000L,
+                lastSavedAt = 125 * 60_000L, startOdometerKm = 100f, lastOdometerKm = 12445.6f))
+        show()
+        assertWholeMetric("12345.6 km")
+        assertWholeMetric("125분")
     }
 
     private fun screenshot(name: String) {
