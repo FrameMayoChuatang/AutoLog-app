@@ -11,6 +11,7 @@ from pathlib import Path
 import signal
 import tempfile
 import threading
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -39,9 +40,13 @@ def heartbeat(base, client, closing=False):
     request = urllib.request.Request(base + '/browser/session?' + urllib.parse.urlencode(query), method='POST')
     # 로컬 세션 요청이 시스템 프록시나 리다이렉트로 외부에 전달되지 않게 한다.
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
-    with opener.open(request, timeout=1) as response:
-        if response.status != 200:
-            raise OSError('콘솔 세션 요청 실패')
+    try:
+        with opener.open(request, timeout=1) as response:
+            if response.status != 200:
+                raise OSError('콘솔 세션 요청 실패')
+    except urllib.error.HTTPError as error:
+        error.close()
+        raise
 
 
 def keep_alive(base, client, stopped, stop_requested):
