@@ -10,6 +10,7 @@ captures/
 .externalNativeBuild/
 .cxx/
 *.apk
+!apk/*_release.apk
 *.aab
 
 tools/.demo-state*.json

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 서버는 HTTPS만 쓴다. 콘솔 누적거리 옵션(#115)이 읽는 에뮬레이터 내부 콘솔만 평문을 허용한다(#189). debug는 src/debug의 같은 파일이 덮어쓴다. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

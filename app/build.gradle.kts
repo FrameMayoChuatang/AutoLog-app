@@ -39,17 +39,15 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
-        resValue("bool", "use_console_odometer", "false")
+        resValue("bool", "use_console_odometer",
+            (project.findProperty("consoleOdometer")?.toString()?.toBooleanStrict() ?: false).toString())
         resValue("string", "server_url", "\"$serverUrl\"")
     }
 
     buildTypes {
-        debug {
-            resValue("bool", "use_console_odometer",
-                (project.findProperty("consoleOdometer")?.toString()?.toBooleanStrict() ?: false).toString())
-        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
