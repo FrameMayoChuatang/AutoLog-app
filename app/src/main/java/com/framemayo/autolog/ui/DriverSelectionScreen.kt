@@ -164,7 +164,8 @@ internal fun DriverSelectionScreen(
                 }
                 var topBarHeight by remember { mutableIntStateOf(0) }
                 var footerHeight by remember { mutableIntStateOf(0) }
-                val footerPx = if (managing) 0 else footerHeight
+                // 관리 전환 시에도 기존 차량 카드 높이를 중앙 정렬 기준으로 유지한다.
+                val footerPx = footerHeight
                 val firstPageHeight = with(LocalDensity.current) {
                     (viewportHeight.roundToPx() - topBarHeight - footerPx).coerceAtLeast(0).toDp()
                 }
@@ -196,11 +197,11 @@ internal fun DriverSelectionScreen(
                     LazyColumn(
                         Modifier.weight(1f).fillMaxWidth(), state = listState, horizontalAlignment = Alignment.CenterHorizontally,
                         userScrollEnabled = inputEnabled,
-                        contentPadding = PaddingValues(bottom = 40.dp),
+                        contentPadding = PaddingValues(bottom = if (showingMore) 40.dp else 0.dp),
                     ) {
                         item {
-                            // 펼쳤을 때만 첫 페이지를 줄여, 패널 상단 여백 24dp 아래의 프로필이 48dp 보이게 한다.
-                            val pageHeight = if (showingMore && others.isNotEmpty()) (firstPageHeight - 72.dp).coerceAtLeast(0.dp) else firstPageHeight
+                            // 패널 상단 여백과 캐릭터 카드 아래의 이름 한 줄까지 보일 공간을 확보한다.
+                            val pageHeight = if (showingMore && others.isNotEmpty()) (firstPageHeight - avatarSize - 80.dp).coerceAtLeast(0.dp) else firstPageHeight
                             Column(Modifier.fillMaxWidth().heightIn(min = pageHeight),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Top) {

@@ -47,7 +47,10 @@ class DriverSelectionScreenTest {
         assertEquals(recent, compose.onNodeWithContentDescription("운전자5 프로필 선택").assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
         val list = compose.onNode(hasScrollAction()).fetchSemanticsNode().boundsInRoot
         val extra = compose.onNodeWithContentDescription("운전자6 프로필 선택").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        assertEquals(48f, list.bottom - extra.top, 2f)
+        // 낮은 화면에서는 최근 프로필을 침범하지 않는 범위까지만 올라온다.
+        org.junit.Assert.assertTrue(list.bottom - extra.top > 72f)
+        org.junit.Assert.assertTrue(list.bottom - extra.top <= 206f)
+        org.junit.Assert.assertTrue(extra.top >= recent.bottom)
         compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("운전자6 프로필 선택"))
         compose.onNodeWithContentDescription("운전자6 프로필 선택").assertIsDisplayed()
         screenshot("expanded-profiles-scrolled")
@@ -81,6 +84,16 @@ class DriverSelectionScreenTest {
         assertEquals(120f, withoutFooter - withFooter, 2f)
     }
 
+    @Test fun collapsedProfilesDoNotScrollWhenTheyFitButExpandedProfilesDo() {
+        show()
+        val search = compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot
+        compose.onNode(hasScrollAction()).performTouchInput { swipeUp() }
+        assertEquals(search, compose.onNodeWithContentDescription("운전자 검색 열기").fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText("더보기").assertIsDisplayed().performClick()
+        compose.onNode(hasScrollAction()).performTouchInput { swipeUp() }
+        org.junit.Assert.assertTrue(compose.onNodeWithContentDescription("운전자 검색 열기").getUnclippedBoundsInRoot().top.value < search.top)
+    }
+
     @Test fun unlinkedVehicleOnlyOffersPairingAfterProfileSelection() {
         var opened = 0
         var started = false
@@ -103,6 +116,25 @@ class DriverSelectionScreenTest {
         compose.onNodeWithText("차량 연결 카드").assertIsDisplayed()
         compose.onNodeWithText("프로필 관리").performClick()
         compose.onNodeWithText("차량 연결 카드").assertDoesNotExist()
+    }
+
+    @Test fun managementKeepsProfileAndExpandedPanelAtTheSameHeight() {
+        compose.setContent {
+            DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {},
+                footer = { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.height(240.dp)) })
+        }
+        compose.onNodeWithText("더보기").performClick()
+        val name = compose.onNodeWithText("운전자1").fetchSemanticsNode().boundsInRoot
+        val extra = compose.onNodeWithText("운전자6").getUnclippedBoundsInRoot()
+        val list = compose.onNode(hasScrollAction()).fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithText("프로필 관리").performClick()
+        assertEquals(name.top, compose.onNodeWithText("운전자1").fetchSemanticsNode().boundsInRoot.top, 1f)
+        assertEquals(extra.top, compose.onNodeWithText("운전자6").getUnclippedBoundsInRoot().top)
+        val managingList = compose.onNode(hasScrollAction()).fetchSemanticsNode().boundsInRoot
+        assertEquals(list.top, managingList.top, 1f)
+        org.junit.Assert.assertTrue(managingList.bottom > list.bottom + 240f)
+        compose.onNodeWithText("완료").performClick()
+        assertEquals(name, compose.onNodeWithText("운전자1").fetchSemanticsNode().boundsInRoot)
     }
 
     @Test fun selectionNeverOffersDeferredStart() {
