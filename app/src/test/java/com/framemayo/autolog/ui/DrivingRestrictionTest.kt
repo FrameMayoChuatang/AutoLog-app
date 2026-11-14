@@ -114,7 +114,7 @@ class DrivingRestrictionTest {
         state.value = state.value.copy(vehicle = parked.copy(collector = CollectorStatus.RETRYING, odometerKm = null))
         show()
         compose.onNodeWithText("운전자의 프로필을 선택하세요.").assertIsDisplayed()
-        compose.onNodeWithText("차량 정보 수신 대기 · 차량 상태 확인 후 운행을 시작할 수 있습니다.").assertIsDisplayed()
+        compose.onNodeWithText("차량 정보 수신 대기 · 차량 상태 확인 후 운행을 시작할 수 있습니다.").assertDoesNotExist()
         compose.onNodeWithText("운행 현황").assertDoesNotExist()
         compose.onNodeWithContentDescription("운전자 프로필 선택").assertIsDisplayed().assertIsNotEnabled().performClick()
         compose.onNodeWithText("주행 시작").assertDoesNotExist()
@@ -288,7 +288,7 @@ class DrivingRestrictionTest {
         val profiles = (1..5).map { id -> compose.onNodeWithContentDescription("운전자$id 프로필 선택")
             .assertIsDisplayed().assertIsNotEnabled().fetchSemanticsNode().boundsInRoot }
         profiles.forEach { assertEquals(profiles.first().top, it.top, 1f) }
-        compose.onNodeWithText("차량 정보 수신 대기 · 차량 상태 확인 후 운행을 시작할 수 있습니다.").assertIsDisplayed()
+        compose.onNodeWithText("차량 정보 수신 대기 · 차량 상태 확인 후 운행을 시작할 수 있습니다.").assertDoesNotExist()
         compose.onAllNodes(hasClickAction() and isEnabled()).assertCountEquals(0)
         compose.onNodeWithTag("vehicle-link-status").assertIsDisplayed()
         screenshot("selection-waiting-medium")
@@ -307,6 +307,22 @@ class DrivingRestrictionTest {
         compose.onNodeWithText("제한 정보 다시 연결").assertIsDisplayed()
         compose.onNodeWithTag("vehicle-link-status").assertIsDisplayed()
         compose.onAllNodes(hasClickAction() and isEnabled()).assertCountEquals(1)
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h420dp-land-night-mdpi")
+    fun lowWideWaitingKeepsVehicleCardProfilesAndRetryVisible() {
+        state.value = state.value.copy(profiles = (1L..5L).map {
+            DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0)
+        })
+        ux.value = DrivingUxState(failure = DrivingUxFailure.READ_FAILED)
+        show()
+        for (id in 1..5) compose.onNodeWithContentDescription("운전자$id 프로필 선택").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithTag("vehicle-link-status").assertIsDisplayed()
+        compose.onNodeWithText("00가0000 · 테스트 차량").assertIsDisplayed()
+        compose.onNodeWithText("제한 정보 다시 연결").assertIsDisplayed()
+        compose.onNodeWithText("주행 제한 정보를 읽을 수 없음 · 입력 잠금").assertIsDisplayed()
+        screenshot("selection-waiting-low-wide")
     }
 
     @Test
