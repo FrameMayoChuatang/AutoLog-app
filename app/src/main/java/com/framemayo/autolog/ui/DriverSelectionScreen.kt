@@ -150,7 +150,10 @@ internal fun DriverSelectionScreen(
                     Text("차량 상태가 확인되면 선택할 수 있어요.", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
                 }
             } else BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 32.dp)) {
-                val compactWaiting = !inputEnabled && maxHeight < 500.dp
+                val fullRowCount = recent.size + 1
+                val fullRowMinWidth = 136.dp * fullRowCount + 20.dp * (fullRowCount - 1)
+                // 검색·상단 버튼·고정 안내와 프로필 한 줄이 함께 들어갈 때만 전체 배치를 사용한다.
+                val compactWaiting = !inputEnabled && (maxHeight < 760.dp || maxWidth < fullRowMinWidth)
                 val avatarSize = if (compactWaiting) 60.dp else ((maxWidth - 20.dp * 5) / 6 - 16.dp).coerceIn(120.dp, 148.dp)
                 val viewportHeight = maxHeight
                 val columns = ((maxWidth + 20.dp) / (avatarSize + 36.dp)).toInt().coerceAtLeast(1)
