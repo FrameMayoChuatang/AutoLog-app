@@ -224,7 +224,7 @@ class DrivingRestrictionTest {
     }
 
     @Test
-    @Config(qualifiers = "w700dp-h900dp-land-night-mdpi")
+    @Config(qualifiers = "w700dp-h900dp-port-night-mdpi")
     fun narrowCardsFitLongValuesAndUnitsWithoutEllipsis() {
         state.value = state.value.copy(vehicle = parked.copy(gear = VehicleGear.GEAR_DRIVE),
             activeTrip = TripEntity(id = 1, driverId = 1, startedAt = 0, endedAt = 125 * 60_000L,
