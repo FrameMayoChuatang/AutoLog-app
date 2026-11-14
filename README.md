@@ -2,6 +2,47 @@
 
 법인차량 운행기록 자동 작성 서비스의 Pleos Connect(AAOS) 차량 앱.
 
+> **한 줄 소개:** 운전자 프로필만 고르면 차량 누적거리·기어로 운행을 자동 기록하고, 주차 후 목적만 고르면 회사 서버로 운행일지가 전송되는 법인차량 운행기록 앱입니다.
+
+## 공모전 심사용 실행 안내 (#189)
+
+| 항목 | 내용 |
+|---|---|
+| 팀 / 앱 | 프레임마요추어탕 / 오토로그(AutoLog) |
+| APK | [`apk/프레임마요추어탕_오토로그_release.apk`](apk/) (release 빌드, 서명됨) |
+| 에뮬레이터 | Pleos Connect 2.1.0 (Android API 34) AVD |
+| 화면 사양 | 2560×1440, 160dpi (가로) |
+| 필요한 연결 | 에뮬레이터 인터넷(Wi‑Fi `AndroidWifi`), 운영 서버(HTTPS, APK에 포함) |
+
+1. Pleos Connect AVD를 실행하고 상단 Wi‑Fi 아이콘에 X가 없는지 확인합니다.
+2. APK를 설치·실행합니다. Pleos 에뮬레이터는 앱을 현재 사용자(보통 10)로 실행하므로 `--user`를 붙입니다.
+   ```sh
+   adb install -r --user $(adb shell am get-current-user) "apk/프레임마요추어탕_오토로그_release.apk"
+   adb shell am start --user $(adb shell am get-current-user) -n com.framemayo.autolog/.ui.MainActivity
+   ```
+3. **Virtual Console을 열어 두고 누적거리를 넣습니다.** 현재 Pleos 이미지는 SDK로 누적거리가 제대로 전달되지 않아, 제출 APK는 에뮬레이터 내부 Virtual Console 값을 읽습니다. 콘솔 웹 페이지를 닫으면 연결이 끊겨 앱이 `차량 정보 수신 대기`로 잠깁니다.
+   ```sh
+   adb forward tcp:8088 tcp:8088          # 브라우저로 http://127.0.0.1:8088/ 을 열어 둔다
+   curl -X PUT "http://127.0.0.1:8088/vehicle/gear?gear=Park"
+   curl -X PUT "http://127.0.0.1:8088/vehicle/odometer?traveled_distance_km=1000"
+   ```
+4. 운전자 선택 화면 아래 **차량 연결** 카드에 8자리 페어링 코드를 입력합니다. 코드는 운영 서버 관리자가 발급하며 10분·1회용입니다. 심사용 코드 발급 방법은 제출 메일로 안내합니다.
+5. 프로필 선택 → `주행 시작` → 콘솔에서 기어 `Drive`, 누적거리 증가 → 기어 `Park` → `운행 종료` → 최근 운행의 `운행 확인`에서 목적 선택.
+
+- 주행 중(D)에는 Pleos 주행 제한 정책에 따라 읽기 전용 `운행 현황`만 표시합니다.
+- 누적거리는 줄일 수 없고, 한 번에 100 km 넘게 올리면 몇 초 뒤 반영됩니다.
+- 자세한 시연 절차와 예외 상황: [docs/DEMO_ENVIRONMENT.md](docs/DEMO_ENVIRONMENT.md)
+
+### 제출 APK 다시 만들기
+
+```sh
+./gradlew :app:assembleRelease -PconsoleOdometer=true   # .env의 AUTOLOG_SERVER_URL 사용
+cp app/build/outputs/apk/release/app-release.apk "apk/프레임마요추어탕_오토로그_release.apk"
+```
+
+- 공모전 심사용이라 release 빌드를 debug 키로 서명합니다. App Market 배포 전에는 전용 키로 바꿉니다.
+- `-PconsoleOdometer=true`가 없는 기본 빌드(debug·release)는 Vehicle SDK 누적거리를 씁니다. release 빌드는 콘솔 접근을 위해 `127.0.0.1`만 평문 HTTP를 허용합니다.
+
 ## 개발 환경
 
 | 항목 | 버전 |
@@ -33,7 +74,7 @@ AUTOLOG_SERVER_URL=https://<서버호스트>
 
 한 줄 URL 값에 작은따옴표·큰따옴표, 선택적인 `export`, 공백 뒤 `#` 주석을 사용할 수 있다. 인용부호 안의 `#`은 URL의 일부로 보존한다. 변수 치환·이스케이프·여러 줄 값은 지원하지 않는다.
 
-우선순위는 `-PserverUrl` → 실행 환경의 `AUTOLOG_SERVER_URL` → `.env` → 기존 로컬 서버 기본값이다. 주소 변경 후 APK를 다시 빌드해야 하며, 다른 서버로 전환하면 해당 서버의 새 차량 페어링 코드를 사용한다. 생성된 APK에도 설정 주소가 포함되므로 APK를 저장소에 올리지 않는다.
+우선순위는 `-PserverUrl` → 실행 환경의 `AUTOLOG_SERVER_URL` → `.env` → 기존 로컬 서버 기본값이다. 주소 변경 후 APK를 다시 빌드해야 하며, 다른 서버로 전환하면 해당 서버의 새 차량 페어링 코드를 사용한다. 생성된 APK에도 설정 주소가 포함된다. 저장소에는 공모전 제출용 `apk/*_release.apk`만 올린다(#189).
 
 ## 구조
 
@@ -136,10 +177,10 @@ app/src/main/java/com/framemayo/autolog
 ./gradlew :app:assembleDebug -PconsoleOdometer=true
 ```
 
-- 이 옵션을 명시한 debug APK는 에뮬레이터 내부 `http://127.0.0.1:8088/vehicle/state`의 `odometer.traveled_distance_km`을 1초 간격으로 읽습니다. 호스트 서버 주소인 `10.0.2.2:8080`과 별개입니다.
+- 이 옵션을 명시한 APK는 에뮬레이터 내부 `http://127.0.0.1:8088/vehicle/state`의 `odometer.traveled_distance_km`을 1초 간격으로 읽습니다. 호스트 서버 주소인 `10.0.2.2:8080`과 별개입니다.
 - `bridge_ready`와 `emulator_active`가 모두 true인 숫자 값만 사용합니다. HTTP/응답 오류는 기존 수집기 재시도로 전달하며 이전 값 재사용·거리 추정·SDK 자동 전환을 하지 않습니다. 진행 중인 HTTP 호출의 연결/읽기 제한 시간은 각각 1.5초입니다.
 - 초기 1회 조회 실패는 null로 처리하여 다음 유효값을 기다립니다. 0 km 및 감소한 값에 대한 기존 운행 수집기 검증은 유지합니다.
-- 기본 debug와 모든 release 빌드는 기존 Vehicle SDK를 사용합니다. 기어 등 다른 차량 신호도 기존 SDK를 유지합니다.
+- 이 옵션 없이 빌드한 debug·release는 기존 Vehicle SDK를 사용합니다. 공모전 제출 APK는 release 빌드에 이 옵션을 켭니다(#189). 기어 등 다른 차량 신호도 기존 SDK를 유지합니다.
 - 서로 다른 누적거리 기준을 가진 APK로 **진행 중인 운행을 이어서 테스트하지 않습니다**. 먼저 운행을 종료하고, 콘솔 거리를 기존 기록과 일관된 값으로 설정한 뒤 시작합니다. DB와 기존 운행 기록은 자동 초기화하지 않습니다.
 - 벤더 이미지의 전달 문제가 해결되면 옵션을 끄고 콘솔 어댑터를 제거합니다. 이 옵션은 실차 배포용 해결책이 아닙니다.
 
