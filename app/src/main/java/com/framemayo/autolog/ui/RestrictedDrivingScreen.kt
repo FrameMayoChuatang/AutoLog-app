@@ -41,6 +41,7 @@ internal fun DrivingRestrictionGate(
     state: MainUiState,
     ux: DrivingUxState,
     onRetryRestrictions: () -> Unit = {},
+    waitingFooter: @Composable () -> Unit = {},
     parkedContent: @Composable () -> Unit,
 ) {
     val allowed = canUseParkedControls(state.vehicle, ux)
@@ -79,6 +80,7 @@ internal fun DrivingRestrictionGate(
                     if (!ux.ready && gear == VehicleGear.GEAR_PARK && receiving) OutlinedButton(onClick = onRetryRestrictions) {
                         Text("제한 정보 다시 연결", fontSize = 20.sp, color = VehicleUi.Primary)
                     }
+                    waitingFooter()
                 }
             },
         )

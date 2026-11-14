@@ -74,7 +74,11 @@ class MainActivity : ComponentActivity() {
             AutoLogTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val state by viewModel.state.collectAsStateWithLifecycle()
-                    DrivingRestrictionGate(state, drivingUx, onRetryRestrictions = uxObserver::start) {
+                    DrivingRestrictionGate(state, drivingUx, onRetryRestrictions = uxObserver::start,
+                        waitingFooter = {
+                            val linkState by viewModel.linkState.collectAsStateWithLifecycle()
+                            VehicleLinkStatusCard(linkState.link)
+                        }) {
                         LaunchedEffect(Unit) {
                             if (Build.VERSION.SDK_INT >= 33 && !notificationPermissionRequested) {
                                 notificationPermissionRequested = true
