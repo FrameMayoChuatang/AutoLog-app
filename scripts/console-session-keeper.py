@@ -84,29 +84,33 @@ def control(command, base, directory):
     stop_file = directory / 'stop'
     # 잠금 파일은 삭제하지 않는다. 삭제 후 재생성하면 다른 inode를 잠글 수 있다.
     with (directory / 'session.lock').open('a+') as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+        # 세션 소유권 확인부터 ID 읽기/쓰기까지 직렬화한다. 종료 요청이 지연되는
+        # 동안 이전 실행이 끝나도 새 실행의 ID를 읽어 잘못 종료하지 않게 한다.
+        with (directory / 'control.lock').open('a+') as control_lock:
+            fcntl.flock(control_lock, fcntl.LOCK_EX)
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                lock.seek(0)
+                client = lock.read().strip()
+                if command == 'stop':
+                    if not client:
+                        print('연결 유지 시작 중입니다. 잠시 후 다시 중지하세요.', flush=True)
+                        return 1
+                    # PID에 signal을 보내지 않아 PID 재사용으로 다른 프로세스를 종료하지 않는다.
+                    stop_file.write_text(client)
+                    print('연결 유지 종료 요청 완료', flush=True)
+                else:
+                    print('연결 유지 실행 중', flush=True)
+                return 0 if command != 'run' else 1
+            if command != 'run':
+                print('연결 유지가 실행 중이 아닙니다.', flush=True)
+                return 0
+            client = 'autolog-keeper-' + uuid.uuid4().hex
             lock.seek(0)
-            client = lock.read().strip()
-            if command == 'stop':
-                if not client:
-                    print('연결 유지 시작 중입니다. 잠시 후 다시 중지하세요.', flush=True)
-                    return 1
-                # PID에 signal을 보내지 않아 PID 재사용으로 다른 프로세스를 종료하지 않는다.
-                stop_file.write_text(client)
-                print('연결 유지 종료 요청 완료', flush=True)
-            else:
-                print('연결 유지 실행 중', flush=True)
-            return 0 if command != 'run' else 1
-        if command != 'run':
-            print('연결 유지가 실행 중이 아닙니다.', flush=True)
-            return 0
-        client = 'autolog-keeper-' + uuid.uuid4().hex
-        lock.seek(0)
-        lock.truncate()
-        lock.write(client)
-        lock.flush()
+            lock.truncate()
+            lock.write(client)
+            lock.flush()
         stopped = threading.Event()
         previous = {s: signal.signal(s, lambda *_: stopped.set()) for s in (signal.SIGINT, signal.SIGTERM)}
 
