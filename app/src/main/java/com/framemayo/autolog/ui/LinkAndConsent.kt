@@ -125,7 +125,7 @@ internal fun VehicleLinkStatusCard(link: VehicleLink?) {
     val status = if (link == null) "연결된 차량 없음" else "연결됨"
     val statusColor = if (link == null) VehicleUi.Secondary else VehicleUi.Positive
     BoxWithConstraints(Modifier.fillMaxWidth().testTag("vehicle-link-status")) {
-        if (maxWidth < 640.dp) Surface(shape = RoundedCornerShape(24.dp), color = VehicleUi.Surface) {
+        if (maxWidth < 640.dp || maxHeight < 500.dp) Surface(shape = RoundedCornerShape(24.dp), color = VehicleUi.Surface) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
