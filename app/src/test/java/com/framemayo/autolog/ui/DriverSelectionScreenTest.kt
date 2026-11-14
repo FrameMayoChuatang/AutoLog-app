@@ -368,7 +368,11 @@ class DriverSelectionScreenTest {
     }
 
     @Test fun searchModalMovesWithKeyboardAndReturnsAfterHidingIt() {
-        compose.setContent { DriverSearchDialog("", {}, profiles, androidx.compose.ui.geometry.Rect.Zero, false, {}, {}) }
+        compose.setContent {
+            androidx.compose.material3.MaterialTheme(colorScheme = androidx.compose.material3.darkColorScheme()) {
+                DriverSearchDialog("", {}, profiles, androidx.compose.ui.geometry.Rect.Zero, false, {}, {})
+            }
+        }
         val initial = compose.onNodeWithContentDescription("운전자 이름 검색").getUnclippedBoundsInRoot().top
         screenshot("search-before-keyboard")
         fun keyboardInsets(bottom: Int) {
