@@ -35,7 +35,7 @@ class DriverSelectionScreenTest {
         compose.setContent { DriverSelectionScreen(profiles, parked, linked, ready, onStart, { _, _, _, _, _ -> }, { true }, {}) }
     }
 
-    @Test fun footerDoesNotHideMoreAndExpandedProfilesStartBelowFirstPage() {
+    @Test fun footerDoesNotHideMoreAndExpandedProfilesPeekWithoutMovingRecent() {
         val many = (1L..30).map { DriverProfile(DriverEntity(id = it, name = "운전자$it", department = ""), "운전자$it", 0) }
         compose.setContent {
             DriverSelectionScreen(many, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {},
@@ -43,10 +43,14 @@ class DriverSelectionScreenTest {
         }
         val recent = compose.onNodeWithContentDescription("운전자5 프로필 선택").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         compose.onNodeWithText("더보기").assertIsDisplayed().performClick()
+        screenshot("expanded-profiles-peek")
         assertEquals(recent, compose.onNodeWithContentDescription("운전자5 프로필 선택").assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
-        compose.onNodeWithContentDescription("운전자6 프로필 선택").assertIsNotDisplayed()
+        val list = compose.onNode(hasScrollAction()).fetchSemanticsNode().boundsInRoot
+        val extra = compose.onNodeWithContentDescription("운전자6 프로필 선택").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertEquals(48f, list.bottom - extra.top, 2f)
         compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("운전자6 프로필 선택"))
         compose.onNodeWithContentDescription("운전자6 프로필 선택").assertIsDisplayed()
+        screenshot("expanded-profiles-scrolled")
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("접기"))
         compose.onNodeWithText("접기").performClick()
         compose.onNodeWithText("더보기").assertIsDisplayed()
@@ -223,7 +227,7 @@ class DriverSelectionScreenTest {
         org.junit.Assert.assertTrue(search.bottom <= heading.top)
         assertEquals(heading.center.x, search.center.x, 1f)
         org.junit.Assert.assertTrue(heading.bottom < recent.top)
-        compose.onNodeWithContentDescription("운전자6 프로필 선택").assertIsNotDisplayed()
+        compose.onNodeWithContentDescription("운전자6 프로필 선택").assertIsDisplayed()
         compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("운전자6 프로필 선택"))
         compose.onNodeWithContentDescription("운전자6 프로필 선택").assertIsDisplayed()
     }
