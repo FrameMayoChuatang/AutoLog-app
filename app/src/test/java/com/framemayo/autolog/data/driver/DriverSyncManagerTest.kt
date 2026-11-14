@@ -5,6 +5,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.framemayo.autolog.data.local.AutoLogDatabase
 import com.framemayo.autolog.data.local.DriverStatus
+import com.framemayo.autolog.data.remote.ServerApi
+import com.framemayo.autolog.data.remote.TestServer
 import com.framemayo.autolog.data.repository.DriverRepositoryImpl
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -48,21 +50,76 @@ class DriverSyncManagerTest {
         assertEquals(1, pendingCalls)
         assertTrue(sync.sync())
         assertEquals(id, drivers().single().id)
-        assertEquals(DriverStatus.PENDING, drivers().single().status)
+        assertEquals(DriverStatus.ACTIVE, drivers().single().status)
         assertEquals(1, api.registered.size)
     }
 
-    @Test fun localDriverIsRegisteredPendingAndLinkedOnlyOnce() = runBlocking {
+    @Test fun localDriverIsRegisteredActiveAndLinkedOnlyOnce() = runBlocking {
         repo.add("Park", "IT")
         assertTrue(sync.sync())
         assertEquals(listOf("Park" to "IT"), api.registered)
         val d = drivers().single()
         assertEquals(api.server.single().remoteId, d.remoteId)
-        assertEquals(DriverStatus.PENDING, d.status)
+        assertEquals(DriverStatus.ACTIVE, d.status)
 
         assertTrue(sync.sync())
         assertEquals(1, api.registered.size)
         assertEquals(1, drivers().size)
+    }
+
+    @Test fun legacyPendingRegistrationIsNotPromotedByTheApp() = runBlocking {
+        api.registrationStatus = DriverStatus.PENDING
+        repo.addProfile("기존 정책", 0)
+        assertTrue(sync.sync())
+        assertEquals(DriverStatus.PENDING, drivers().single().status)
+        assertTrue(sync.sync())
+        assertEquals(DriverStatus.PENDING, drivers().single().status)
+        assertEquals(1, api.registered.size)
+    }
+
+    @Test fun existingPendingDriverStaysPendingUntilServerChangesItsStatus() = runBlocking {
+        val pending = api.serverDriver("기존 운전자", "미지정", DriverStatus.PENDING)
+        assertTrue(sync.sync())
+        val id = drivers().single().id
+        assertTrue(sync.sync())
+        assertEquals(DriverStatus.PENDING, repo.find(id)!!.status)
+        api.server[0] = pending.copy(status = DriverStatus.ACTIVE)
+        assertTrue(sync.sync())
+        assertEquals(DriverStatus.ACTIVE, repo.find(id)!!.status)
+        assertEquals(0, api.registered.size)
+    }
+
+    @Test fun activeHttpRegistrationReachesRoomWithoutLosingProfileOrDuplicatingDriver() = runBlocking {
+        val remoteId = "22222222-2222-4222-8222-222222222222"
+        val response = """{"id":"$remoteId","name":"샘플","department":"미지정","status":"ACTIVE"}"""
+        var registered = false
+        var registrations = 0
+        val http = TestServer { method, path, _, _ ->
+            when (method to path) {
+                "GET" to "/api/device/drivers" -> 200 to if (registered) "[$response]" else "[]"
+                "POST" to "/api/device/drivers" -> {
+                    registered = true
+                    registrations++
+                    201 to response
+                }
+                else -> 404 to "{}"
+            }
+        }
+        try {
+            val id = repo.addProfile("샘플", 2, 3)
+            val profile = db.driverDao().profile(id)
+            val manager = DriverSyncManager(repo, HttpDriverApi(ServerApi(http.url)))
+            assertTrue(manager.sync())
+            assertEquals(remoteId, repo.find(id)!!.remoteId)
+            assertEquals(DriverStatus.ACTIVE, repo.find(id)!!.status)
+            assertEquals(profile, db.driverDao().profile(id))
+            assertTrue(manager.sync())
+            assertEquals(1, registrations)
+            assertEquals(id, drivers().single().id)
+            assertEquals(DriverStatus.ACTIVE, drivers().single().status)
+        } finally {
+            http.stop()
+        }
     }
 
     @Test fun uniqueNameAndDepartmentMatchLinksInsteadOfRegistering() = runBlocking {
