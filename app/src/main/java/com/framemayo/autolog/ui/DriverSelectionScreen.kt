@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -156,7 +157,7 @@ internal fun DriverSelectionScreen(
                 val compactWaiting = !inputEnabled && (maxHeight < 760.dp || maxWidth < fullRowMinWidth)
                 val avatarSize = if (compactWaiting) 60.dp else ((maxWidth - 20.dp * 5) / 6 - 16.dp).coerceIn(120.dp, 148.dp)
                 val viewportHeight = maxHeight
-                val columns = ((maxWidth + 20.dp) / (avatarSize + 36.dp)).toInt().coerceAtLeast(1)
+                val columns = ((maxWidth - 48.dp + 20.dp) / (avatarSize + 36.dp)).toInt().coerceAtLeast(1)
                 val openEditor: (Long?) -> Unit = { editingId = it; error = null; editing = true }
                 val card: @Composable (DriverProfile) -> Unit = { profile ->
                     DriverProfileCard(profile, avatarSize, managing, { select(profile) }, { openEditor(profile.driver.id) }, { error = null; deletingId = profile.driver.id }, enabled = inputEnabled)
@@ -198,8 +199,9 @@ internal fun DriverSelectionScreen(
                         contentPadding = PaddingValues(bottom = 40.dp),
                     ) {
                         item {
-                            // 첫 화면 안에 더보기를 두고, 펼친 목록은 실제 스크롤 영역 아래에서 시작한다.
-                            Column(Modifier.fillMaxWidth().heightIn(min = firstPageHeight),
+                            // 펼쳤을 때만 첫 페이지를 줄여, 패널 상단 여백 24dp 아래의 프로필이 48dp 보이게 한다.
+                            val pageHeight = if (showingMore && others.isNotEmpty()) (firstPageHeight - 72.dp).coerceAtLeast(0.dp) else firstPageHeight
+                            Column(Modifier.fillMaxWidth().heightIn(min = pageHeight),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Top) {
                             Box(Modifier.fillMaxWidth()) {
@@ -249,11 +251,18 @@ internal fun DriverSelectionScreen(
                         }
                             }
                         }
-                        if (showingMore && others.isNotEmpty()) item { Box(Modifier.fillMaxWidth().padding(top = 72.dp)) }
+                        if (showingMore && others.isNotEmpty()) item {
+                            Box(Modifier.fillMaxWidth()
+                                .background(VehicleUi.Surface, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                                .padding(top = 24.dp))
+                        }
                         if (showingMore) items(others.chunked(columns), key = { row -> "others-${row.first().driver.id}" }) { row ->
-                            Row(Modifier.fillMaxWidth().padding(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.Top) { row.forEach { card(it) } }
+                            Row(Modifier.fillMaxWidth().background(VehicleUi.Surface).padding(start = 24.dp, end = 24.dp, bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.Top) { row.forEach { card(it) } }
                         }
                         if (showingMore && others.isNotEmpty()) item(key = "collapse-profiles") {
+                            Box(Modifier.fillMaxWidth()
+                                .background(VehicleUi.Surface, RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)),
+                                contentAlignment = Alignment.Center) {
                             OutlinedButton(
                                 enabled = inputEnabled,
                                 onClick = {
@@ -264,6 +273,7 @@ internal fun DriverSelectionScreen(
                                 shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, SelectionColors.outline),
                                 colors = ButtonDefaults.outlinedButtonColors(containerColor = SelectionColors.surface, contentColor = SelectionColors.onSurface),
                             ) { Text("접기", fontSize = 20.sp) }
+                            }
                         }
                     }
                     }
