@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -150,7 +152,9 @@ internal fun DriverSelectionScreen(
                     Text("주차 후 이용해 주세요", fontSize = 30.sp)
                     Text("차량 상태가 확인되면 선택할 수 있어요.", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
                 }
-            } else BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 32.dp)) {
+            } else BoxWithConstraints(Modifier.fillMaxSize()
+                .then(if (searching) Modifier.systemBarsPadding().displayCutoutPadding() else Modifier.safeDrawingPadding().imePadding())
+                .padding(horizontal = 32.dp)) {
                 val fullRowCount = recent.size + 1
                 val fullRowMinWidth = 136.dp * fullRowCount + 20.dp * (fullRowCount - 1)
                 // 검색·상단 버튼·고정 안내와 프로필 한 줄이 함께 들어갈 때만 전체 배치를 사용한다.

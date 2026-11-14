@@ -345,6 +345,66 @@ class DriverSelectionScreenTest {
         compose.onNodeWithContentDescription("운전자7 검색 결과 선택").assertDoesNotExist()
     }
 
+    @Test fun searchCloseReturnsFieldBeforeCompletingDismissal() {
+        var dismissals = 0
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            DriverSearchDialog("", {}, profiles, androidx.compose.ui.geometry.Rect(300f, 300f, 780f, 364f), false, { dismissals++ }, {})
+        }
+        compose.mainClock.advanceTimeBy(400)
+        compose.waitForIdle()
+        val openedWidth = compose.onNodeWithContentDescription("운전자 이름 검색").fetchSemanticsNode().boundsInRoot.width
+        compose.onNodeWithContentDescription("검색 닫기").performClick()
+        compose.mainClock.advanceTimeBy(96)
+        compose.waitForIdle()
+        assertEquals(0, dismissals)
+        val closingWidth = compose.onNodeWithContentDescription("운전자 이름 검색").fetchSemanticsNode().boundsInRoot.width
+        org.junit.Assert.assertTrue(closingWidth < openedWidth)
+        org.junit.Assert.assertTrue(closingWidth > 480f)
+        compose.mainClock.advanceTimeBy(240)
+        compose.waitForIdle()
+        assertEquals(1, dismissals)
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test fun searchModalMovesWithKeyboardAndReturnsAfterHidingIt() {
+        compose.setContent {
+            androidx.compose.material3.MaterialTheme(colorScheme = androidx.compose.material3.darkColorScheme()) {
+                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides androidx.compose.ui.graphics.Color.White) {
+                    DriverSearchDialog("", {}, profiles, androidx.compose.ui.geometry.Rect.Zero, false, {}, {})
+                }
+            }
+        }
+        val initial = compose.onNodeWithContentDescription("운전자 이름 검색").getUnclippedBoundsInRoot().top
+        screenshot("search-before-keyboard")
+        fun keyboardInsets(bottom: Int) {
+            compose.runOnIdle {
+                val decor = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+                androidx.core.view.ViewCompat.dispatchApplyWindowInsets(decor,
+                    androidx.core.view.WindowInsetsCompat.Builder()
+                        .setInsets(androidx.core.view.WindowInsetsCompat.Type.ime(), androidx.core.graphics.Insets.of(0, 0, 0, bottom))
+                        .setVisible(androidx.core.view.WindowInsetsCompat.Type.ime(), bottom > 0).build())
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        keyboardInsets(300)
+        compose.mainClock.advanceTimeBy(96)
+        compose.waitForIdle()
+        val moving = compose.onNodeWithContentDescription("운전자 이름 검색").getUnclippedBoundsInRoot().top
+        org.junit.Assert.assertTrue(moving < initial)
+        compose.mainClock.advanceTimeBy(240)
+        compose.waitForIdle()
+        val raised = compose.onNodeWithContentDescription("운전자 이름 검색").getUnclippedBoundsInRoot().top
+        org.junit.Assert.assertTrue(raised < moving)
+        screenshot("search-after-keyboard")
+        compose.onNodeWithContentDescription("검색 닫기").assertIsDisplayed()
+        keyboardInsets(0)
+        compose.mainClock.advanceTimeBy(320)
+        compose.waitForIdle()
+        assertEquals(initial, compose.onNodeWithContentDescription("운전자 이름 검색").getUnclippedBoundsInRoot().top)
+        compose.mainClock.autoAdvance = true
+    }
+
     @Test
     @Config(qualifiers = "w540dp-h420dp-land-night-mdpi")
     fun emptySearchKeepsMessageAndCloseVisibleWithKeyboard() {
