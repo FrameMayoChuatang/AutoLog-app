@@ -52,7 +52,8 @@ python3 tools/demo_server.py setup
 | 업무 목적 | 고객 미팅, 물품 수령 |
 
 - 관리자 계정은 `tools/.demo-state.json`에 저장된다. Git에 올라가지 않으며, 화면 공유나 녹화에 비추지 않는다.
-- **승인 대기 운전자**는 서버에서 미리 만들지 않는다. 시연 중 앱에서 `운전자 추가`로 프로필을 만들면 서버에 승인 대기로 등록된다.
+- 서버 PR [#5](https://github.com/FrameMayoChuatang/AutoLog-server/pull/5) 반영 후 앱에서 생성한 **신규 운전자**는 등록 응답의 `ACTIVE` 상태로 연결된다. 별도 관리자 승인 없이 운행 확인을 전송할 수 있다. 배포 반영 여부는 실제 응답으로 확인한다.
+- 기존 `PENDING`/`INACTIVE` 운전자는 자동 변경되지 않는다. 승인 대기 예외는 기존 데이터 또는 시연 환경에서 관리자가 상태를 PENDING으로 지정한 데이터로 검증한다.
 - 승인된 운전자 김운전은 차량을 연결하면 앱의 프로필 목록에 자동으로 나타난다.
 - 서버 DB를 초기화했다면 `tools/.demo-state.json`을 지우고 `setup`을 다시 실행한다.
 
@@ -62,11 +63,13 @@ python3 tools/demo_server.py setup
 |---|---|
 | `python3 tools/demo_server.py pair` | 8자리 페어링 코드 발급 |
 | `python3 tools/demo_server.py drivers` | 운전자와 승인 상태 |
-| `python3 tools/demo_server.py approve <이름>` | 승인 대기 운전자 승인 |
+| `python3 tools/demo_server.py approve <이름>` | 기존 PENDING 운전자 승인 (신규 ACTIVE 등록에는 불필요) |
 | `python3 tools/demo_server.py trips` | 서버에 올라온 운행 (분류·승인 상태·누적거리) |
 | `python3 tools/demo_server.py approve-trip <id 앞자리>` | 운행을 관리자 승인. 이후 차량에서 수정하면 `전송 실패` |
 
 관리자 토큰이 만료되면 스크립트가 알아서 다시 로그인한다.
+
+운전자 자동 승인은 운행기록의 관리자 승인을 대신하지 않는다. 운행 확인 후 `approvalStatus`는 PENDING이며, 유효한 완료 기록의 관리자 승인까지 마쳐야 엑셀의 승인 운행기록에 포함된다. 보고서 다운로드와 관리자 인증 경로도 별도로 준비한다.
 
 ## 3. 에뮬레이터
 
@@ -156,7 +159,7 @@ python3 tools/demo_server.py pair
 
 | 상황 | 만드는 방법 | 되돌리기 |
 |---|---|---|
-| 승인 대기 | 앱에서 새 프로필을 만들어 운행하고 목적 저장 → `전송 보류` | `demo_server.py approve <이름>`. 30초~5분 안에 자동 전송 |
+| 기존 승인 대기 | 기존 PENDING 프로필 또는 시연 환경에서 관리자가 PENDING으로 지정한 프로필로 운행하고 목적 저장 → `전송 보류` | `demo_server.py approve <이름>`. 30초~5분 안에 자동 전송. 신규 프로필은 ACTIVE이므로 이 상황을 재현하지 않음 |
 | 오프라인 | 서버를 띄운 터미널에서 Ctrl+C 후 운행 기록 → `전송 대기` | 서버를 다시 실행. 30초~5분 안에 자동 재전송, 중복 없음 |
 | 서버 거절 | `demo_server.py approve-trip <id>` 후 앱에서 `확인 및 수정` → `전송 실패` | 되돌릴 수 없음. 시연용 운행으로만 한다 |
 | 차량 미연결 | 운전자 선택 화면 아래 연결 카드의 `연결 해제` → 확인 창에서 `연결 해제` | `demo_server.py pair`로 새 코드 발급 후 다시 연결 |
