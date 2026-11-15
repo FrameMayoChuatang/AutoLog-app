@@ -151,7 +151,7 @@ python3 -B scripts/console-session-keeper.py stop
 # 2) 출발
 curl -X PUT "http://127.0.0.1:8088/vehicle/gear?gear=Drive"
 curl -X PUT "http://127.0.0.1:8088/vehicle/odometer?traveled_distance_km=1012"
-# 3) 도착: P로 바꾼 뒤 앱에서 `운행 종료` → 최근 운행의 `운행 확인`으로 목적 선택
+# 3) 도착: P로 바꾼 뒤 앱에서 `운행 종료` → 열린 운행 상세의 `운행 확인`으로 목적 선택
 curl -X PUT "http://127.0.0.1:8088/vehicle/gear?gear=Park"
 ```
 
