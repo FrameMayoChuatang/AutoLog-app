@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import com.framemayo.autolog.data.local.TripPurpose
 import com.framemayo.autolog.data.sync.HoldReason
@@ -47,5 +48,17 @@ class TripSyncStatusNoticeTest {
     @Test fun uploadedMeasurementsStillAskForUnconfirmedPurpose() {
         compose.setContent { AutoLogTheme { TripSyncStatusNotice(TripSyncStatus.Synced, TripPurpose.UNCONFIRMED) } }
         compose.onNodeWithText("목적을 선택해", substring = true).assertIsDisplayed()
+    }
+
+    @Test fun syncIconUsesOneIconPerState() {
+        val status = mutableStateOf<TripSyncStatus>(TripSyncStatus.Synced)
+        compose.setContent { AutoLogTheme { SyncStatusIcon(status.value) } }
+        compose.onNodeWithContentDescription("전송 완료").assertIsDisplayed()
+        compose.runOnIdle { status.value = TripSyncStatus.Waiting }
+        compose.onNodeWithContentDescription("전송 중").assertIsDisplayed()
+        for (unsent in listOf(TripSyncStatus.Held(HoldReason.NO_DRIVER), TripSyncStatus.Failed)) {
+            compose.runOnIdle { status.value = unsent }
+            compose.onNodeWithContentDescription("미전송").assertIsDisplayed()
+        }
     }
 }
