@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +27,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -115,9 +117,15 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
     val parked = v.gear == VehicleGear.GEAR_PARK
     var showVehicle by rememberSaveable { mutableStateOf(false) }
     var showTripDetail by rememberSaveable { mutableStateOf(false) }
-    // 운행을 마친 뒤에도 목적 선택과 기록 확인 화면에 머문다.
+    var selectedTripId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var historyPage by rememberSaveable { mutableIntStateOf(0) }
+    var lastActiveId by rememberSaveable { mutableStateOf<Long?>(null) }
+    // 운행을 마친 뒤에도 기록 화면에 머물고, 방금 끝난 운행의 상세에서 바로 목적을 확인한다.
     LaunchedEffect(state.activeTrip?.id) {
-        if (state.activeTrip != null) showVehicle = true
+        val current = state.activeTrip?.id
+        if (current != null) showVehicle = true
+        else if (lastActiveId != null) selectedTripId = lastActiveId
+        lastActiveId = current
         showTripDetail = false
     }
     if (parked) {
@@ -151,6 +159,22 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
     }
     BackHandler(enabled = active != null) { showTripDetail = false }
     BackHandler(enabled = showVehicle && state.activeTrip == null) { showVehicle = false }
+    val selected = state.recentTrips.find { it.id == selectedTripId }
+    if (selected != null) {
+        BackHandler { selectedTripId = null }
+        val stops by remember(selected.id) { vm.tripStops(selected.id) }.collectAsStateWithLifecycle(emptyList())
+        val energy by produceState(emptyList(), selected.id, selected.endedAt) {
+            value = try { vm.tripEnergy(selected.id) } catch (e: CancellationException) { throw e } catch (_: Exception) { emptyList() }
+        }
+        TripDetailScreen(
+            selected, state, parked, stops, energy,
+            onBack = { selectedTripId = null },
+            onAssign = { vm.assignDriver(selected.id, it) },
+            onPurpose = { purpose, text -> vm.setPurpose(selected.id, purpose, text) },
+            loadPurposes = vm::loadPurposes,
+        )
+        return
+    }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     LazyColumn(
         modifier = Modifier.widthIn(max = 1100.dp).fillMaxSize().safeDrawingPadding().padding(horizontal = 32.dp),
@@ -162,9 +186,6 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
         } else {
             item { VehicleSecondaryButton("← 주행 중 화면으로 돌아가기", { showTripDetail = false }) }
         }
-        item { VehicleStatusCard(v) }
-
-
         if (active != null) {
             item {
                 VehicleSection("운행 중 · ${state.driverName(active.driverId)}") {
@@ -180,16 +201,9 @@ private fun MainScreen(state: MainUiState, vm: MainViewModel, requestLocationPer
                 }
             }
         }
+        item { VehicleStatusCard(v) }
 
-
-        item { Text("최근 운행", Modifier.padding(top = 12.dp), fontSize = VehicleUi.Title, fontWeight = FontWeight.SemiBold) }
-        if (state.recentTrips.isEmpty()) item { Text("아직 운행 기록이 없어요.", fontSize = VehicleUi.Body, color = VehicleUi.Secondary) }
-        items(state.recentTrips, key = { it.id }) { trip ->
-            TripReviewCard(
-                trip, state, parked, { vm.assignDriver(trip.id, it) },
-                { purpose, text -> vm.setPurpose(trip.id, purpose, text) }, vm::loadPurposes,
-            )
-        }
+        recentTrips(state.recentTrips, state, historyPage, { historyPage = it }, { selectedTripId = it.id })
     }
     }
 }

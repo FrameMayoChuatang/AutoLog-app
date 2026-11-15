@@ -13,11 +13,14 @@ import com.framemayo.autolog.data.local.PurposeEntity
 import com.framemayo.autolog.data.remote.PurposeCatalog
 import com.framemayo.autolog.data.local.TripEntity
 import com.framemayo.autolog.data.local.TripPurpose
+import com.framemayo.autolog.data.local.TripStopEntity
+import com.framemayo.autolog.data.local.EnergyEventEntity
 import com.framemayo.autolog.data.sync.SyncScheduler
 import com.framemayo.autolog.data.sync.TripSyncStatus
 import com.framemayo.autolog.data.sync.syncStatus
 import com.framemayo.autolog.service.RecorderState
 import com.framemayo.autolog.service.VehicleSnapshot
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +56,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val trips = app.container.trips
     private val drivers = app.container.drivers
     private val arrival = app.container.arrival
+    private val stops = app.container.stops
+    private val energy = app.container.energy
 
     private suspend fun consentOf(driverId: Long?): Boolean? = driverId?.let { drivers.consentOf(it) }
 
@@ -189,6 +194,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             arrival.recordArrival(ended, consentOf(ended.driverId))
         }
     }
+
+    /** 운행 상세 타임라인용 정차 구간. 운행 중이면 새 정차가 생길 때마다 갱신된다. */
+    fun tripStops(tripId: Long): Flow<List<TripStopEntity>> = stops.observeForTrip(tripId)
+
+    suspend fun tripEnergy(tripId: Long): List<EnergyEventEntity> = energy.forTrip(tripId)
 
     fun assignDriver(tripId: Long, driverId: Long) {
         viewModelScope.launch { trips.setDriver(tripId, driverId) }
