@@ -109,26 +109,60 @@ class DriverSelectionScreenTest {
         org.junit.Assert.assertTrue(compose.onNodeWithContentDescription("운전자 검색 열기").getUnclippedBoundsInRoot().top.value < search.top)
     }
 
-    @Test fun unlinkedVehicleOnlyOffersPairingAfterProfileSelection() {
+    @Test fun unlinkedVehicleShowsOnlyCenteredLinkCard() {
+        val starts = mutableListOf<Long>()
         var opened = 0
-        var started = false
-        compose.setContent { DriverSelectionScreen(profiles, true, false, true, { started = true }, { _, _, _, _, _ -> }, { true }, { opened++ }) }
-        compose.onNodeWithText("차량 연결하기").assertDoesNotExist()
-        compose.onNodeWithText("운행 기록 · 차량").assertDoesNotExist()
-        compose.onNodeWithContentDescription("운전자1 프로필 선택").performClick()
-        compose.onNodeWithText("주행 시작").performClick()
-        compose.onNodeWithText("차량 연결이 필요합니다").assertIsDisplayed()
-        compose.onNodeWithText("차량 연결하기").performClick()
-        compose.onNodeWithText("차량 연결이 필요합니다").assertDoesNotExist()
+        compose.setContent {
+            DriverSelectionScreen(profiles, true, false, true, { starts.add(it) }, { _, _, _, _, _ -> }, { true }, { opened++ },
+                footer = { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.height(240.dp)) { androidx.compose.material3.Text("차량 연결 카드") } })
+        }
+        compose.onNodeWithText("차량 연결 카드").assertIsDisplayed()
+        // 시작할 수 없는 프로필 선택 UI는 미연결 동안 노출하지 않는다.
+        compose.onNodeWithText("운전자의 프로필을 선택하세요.").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자1 프로필 선택").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 검색 열기").assertDoesNotExist()
+        compose.onNodeWithContentDescription("운전자 추가").assertDoesNotExist()
+        compose.onNodeWithText("프로필 관리").assertDoesNotExist()
+        compose.onNodeWithText("최근 운행").assertDoesNotExist()
+        compose.onNodeWithText("더보기").assertDoesNotExist()
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        val card = compose.onNodeWithTag("unlinked-vehicle-link").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertEquals(root.center.x, card.center.x, 2f)
+        assertEquals(root.center.y, card.center.y, 2f)
+        screenshot("unlinked-centered-link-card")
+        assertEquals(emptyList<Long>(), starts)
         assertEquals(0, opened)
-        assertEquals(false, started)
+    }
+
+    @Test fun linkChangeTogglesProfilesAndResetsManagement() {
+        var linked by mutableStateOf(true)
+        compose.setContent {
+            DriverSelectionScreen(profiles, true, linked, true, {}, { _, _, _, _, _ -> }, { true }, {}, footer = { androidx.compose.material3.Text("차량 연결 카드") })
+        }
+        val linkedFooter = compose.onNodeWithText("차량 연결 카드").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithText("프로필 관리").performClick()
+        compose.onNodeWithText("완료").assertIsDisplayed()
+        compose.runOnIdle { linked = false }
+        compose.onNodeWithContentDescription("운전자1 프로필 수정").assertDoesNotExist()
+        compose.onNodeWithText("완료").assertDoesNotExist()
+        compose.onNodeWithTag("unlinked-vehicle-link").assertIsDisplayed()
+        compose.onNodeWithText("차량 연결 카드").assertIsDisplayed()
+        compose.runOnIdle { linked = true }
+        // 다시 연결되면 관리 모드를 이어가지 않고 기존 선택 화면과 아래 연결 카드로 돌아온다.
+        compose.onNodeWithTag("unlinked-vehicle-link").assertDoesNotExist()
+        compose.onNodeWithText("프로필 관리").assertIsDisplayed()
+        compose.onNodeWithContentDescription("운전자1 프로필 선택").assertIsDisplayed()
+        assertEquals(linkedFooter, compose.onNodeWithText("차량 연결 카드").assertIsDisplayed().fetchSemanticsNode().boundsInRoot)
     }
 
     @Test fun vehicleLinkFooterIsShownBelowProfilesAndHiddenWhileManaging() {
         compose.setContent {
-            DriverSelectionScreen(profiles, true, false, true, {}, { _, _, _, _, _ -> }, { true }, {}, footer = { androidx.compose.material3.Text("차량 연결 카드") })
+            DriverSelectionScreen(profiles, true, true, true, {}, { _, _, _, _, _ -> }, { true }, {}, footer = { androidx.compose.material3.Text("차량 연결 카드") })
         }
-        compose.onNodeWithText("차량 연결 카드").assertIsDisplayed()
+        val card = compose.onNodeWithText("차량 연결 카드").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val lastProfile = compose.onNodeWithText("운전자5").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue(card.top > lastProfile.bottom)
+        compose.onNodeWithTag("unlinked-vehicle-link").assertDoesNotExist()
         compose.onNodeWithText("프로필 관리").performClick()
         compose.onNodeWithText("차량 연결 카드").assertDoesNotExist()
     }
@@ -528,15 +562,6 @@ class DriverSelectionScreenTest {
         compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("운전자7 프로필 수정"))
         compose.onNodeWithContentDescription("운전자7 프로필 수정").assertExists()
         compose.onNodeWithContentDescription("운전자6 프로필 수정").assertExists()
-    }
-
-    @Test fun unlinkedVehicleCannotStart() {
-        val starts = mutableListOf<Long>()
-        show(linked = false, onStart = { starts.add(it) })
-        compose.onNodeWithContentDescription("운전자1 프로필 선택").performClick()
-        compose.onNodeWithText("주행 시작").performClick()
-        compose.onNodeWithText("차량 연결이 필요합니다").assertIsDisplayed()
-        assertEquals(emptyList<Long>(), starts)
     }
 
     @Test fun missingOdometerCannotStart() {
