@@ -1,222 +1,67 @@
-# 오토로그 (AutoLog) — 차량용 앱
+# 오토로그 (AutoLog)
 
-법인차량 운행기록 자동 작성 서비스의 Pleos Connect(AAOS) 차량 앱.
+법인 승용차의 운행기록을 차량에서 수집하고, 운전자의 목적 확인과 관리자의 월말 취합을 줄여주는 서비스.
 
-> **한 줄 소개:** 운전자 프로필만 고르면 차량 누적거리·기어로 운행을 자동 기록하고, 주차 후 목적만 고르면 회사 서버로 운행일지가 전송되는 법인차량 운행기록 앱입니다.
+## APK
 
-## 공모전 심사용 실행 안내 (#189)
+[공모전 제출용 APK 다운로드](apk/프레임마요추어탕_오토로그_release.apk)
+
+## 테스트 환경 및 설정
 
 | 항목 | 내용 |
-|---|---|
-| 팀 / 앱 | 프레임마요추어탕 / 오토로그(AutoLog) |
-| APK | [`apk/프레임마요추어탕_오토로그_release.apk`](apk/) (release 빌드, 서명됨) |
-| 에뮬레이터 | Pleos Connect 2.1.0 (Android API 34) AVD |
-| 화면 사양 | 2560×1440, 160dpi (가로) |
-| 필요한 연결 | 에뮬레이터 인터넷(Wi‑Fi `AndroidWifi`), 운영 서버(HTTPS, APK에 포함) |
+| --- | --- |
+| 개발·테스트 에뮬레이터 | Pleos Connect **2.1.0**, Android API **34** |
+| 화면 규격 | **2560 × 1440**, **160 dpi**, 가로 화면 |
+| 네트워크 | 에뮬레이터에서 운영 서버에 접근 가능해야 함 |
+| 차량 연결 | 심사용 영구 페어링 코드: `71242776` |
+| 차량 신호 | Virtual Console 연결 유지, **P 기어**, **0보다 큰 누적거리** 필요 |
 
-1. Pleos Connect AVD를 실행하고 상단 Wi‑Fi 아이콘에 X가 없는지 확인합니다.
-2. APK를 설치·실행합니다. Pleos 에뮬레이터는 앱을 현재 사용자(보통 10)로 실행하므로 `--user`를 붙입니다.
-   ```sh
-   adb install -r --user $(adb shell am get-current-user) "apk/프레임마요추어탕_오토로그_release.apk"
-   adb shell am start --user $(adb shell am get-current-user) -n com.framemayo.autolog/.ui.MainActivity
-   ```
-3. **Virtual Console을 열어 두고 누적거리를 넣습니다.** 현재 Pleos 이미지는 SDK로 누적거리가 제대로 전달되지 않아, 제출 APK는 에뮬레이터 내부 Virtual Console 값을 읽습니다. 콘솔 웹 페이지를 닫으면 연결이 끊겨 앱이 `차량 정보 수신 대기`로 잠깁니다.
-   ```sh
-   adb forward tcp:8088 tcp:8088          # 브라우저로 http://127.0.0.1:8088/ 을 열어 둔다
-   curl -X PUT "http://127.0.0.1:8088/vehicle/gear?gear=Park"
-   curl -X PUT "http://127.0.0.1:8088/vehicle/odometer?traveled_distance_km=1000"
-   ```
-4. 운전자 선택 화면 아래 **차량 연결** 카드에 8자리 페어링 코드를 입력합니다. 코드는 운영 서버 관리자가 발급하며 10분·1회용입니다. 심사용 코드 발급 방법은 제출 메일로 안내합니다.
-5. 프로필 선택 → `주행 시작` → 콘솔에서 기어 `Drive`, 누적거리 증가 → 기어 `Park` → `운행 종료` → 최근 운행의 `운행 확인`에서 목적 선택.
+제출 APK에는 서버 주소가 포함되어 있습니다. 현재 에뮬레이터의 SDK 누적거리 전달 문제로 Virtual Console 누적거리를 사용합니다.
 
-- 주행 중(D)에는 Pleos 주행 제한 정책에 따라 읽기 전용 `운행 현황`만 표시합니다.
-- 누적거리는 줄일 수 없고, 한 번에 100 km 넘게 올리면 몇 초 뒤 반영됩니다.
-- 자세한 시연 절차와 예외 상황: [docs/DEMO_ENVIRONMENT.md](docs/DEMO_ENVIRONMENT.md)
+## 실행 방법
 
-### 제출 APK 다시 만들기
+### 1. APK 설치 및 실행
+
+Pleos Connect AVD를 실행하고 네트워크 연결을 확인한 뒤, 저장소 루트에서 실행합니다.
 
 ```sh
-./gradlew :app:assembleRelease -PconsoleOdometer=true   # .env의 AUTOLOG_SERVER_URL 사용
-cp app/build/outputs/apk/release/app-release.apk "apk/프레임마요추어탕_오토로그_release.apk"
+adb install -r --user $(adb shell am get-current-user) "apk/프레임마요추어탕_오토로그_release.apk"
+adb shell am start --user $(adb shell am get-current-user) -n com.framemayo.autolog/.ui.MainActivity
 ```
 
-- 공모전 심사용이라 release 빌드를 debug 키로 서명합니다. App Market 배포 전에는 전용 키로 바꿉니다.
-- `-PconsoleOdometer=true`가 없는 기본 빌드(debug·release)는 Vehicle SDK 누적거리를 씁니다. release 빌드는 콘솔 접근을 위해 `127.0.0.1`만 평문 HTTP를 허용합니다.
+기존 설치본과 서명이 달라 업데이트가 거절되면 새 AVD에서 설치합니다. 기존 운행기록을 보존하려면 앱 삭제나 데이터 초기화를 하지 않습니다.
 
-## 개발 환경
+### 2. 차량 신호 준비
 
-| 항목 | 버전 |
-|---|---|
-| Android Studio | Koala 이상 |
-| JDK | 17 (Android Studio 내장 JBR) |
-| Gradle / AGP | 8.7 / 8.5.2 |
-| Kotlin | 2.0.21 (Compose, KSP) |
-| compileSdk / minSdk | 34 / 28 |
-| Pleos Vehicle SDK | 2.3.2 |
-| 에뮬레이터 | Pleos Connect v2.1.0+ (API 34) |
-
-## 실행
-
-1. Android Studio → Open → 이 폴더 → Gradle Sync
-2. Pleos Connect AVD 실행 → ▶ Run
-3. Virtual Console: `adb forward tcp:8088 tcp:8088` → http://127.0.0.1:8088/
-   - Motion → 기어 / Odometer (누적거리는 줄일 수 없음, 현재값보다 크게)
-4. 테스트: `./gradlew test`
-5. 서버와 함께 시연 환경을 띄우는 방법: [docs/DEMO_ENVIRONMENT.md](docs/DEMO_ENVIRONMENT.md)
-
-## 서버 주소 로컬 설정
-
-저장소 루트의 `.env`에 `AUTOLOG_SERVER_URL`을 설정한다. 이 파일과 `.env.*`는 Git에서 제외되며 실제 배포 주소는 커밋·이슈·PR에 작성하지 않는다.
-
-```dotenv
-AUTOLOG_SERVER_URL=https://<서버호스트>
+```sh
+adb forward tcp:8088 tcp:8088
 ```
 
-한 줄 URL 값에 작은따옴표·큰따옴표, 선택적인 `export`, 공백 뒤 `#` 주석을 사용할 수 있다. 인용부호 안의 `#`은 URL의 일부로 보존한다. 변수 치환·이스케이프·여러 줄 값은 지원하지 않는다.
+브라우저에서 `http://127.0.0.1:8088/`을 **열어 둔 상태로**, 별도 터미널에서 초기값을 설정합니다. 기존 기록이 있다면 누적거리는 기존 값 이상으로 설정합니다.
 
-우선순위는 `-PserverUrl` → 실행 환경의 `AUTOLOG_SERVER_URL` → `.env` → 기존 로컬 서버 기본값이다. 주소 변경 후 APK를 다시 빌드해야 하며, 다른 서버로 전환하면 해당 서버의 새 차량 페어링 코드를 사용한다. 생성된 APK에도 설정 주소가 포함된다. 저장소에는 공모전 제출용 `apk/*_release.apk`만 올린다(#189).
-
-## 구조
-
-```
-app/src/main/java/com/framemayo/autolog
-├─ AutoLogApp.kt            # Application + 수동 DI(AppContainer)
-├─ vehicle/                 # Pleos SDK는 여기서만 호출
-│  ├─ VehicleDataSource.kt  # 누적거리·기어 Flow
-│  ├─ OdometerValidator.kt  # 0·감소값 무시 (P0)
-│  ├─ MotionTracker.kt      # 주행/신호대기/주차 판단, 중간 정차·종료 후보·장시간 주차 자동 종료
-│  ├─ AutoTripStarter.kt    # 이동 감지 자동 시작 판단
-│  └─ EnergyEventDetector.kt # 주유·충전 감지
-├─ data/
-│  ├─ local/                # Room: drivers, trips
-│  └─ repository/           # TripRepository(시작·1초 저장·종료·복구), DriverRepository
-├─ service/
-│  ├─ TripRecorderService.kt # 포그라운드 서비스: 수집 + 1초 저장 + 복구 + 정차·자동 시작·주유 감지
-│  ├─ TripRecovery.kt        # 강제 종료 운행 재개/실측 완료/INTERRUPTED 판단
-│  ├─ CollectorSupervisor.kt # SDK 초기화·구독 지수 백오프 재시도
-│  ├─ AutoTripController.kt  # 자동 시작 운행 생성
-│  ├─ BootReceiver.kt        # 부팅 시 서비스 자동 시작
-│  └─ RecorderState.kt       # 실시간 차량 상태 StateFlow
-└─ ui/                      # Compose 운전자 선택 화면 + 기존 차량·기록 화면
+```sh
+curl -X PUT "http://127.0.0.1:8088/vehicle/gear?gear=Park"
+curl -X PUT "http://127.0.0.1:8088/vehicle/odometer?traveled_distance_km=1000"
 ```
 
-## 설계 원칙 (에뮬레이터 검증 결과 반영)
+### 3. 운행 시연
 
-- 운행 거리 = 종료 누적거리 − 시작 누적거리 (Trip API 미지원)
-- 운행 시간 = 앱이 기록한 시작·종료 시각 (epoch ms 저장, 표시·출력은 KST)
-- 주행 중 앱 화면은 차단됨 → 시작·종료·목적 선택은 P에서만
-- 부팅 시 기록 서비스 자동 시작, 화면 자동 실행은 불가
-- 프로세스가 죽으면 종료 이벤트가 없음 → 1초마다 저장, 다음 실행 시 복구
+1. 차량이 연결되지 않은 상태에서는 화면 가운데 **차량 연결** 카드만 표시됩니다. 이 카드에 심사용 영구 페어링 코드 `71242776`을 입력합니다.
+2. 프로필 선택 → **주행 시작**을 누릅니다.
+3. Virtual Console에서 기어를 **Drive**로 바꾸고 누적거리를 증가시킵니다.
+4. 기어를 **Park**로 바꾼 뒤 앱에서 **운행 종료**를 누릅니다.
+5. 운행을 종료하면 바로 열리는 운행 상세의 **운행 확인**에서 목적을 저장하고 전송 상태를 확인합니다. 지난 운행은 **최근 운행**에서 카드나 행을 눌러 상세로 들어갑니다.
 
-## 수집·복구 (앱 A)
+주행 중에는 읽기 전용 운행 현황을 표시합니다. 주차만으로 운행이 자동 종료되지는 않습니다.
 
-| 상황 | 동작 |
-|---|---|
-| 서비스 재시작, 마지막 저장 10분 이내 + 유효 누적거리 | 같은 운행 이어서 기록 (ACTIVE 유지) |
-| 재시작 시 누적거리가 마지막 저장값과 같음(±0.05km) | 마지막 저장 시각·누적거리로 COMPLETED(`endedBy = RECOVERED`) |
-| 누적거리를 못 읽음 | INTERRUPTED, 첫 유효 누적거리가 마지막 저장값과 같으면 늦게 COMPLETED |
-| 정지 중 차가 움직였음 | INTERRUPTED 유지. 종료값을 추정하지 않음 (서버 계약) |
-| SDK 초기화·구독 실패 | 1초부터 두 배씩 최대 30초 간격으로 재시도, 재구독 직후 누적거리 1회 조회. `RecorderState.collector`로 상태 노출 |
-| 기어 P | 주차(PARKED). 운행 중이면 `trip_stops`에 정차 구간 기록, 같은 운행 유지 |
-| P가 아니고 누적거리 45초 무변화 | 신호 대기(IDLE). 상태만 노출 |
-| 운행 중 주차 5분 | `RecorderState.endCandidate = true` (종료 안내용) |
-| 운행 중 오래 주차 | 자동 종료하지 않음. 기능 명세(정차 판단: 자동 종료 판단 아님)대로 운행은 종료 버튼으로만 끝남 |
-| 운행 없음 + P 아님 + 누적거리 0.05km 이상 증가 | 운전자 미지정 운행 자동 시작 (`startedBy = AUTO`), 시작값은 움직이기 전 기준 누적거리 |
-| 정차 중 연료량 5%p 이상 증가 | 주유(REFUEL) 1건, 주유량·금액 추정 |
-| 정차 중 배터리 3%p 이상 증가 또는 충전구 열림 중 증가 | 충전(CHARGE) 세션 1건, kWh·금액 추정 |
+## 소스 빌드
 
-- 운행 시작·종료 시 연료량·배터리 잔량을 저장하고 `EnergyRepository.tripCost`로 운행별 사용량과 비용을 추정합니다. 단가·탱크 용량 기본값(`EnergyPricing`)은 추정용이며 서버로 전송하지 않습니다.
-- 정차 구간·주유/충전 이벤트·자동 시작/종료 방식은 차량 로컬 정보입니다. 서버 전송 계약은 바뀌지 않습니다.
-- Room DB v12에서 위 열과 `trip_stops`, `energy_events` 테이블을 추가합니다.
-
-## 운전자 선택 UI
-
-- 웹 미리보기에서 확정한 검은 배경과 원본 구름 캐릭터를 Compose로 이식했습니다. 로고·부서·최근 운전자 배지·별도 시작 버튼은 표시하지 않습니다.
-- 프로필을 누르면 운행 시작 확인창이 열리고, `주행 시작`을 누르면 기존 위치 동의 흐름으로 진입합니다. `P` 기어, 차량 연결, 유효한 누적거리가 확인되어야 시작할 수 있습니다. 연결 전에는 안내창의 `차량 상태 확인`으로 기존 페어링 화면에 접근합니다.
-- 운전자 선택 화면에서는 프로필 선택으로 운행을 시작하며, 나중에 선택하는 버튼은 제공하지 않습니다. 기존 운전자 미지정 기록의 운전자 지정 기능은 유지합니다.
-- 프로필 생성에 부서 입력은 제공하지 않습니다. 새 로컬 운전자는 기존 동기화 규칙에 따라 미지정 부서로 등록하며, 이름만으로 기존 서버 운전자를 자동 연결하지 않습니다.
-- 상단에는 운행 시각 기준 최근 운전자 최대 5명과 추가 버튼을 표시합니다. 동일 운전자의 여러 운행은 중복되지 않습니다. 운행 이력이 없는 운전자는 생성 시각 순서로 배치합니다.
-- 나머지 프로필은 기본적으로 숨기고 최근 프로필 아래 `더보기`를 누르면 펼칩니다. 펼치면 `더보기` 버튼은 사라지고 추가 프로필만 표시합니다. 운전자가 5명 이하이면 버튼을 표시하지 않습니다. 검색 모달은 펼침 여부와 관계없이 전체 운전자를 검색합니다.
-- 프로필 선택 안내 문구 위 중앙 검색바를 누르면 검색 모달이 열리고, 전체 운전자의 이름 검색 결과는 모달 안에서만 표시합니다. 메인 화면의 최근 5명과 나머지 운전자 목록은 검색어에 영향을 받지 않습니다. 모달을 닫거나 결과를 선택하면 검색어를 비우며, 키보드만 닫을 때는 유지합니다.
-- 왼쪽 위 `프로필 관리`에서 제목이 변경되고 각 카드에 수정/삭제 버튼이 나타납니다. 삭제는 확인창을 거치며 진행 중인 운전자는 삭제할 수 없습니다.
-- `프로필 생성`/`프로필 수정` 모달은 가로 배치에서 최대 1,200×600dp로 표시하고 작은 화면에서는 영역 안에 맞춥니다. 이름을 실시간 미리보기하고 7가지 원형 색상과 7가지 표정(기본·미소·윙크·버럭·찡긋·빙글·느긋)을 각각 선택할 수 있습니다. 캐릭터 프리셋은 첨부 원본의 색상·표정 조합이며, 둘 중 하나라도 바꾸면 일치하지 않는 프리셋의 선택 표시를 해제합니다. 색상·표정·캐릭터 선택지는 각각 한 줄로 가로 스크롤하며 줄바꿈하지 않습니다. 왼쪽 편집 영역만 세로 스크롤하고, 좁은 화면에서는 편집 영역과 미리보기를 위아래로 배치합니다.
-- 모든 표정은 같은 몸체 위에 눈·눈썹 레이어만 교체하므로 몸체의 색상·크기·위치는 유지됩니다. 표정 버튼은 연한 색상 배경에 눈만 표시합니다. 기본·윙크·버럭 표정은 열린 눈과 반사광을 함께 깜박이며 포인터 추적은 없습니다. 나머지 표정은 특유의 눈 모양을 보존하도록 정적으로 표시합니다. 깜박임은 편집 모달이 전면에 있을 때만 실행합니다. API 33 이상 하드웨어 캔버스에서 색상·깜박임을 지원하며, API 28–32와 소프트웨어 캔버스에서는 공통 하늘색 몸체와 선택한 눈을 정적으로 표시합니다.
-- [Pleos 주행 제한 개발 가이드](https://document.pleos.ai/docs/pleos-only/vehicle-app-developer-guide/driving-restriction-development-guide)에 따라 `CarUxRestrictionsManager`를 구독합니다. 현재 v2.1 에뮬레이터는 표준 API를 `android.car-module.jar` 부팅 모듈로 제공합니다. P 기어·차량 수집 정상·플랫폼 제한 해제가 모두 확인될 때만 검색과 편집을 허용합니다. 제한 활성화 또는 상태 미확인 시 모달·키보드를 닫고 읽기 전용 운행 현황으로 전환합니다. Activity의 DO 선언은 이 화면 제한과 함께 적용합니다.
-- 주행 현황은 진행 중인 기록의 거리·시간을 표시합니다. 활성 기록이 없거나 차량 데이터가 준비되지 않으면 대기 상태를 표시하며 이 화면에서 운행을 새로 생성하지 않습니다. 자동 기록·저장·서버 전송은 기존 기록 서비스가 담당합니다.
-
-- 목록 이미지는 화면 밀도에 따라 1/2 또는 1/4 크기로 디코딩하며 편집 미리보기는 원본 해상도를 유지합니다. 공통 몸체와 원본에서 분리한 투명 눈 레이어는 백그라운드에서 로딩하고 해상도별 최대 24MB 캐시로 공유합니다. 캐시에서 제거된 이미지도 현재 표시 중일 수 있으므로 강제로 recycle하지 않습니다.
-
-### 로컬 프로필 설정과 서버 연동
-
-- Room DB v11은 v10 통합 구조에 선택한 업무 목적 문구(`trips.purposeText`)를 추가합니다. v10은 main과 프로필 시제품의 v8/v9 구조를 통합합니다. 기존 운전자·동의·운행·프로필 색상과 표정을 보존하고 누락된 열과 테이블만 추가합니다.
-- 프로필 삭제는 `hidden` 상태로 목록에서 제외합니다. 서버 ID와 기존 운행 기록은 보존되며, 서버 운전자 목록을 다시 받아도 로컬 설정은 유지합니다. 현재 프로필 설정의 서버 업로드는 구현하지 않았습니다.
-- 이후 서버가 프로필 설정을 관리하면 설정을 서버로 이전한 뒤 조회/저장 경로를 교체하고, 별도 마이그레이션에서 `driver_profiles`만 제거할 수 있습니다. 앱 DB 전체 초기화는 운행 기록을 잃으므로 사용하지 않습니다.
-- 미리보기 브라우저의 샘플 프로필은 앱 DB로 복사하지 않습니다. 앱에 기존 저장된 운전자와 새로 생성한 프로필을 사용합니다.
-
-### 운행 확인과 업무 목적
-
-- 최근 운행은 최근 3건을 요약 카드로, 나머지를 5건씩 페이지로 나눈 `이전 운행` 목록으로 보여 줍니다. 카드나 행을 누르면 운행 상세로 들어갑니다.
-- 운행 상세는 거리·시간·목적 요약, 전송 상태, 출발 → 주행 → 정차·충전 → 도착 타임라인을 보여 줍니다. 경로 좌표는 기록하지 않으므로 지도는 표시하지 않습니다.
-- 운행을 종료하면 그 운행의 상세가 바로 열리고, `운행 확인`에서 목적을 선택합니다. 확정 후에도 `확인 및 수정`으로 목적을 바꿀 수 있습니다.
-- 업무 목적은 최대 200자로 직접 입력하거나 회사의 활성 목적 목록에서 선택합니다. 목록 조회가 실패해도 직접 입력과 로컬 저장은 가능합니다.
-- 선택한 문구는 메모와 분리해 저장하고 서버 확인 요청의 `purposeText`로 전달합니다. 기존 업무 기록의 목적 문구가 비어 있으면 `일반 업무`로 해석합니다. 개인·출퇴근으로 변경하면 업무 목적 문구만 비우고 메모는 유지합니다.
-- 운전자 없는 기록은 검색을 통해 운전자를 지정하며 지정 전 확인창을 거칩니다. 지정된 운전자는 차량에서 교체할 수 없습니다.
-- 전송 상태는 완료·대기·보류·실패로 표시하고 보류 이유와 다음 조치를 안내합니다. 목적 미확인 기록은 측정값이 전송됐어도 목적 선택 안내를 유지합니다.
-
-### 검증
-
-- 전체 단위 테스트: `./gradlew :app:testDebugUnitTest`
-- APK 빌드: `./gradlew :app:assembleDebug`
-- UI 테스트: `./gradlew :app:testDebugUnitTest --tests 'com.framemayo.autolog.ui.DriverSelectionScreenTest'`
-- DB 마이그레이션/프로필 설정/서버 목록 갱신 후 보존, 삭제 시 운행 보존과 진행 중 삭제 차단을 검증합니다.
-- UI 테스트는 Robolectric SDK 35에서 실행합니다. SDK 34 테스트 엔진은 실제 API 34와 달리 이전 Skia를 사용해 child RuntimeShader를 지원하지 않습니다. 테스트 이미지 `app/build/reports/driver-selection/`는 소프트웨어 캔버스 기반 배치 확인용이며 색상·깜박임의 GPU 출력 검증을 대신하지 않습니다.
-
-### Pleos 에뮬레이터 누적거리 개발 옵션 (#115)
-
-현재 Pleos 이미지에서 Virtual Console/DDS의 누적거리와 VHAL `PERF_ODOMETER` 값이 다르게 전달되는 문제가 확인됐습니다. 해당 환경에서만 다음 옵션으로 APK를 빌드합니다.
+JDK **17**, Android SDK **34**가 필요합니다. 루트 `.env`에 `AUTOLOG_SERVER_URL=https://<서버호스트>`를 설정한 뒤 빌드합니다.
 
 ```sh
 ./gradlew :app:assembleDebug -PconsoleOdometer=true
 ```
 
-- 이 옵션을 명시한 APK는 에뮬레이터 내부 `http://127.0.0.1:8088/vehicle/state`의 `odometer.traveled_distance_km`을 1초 간격으로 읽습니다. 호스트 서버 주소인 `10.0.2.2:8080`과 별개입니다.
-- `bridge_ready`와 `emulator_active`가 모두 true인 숫자 값만 사용합니다. HTTP/응답 오류는 기존 수집기 재시도로 전달하며 이전 값 재사용·거리 추정·SDK 자동 전환을 하지 않습니다. 진행 중인 HTTP 호출의 연결/읽기 제한 시간은 각각 1.5초입니다.
-- 초기 1회 조회 실패는 null로 처리하여 다음 유효값을 기다립니다. 0 km 및 감소한 값에 대한 기존 운행 수집기 검증은 유지합니다.
-- 이 옵션 없이 빌드한 debug·release는 기존 Vehicle SDK를 사용합니다. 공모전 제출 APK는 release 빌드에 이 옵션을 켭니다(#189). 기어 등 다른 차량 신호도 기존 SDK를 유지합니다.
-- 서로 다른 누적거리 기준을 가진 APK로 **진행 중인 운행을 이어서 테스트하지 않습니다**. 먼저 운행을 종료하고, 콘솔 거리를 기존 기록과 일관된 값으로 설정한 뒤 시작합니다. DB와 기존 운행 기록은 자동 초기화하지 않습니다.
-- 벤더 이미지의 전달 문제가 해결되면 옵션을 끄고 콘솔 어댑터를 제거합니다. 이 옵션은 실차 배포용 해결책이 아닙니다.
+생성 APK: `app/build/outputs/apk/debug/app-debug.apk`
 
-## 브랜치 / 커밋
-
-- `main`: 시연 가능한 상태 유지
-- 기능 브랜치: `feat/<기능>`, 버그: `fix/<내용>`
-- 커밋: `feat: 운행 종료 시 목적 선택 추가` 형식
-
-## TODO
-
-- [ ] 운전자 선택 알림 (알림 센터 버튼) — `autoLog_test`의 DriverPrompt 이식
-- [ ] 정차 후보 시 종료 안내 (앱 A는 `RecorderState.endCandidate` 제공, 안내 UI는 앱 B)
-- [ ] 서버 동기화 (오프라인 대기열)
-- [x] CarUxRestrictions 연동 및 주행 중 읽기 전용 운행 현황 (실차·지역별 검증은 별도)
-- [ ] 국세청 운행기록부 출력은 서버/웹에서
-
-### 공통 캐릭터 몸체 이미지
-
-- `app/src/main/res/drawable-nodpi/driver_cloud_body.png`는 사용자가 제공한 하늘색 원본을 built-in imagegen의 편집 모드로 처리한 이미지입니다. 표정별 원본 몸체의 크기·색상 차이를 없애기 위해 눈만 제거한 공통 몸체를 사용합니다. 눈과 눈썹은 제공된 각 표정 원본에서 실행 중 분리하며 흰 반사광을 보존합니다.
-- 편집 프롬프트: `Remove only the two brown oval eyes and their white highlights and shadows. Reconstruct seamless blue material beneath them. Preserve the exact original silhouette, framing, position, size, blue color, texture, lighting, white backdrop and four white cheek marks. No eyes, eyebrows, mouth, text or new objects.`
-
-### 개발용 가속 조작과 모의 거리 연결 (#119)
-
-콘솔 탭을 닫아도 차량 신호 연결을 유지하려면 별도 터미널에서 `python3 -B scripts/console-session-keeper.py`를 실행합니다. `status`로 실행 여부, `stop`으로 종료를 요청할 수 있습니다. 백그라운드 실행·재연결 절차는 [시연 환경 안내](docs/DEMO_ENVIRONMENT.md#5-누적거리와-기어-virtual-console)를 참고하세요. 이 스크립트는 연결만 유지하며 아래 모의 거리 생성기와 별개입니다.
-
-Virtual Console의 가속/브레이크는 속도와 누적거리를 따로 관리합니다. 에뮬레이터 시연에서 가속에 따라 거리가 증가하게 하려면 콘솔 거리 옵션으로 빌드한 앱과 함께 아래 스크립트를 실행합니다. macOS/Linux의 Python 3 표준 라이브러리만 사용합니다.
-
-```sh
-adb forward tcp:8088 tcp:8088
-python3 scripts/console-driving-simulator.py
-```
-
-- 콘솔의 D/R 및 가속/브레이크 조작으로 바뀌는 속도를 0.5초마다 관측해 모의 누적거리로 발행합니다. 실측 주행거리 검증을 대신하지 않습니다.
-- P, 연결 실패, 3초를 넘는 관측 공백에서는 적산하지 않습니다. 재연결 첫 관측과 감지된 수동 누적거리 변경은 새 기준점으로 사용합니다. 서버 API에 조건부 쓰기가 없어 읽기와 발행 사이의 수동 조작까지 원자적으로 보호할 수는 없으므로 실행 중 누적거리 수동 편집은 피합니다.
-- 중복 실행은 호스트 사용자별 잠금으로 막습니다. Ctrl+C로 종료하며 앱·콘솔 재시작 후에는 다시 실행해야 합니다. 종료해도 기어·속도·기록을 변경하지 않습니다.
-- 검증: `python3 -B -m unittest discover -s scripts -p 'test_*.py'`
+[상세 실행·문제 해결](docs/DEMO_ENVIRONMENT.md) · [상세 개발 안내](docs/DEVELOPMENT_NOTES.md)

@@ -6,6 +6,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -58,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -127,8 +130,8 @@ internal fun DriverSelectionScreen(
     val haptic = LocalHapticFeedback.current
     val recent = profiles.take(5)
     val others = profiles.drop(5)
-    LaunchedEffect(parked, inputEnabled) {
-        if (!parked || !inputEnabled) {
+    LaunchedEffect(parked, inputEnabled, linked) {
+        if (!parked || !inputEnabled || !linked) {
             searching = false; editing = false; deletingId = null; selectedId = null
             blocked = false; managing = false; showingMore = false; query = ""; keyboard?.hide()
         }
@@ -152,6 +155,13 @@ internal fun DriverSelectionScreen(
                     Text("주차 후 이용해 주세요", fontSize = 30.sp)
                     Text("차량 상태가 확인되면 선택할 수 있어요.", fontSize = 20.sp, color = SelectionColors.onSurfaceVariant)
                 }
+            } else if (!linked) Box(
+                // 미연결이면 시작할 수 없는 프로필 UI를 숨기고 연결 카드만 화면 중앙에 둔다.
+                Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 32.dp)
+                    .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.widthIn(max = 960.dp).fillMaxWidth().padding(vertical = 24.dp).testTag("unlinked-vehicle-link")) { footer() }
             } else BoxWithConstraints(Modifier.fillMaxSize()
                 .then(if (searching) Modifier.systemBarsPadding().displayCutoutPadding() else Modifier.safeDrawingPadding().imePadding())
                 .padding(horizontal = 32.dp)) {
